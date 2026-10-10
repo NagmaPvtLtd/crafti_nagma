@@ -438,3 +438,11 @@ CREATE TABLE audit_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE
     SET NULL
 );
+-- ===========================================================
+-- Settings Toggle
+-- ===========================================================
+CREATE TABLE setting_toggle (
+    field_name VARCHAR(100) NOT NULL PRIMARY KEY,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    save_in_redis BOOLEAN NOT NULL DEFAULT TRUE
+);

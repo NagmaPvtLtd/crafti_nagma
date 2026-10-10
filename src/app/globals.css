@@ -24,3 +24,33 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==========================================================================
+ * Transparent scrollbars — scroll still works, bar is invisible.
+ * Applies to every element (html, body, divs, dropdowns, drawers, etc.)
+ * ========================================================================== */
+
+/* Firefox + modern standards */
+* {
+  scrollbar-width: none;
+}
+
+/* IE / legacy Edge */
+* {
+  -ms-overflow-style: none;
+}
+
+/* Chrome / Safari / Chromium */
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+}
