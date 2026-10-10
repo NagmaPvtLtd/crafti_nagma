@@ -1,17 +1,26 @@
-import { RowDataPacket } from "mysql2";
-import { JWT } from "next-auth/jwt";
+import type { JWT } from "next-auth/jwt";
+import type { UserRole, UserStatus } from "./UserRow.types";
 
-export interface MyJWT extends JWT, RowDataPacket {
+export type MyJWT = JWT & {
   id?: string;
   name?: string;
   email?: string;
   image?: string | null;
-  is_admin?: boolean;
-}
+  role?: UserRole;
+  status?: UserStatus;
+  profile_completed?: boolean;
+};
 
-export interface SessionUserClient {
+/**
+ * Client-safe subset of the session user, useful for passing into
+ * `AppShell` and other client components.
+ */
+export type SessionUserClient = {
+  id: string;
   name: string;
   email: string;
   image: string | null;
-  is_admin: boolean;
-}
+  role: UserRole;
+  status: UserStatus;
+  profile_completed: boolean;
+};
