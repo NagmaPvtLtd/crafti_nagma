@@ -1,7 +1,7 @@
 const MAXMIND_ACCOUNT_ID = process.env.MAXMIND_ACCOUNT_ID;
 const MAXMIND_LICENSE_KEY = process.env.MAXMIND_LICENSE_KEY;
 
-const MAXMIND_BASE = "https://geoip.maxmind.com/geoip/v2.1";
+const MAXMIND_BASE = "https://geolite.info/geoip/v2.1";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -52,7 +52,7 @@ async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
   ).toString("base64");
 
   try {
-    const res = await fetch(`${MAXMIND_BASE}/city/${ip}`, {
+    const res = await fetch(`${MAXMIND_BASE}/country/${ip}`, {
       headers: {
         Authorization: `Basic ${auth}`,
         Accept: "application/json",
@@ -67,7 +67,8 @@ async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
     }
 
     if (!res.ok) {
-      console.warn(`[geo] MaxMind lookup failed: HTTP ${res.status}`);
+      const body = await res.text();
+      console.warn(`[geo] MaxMind lookup failed: HTTP ${res.status} ${body}`);
       return null;
     }
 
