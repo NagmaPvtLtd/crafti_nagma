@@ -14,27 +14,44 @@ export class AuditLogService {
   ): Promise<string | null> {
     const {
       userId = null,
-      accountId = null,
       action,
       entityType,
+      entityId = null,
       description,
+      metadata = null,
       id = randomUUID(),
       createdAt,
     } = input;
 
     const useExplicitTimestamp = createdAt instanceof Date;
 
+    const metadataJson =
+      metadata === null || metadata === undefined
+        ? null
+        : JSON.stringify(metadata);
+
     const sql = useExplicitTimestamp
       ? `INSERT INTO audit_logs
-           (id, user_id, account_id, action, entity_type, description, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+           (id, user_id, action, entity_type, entity_id,
+            description, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       : `INSERT INTO audit_logs
-           (id, user_id, account_id, action, entity_type, description)
-         VALUES (?, ?, ?, ?, ?, ?)`;
+           (id, user_id, action, entity_type, entity_id,
+            description, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
     const params = useExplicitTimestamp
-      ? [id, userId, accountId, action, entityType, description, createdAt]
-      : [id, userId, accountId, action, entityType, description];
+      ? [
+          id,
+          userId,
+          action,
+          entityType,
+          entityId,
+          description,
+          metadataJson,
+          createdAt,
+        ]
+      : [id, userId, action, entityType, entityId, description, metadataJson];
 
     try {
       const [result] = await db.execute<ResultSetHeader>(sql, params);
@@ -43,8 +60,8 @@ export class AuditLogService {
       console.error("[AuditLogService.log] failed to write audit log:", err, {
         action,
         entityType,
+        entityId,
         userId,
-        accountId,
       });
       if (opts.throwOnError) throw err;
       return null;

@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+
+import { websiteLink } from "../utils/main.util";
+
+import HomePageHeartbeat from "../hooks/Heartbeat.hook";
+import CustomLoader from "./(components)/CustomLoader";
+import Navbar from "./(components)/Navbar/Navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,34 +22,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = "https://discordbotcardsellingmanager.vercel.app";
-
 const siteDescription =
-  "A manual organization system for Discord in-game bot cards. Keep your card collection tidy, track what you owe, and manage your cards for selling — all in one clean, easy-to-use dashboard.";
+  "Shop handmade crochet gifts, embroidery hoops, and custom decor. Made with love by Crafti Nagma 💛";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(websiteLink),
   title: {
-    default: "Discord Bot Card Selling Manager",
-    template: "%s | Discord Bot Card Selling Manager",
+    default: "Crafti Nagma — Handmade Crochet & Embroidery",
+    template: "%s | Crafti Nagma",
   },
   description: siteDescription,
   keywords: [
-    "Discord bot cards",
-    "in-game cards",
-    "card collection manager",
-    "card organizer",
-    "Discord card selling",
-    "card inventory tracker",
-    "manual card organization",
-    "Discord trading cards",
+    "handmade crochet",
+    "embroidery hoops",
+    "custom decor",
+    "crochet gifts",
+    "handmade gifts",
+    "Crafti Nagma",
+    "crochet India",
+    "embroidery art",
   ],
-  authors: [
-    { name: "www.itsmeprince.com", url: "https://www.itsmeprince.com" },
-  ],
-  creator: "www.itsmeprince.com",
-  publisher: "www.itsmeprince.com",
-  applicationName: "Discord Bot Card Selling Manager",
+  authors: [{ name: "Crafti Nagma", url: websiteLink }],
+  creator: "Crafti Nagma",
+  publisher: "Crafti Nagma",
+  applicationName: "Crafti Nagma",
   robots: {
     index: true,
     follow: true,
@@ -58,26 +61,41 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: siteUrl,
-    siteName: "Discord Bot Card Selling Manager",
-    title: "Discord Bot Card Selling Manager",
+    url: websiteLink,
+    siteName: "Crafti Nagma",
+    title: "Crafti Nagma — Handmade Crochet & Embroidery",
     description: siteDescription,
+    images: [
+      {
+        url: "/assets/avatar_v1.png",
+        width: 1200,
+        height: 630,
+        alt: "Crafti Nagma Logo",
+      },
+    ],
   },
   twitter: {
     card: "summary",
-    title: "Discord Bot Card Selling Manager",
+    title: "Crafti Nagma — Handmade Crochet & Embroidery",
     description: siteDescription,
+  },
+  icons: {
+    icon: "/assets/avatar_v1.png",
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        {children}
+        <Suspense fallback={<CustomLoader label="Loading ..." />}>
+          <Navbar />
+          <HomePageHeartbeat />
+          {children}
+        </Suspense>
 
         <Analytics />
         <SpeedInsights />
