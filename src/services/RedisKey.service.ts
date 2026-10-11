@@ -18,4 +18,13 @@ export class RedisKeyService {
       redis_ttl: ONE_HOUR,
     };
   }
+
+  static settingsKey(): { redis_key: string; redis_ttl: number } {
+    const env = getProduction();
+    const dbName = getDBName();
+    return {
+      redis_key: `${dbName}:setting_toggle_cache:${env}`,
+      redis_ttl: ONE_HOUR * 24,
+    };
+  }
 }
