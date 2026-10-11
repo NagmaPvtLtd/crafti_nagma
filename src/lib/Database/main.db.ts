@@ -1,3 +1,4 @@
+import { Pool } from "mysql2/promise";
 import { getProduction } from "../../utils/ValueFetcher/getProduction.util";
 import { getDbPool, initializeDatabase } from "./init.db";
 
@@ -29,4 +30,13 @@ export async function initServer() {
  */
 export function db() {
   return getDbPool();
+}
+
+export async function getPool(): Promise<Pool> {
+  let pool: Pool | null = null;
+  if (!pool) {
+    await initServer();
+    pool = db();
+  }
+  return pool;
 }

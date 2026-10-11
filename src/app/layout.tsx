@@ -1,18 +1,14 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
-import { getServerSession } from "next-auth";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { websiteLink } from "../utils/main.util";
-import { authOptions } from "./api/auth/[...nextauth]/route";
 
 import HomePageHeartbeat from "../hooks/Heartbeat.hook";
-import { SessionUserClient } from "../types/User/JWT.types";
-import AppShell from "./(components)/AppShell/AppShell";
 import CustomLoader from "./(components)/CustomLoader";
 import Navbar from "./(components)/Navbar/Navbar";
 
@@ -89,33 +85,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const session = await getServerSession(authOptions);
-
-  const user: SessionUserClient | null = session?.user
-    ? {
-        id: session.user.id ?? "",
-        name: session.user.name ?? "",
-        email: session.user.email ?? "",
-        image: session.user.image ?? null,
-        role: session.user.role ?? "customer",
-        status: session.user.status ?? "active",
-        profile_completed: Boolean(session.user.profile_completed),
-      }
-    : null;
-
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppShell user={user}>
-          <Suspense fallback={<CustomLoader label="Loading ..." />}>
-            <Navbar />
-            <HomePageHeartbeat />
-            {children}
-          </Suspense>
-        </AppShell>
+        <Suspense fallback={<CustomLoader label="Loading ..." />}>
+          <Navbar />
+          <HomePageHeartbeat />
+          {children}
+        </Suspense>
 
         <Analytics />
         <SpeedInsights />

@@ -1,145 +1,235 @@
 import type {
   DbExecutor,
+  SettingPatch,
   SettingResult,
   SettingRow,
 } from "../types/Setting/setting.types";
 import { getRedis } from "../lib/Redis/redis.config";
+import { getDBName } from "../utils/ValueFetcher/getDBName.util";
 
 /* =============================================================================
  * SettingService — feature toggles
  * =============================================================================
  * Table: setting_toggle (field_name, active, save_in_redis)
  *
- *   isActive()      → check if a toggle is ON
- *   setActive()     → turn a toggle ON / OFF
- *   setSaveInRedis()→ turn Redis caching ON / OFF for a toggle
+ * Every Redis-cached setting lives in ONE object under a single key,
+ * namespaced by database name so dev/staging/prod never collide:
  *
- * Read flow:  Redis → MySQL → cache if save_in_redis = TRUE
- * Write flow: UPDATE MySQL → invalidate Redis key
+ *     `${getDbName()}:setting_toggle:cache`  →  { [field_name]: SettingResult }
+ *
+ * Only fields with `save_in_redis = TRUE` are stored in that map.
+ *
+ * Public API:
+ *   isActive(db, field_name)                    → boolean
+ *   create(db, field_name, active, saveInRedis) → SettingResult
+ *   update(db, original, patch)                 → SettingResult | null
+ *   remove(db, field_name)                      → boolean
+ *   setActive(db, field_name, bool)             → boolean
+ *   setSaveInRedis(db, field_name, bool)        → boolean
  * ========================================================================== */
 
-const CACHE_PREFIX = "setting_toggle:";
-const CACHE_TTL_SECONDS = 60 * 60; // 1 hour
+const CACHE_TTL_SECONDS = 60 * 60;
+const CACHE_SUFFIX = "setting_toggle:cache";
+
+function cacheKey(): string {
+  return `${getDBName()}:${CACHE_SUFFIX}`;
+}
+
+type SettingMap = Record<string, SettingResult>;
 
 export class SettingService {
-  /**
-   * Check if a toggle is ON.
-   * Missing field → `false` (fail-safe).
-   */
+  /* ---------------- Read ---------------- */
+
   async isActive(db: DbExecutor, field_name: string): Promise<boolean> {
     if (!field_name) return false;
 
-    const cacheKey = CACHE_PREFIX + field_name;
     const redis = getRedis();
+    const key = cacheKey();
 
-    // 1. Cache read
     if (redis) {
       try {
-        const cached = await redis.get<SettingResult>(cacheKey);
-        if (cached) return cached.active;
+        const cache = await redis.get<SettingMap>(key);
+
+        if (cache && Object.prototype.hasOwnProperty.call(cache, field_name)) {
+          return cache[field_name].active;
+        }
+
+        if (cache) {
+          const row = await this.loadOne(db, field_name);
+          if (!row) return false;
+
+          if (row.save_in_redis) {
+            const merged: SettingMap = { ...cache, [field_name]: row };
+            await redis.set(key, merged, { ex: CACHE_TTL_SECONDS });
+          }
+          return row.active;
+        }
       } catch (err) {
         console.warn("[SettingService.isActive] Redis read failed:", err);
       }
     }
 
-    // 2. DB read
-    const [rows] = await db.execute<SettingRow[]>(
-      `SELECT field_name, active, save_in_redis
-         FROM setting_toggle
-        WHERE field_name = ?
-        LIMIT 1`,
-      [field_name],
-    );
+    const rows = await this.loadAll(db);
+    const hit = rows.find((r) => r.field_name === field_name);
 
-    if (!Array.isArray(rows) || rows.length === 0) return false;
-
-    const row = rows[0];
-    const result: SettingResult = {
-      field_name: row.field_name,
-      active: Boolean(row.active),
-      save_in_redis: Boolean(row.save_in_redis),
-    };
-
-    // 3. Cache write (only if allowed)
-    if (redis && result.save_in_redis) {
+    if (redis) {
+      const map: SettingMap = {};
+      for (const r of rows) if (r.save_in_redis) map[r.field_name] = r;
       try {
-        await redis.set(cacheKey, result, { ex: CACHE_TTL_SECONDS });
+        await redis.set(key, map, { ex: CACHE_TTL_SECONDS });
       } catch (err) {
         console.warn("[SettingService.isActive] Redis write failed:", err);
       }
     }
 
-    return result.active;
+    return hit?.active ?? false;
   }
 
-  /**
-   * Turn a toggle ON / OFF.
-   * Also invalidates the Redis cache for that key.
-   * Returns `true` if a row was updated.
-   */
+  /* ---------------- Create ---------------- */
+
+  async create(
+    db: DbExecutor,
+    field_name: string,
+    active: boolean,
+    save_in_redis: boolean,
+  ): Promise<SettingResult> {
+    await db.query(
+      `INSERT INTO setting_toggle (field_name, active, save_in_redis)
+       VALUES (?, ?, ?)`,
+      [field_name, active, save_in_redis],
+    );
+
+    const created: SettingResult = { field_name, active, save_in_redis };
+    if (save_in_redis) await this.mergeIntoCache(field_name, created);
+    return created;
+  }
+
+  /* ---------------- Update ---------------- */
+
+  async update(
+    db: DbExecutor,
+    original: string,
+    patch: SettingPatch,
+  ): Promise<SettingResult | null> {
+    const before = await this.loadOne(db, original);
+    if (!before) return null;
+
+    const nextName = patch.new_field_name ?? original;
+    const nextActive = patch.active ?? before.active;
+    const nextRedis = patch.save_in_redis ?? before.save_in_redis;
+
+    await db.query(
+      `UPDATE setting_toggle
+          SET field_name = ?, active = ?, save_in_redis = ?
+        WHERE field_name = ?`,
+      [nextName, nextActive, nextRedis, original],
+    );
+
+    const after: SettingResult = {
+      field_name: nextName,
+      active: nextActive,
+      save_in_redis: nextRedis,
+    };
+
+    if (nextName !== original) await this.removeFromCache(original);
+    if (nextRedis) await this.mergeIntoCache(nextName, after);
+    else await this.removeFromCache(nextName);
+
+    return after;
+  }
+
+  /* ---------------- Delete ---------------- */
+
+  async remove(db: DbExecutor, field_name: string): Promise<boolean> {
+    const [result] = await db.query(
+      `DELETE FROM setting_toggle WHERE field_name = ?`,
+      [field_name],
+    );
+    const affected = (result as { affectedRows?: number })?.affectedRows ?? 0;
+    if (affected > 0) await this.removeFromCache(field_name);
+    return affected > 0;
+  }
+
+  /* ---------------- Field setters ---------------- */
+
   async setActive(
     db: DbExecutor,
     field_name: string,
     active: boolean,
   ): Promise<boolean> {
-    const [result] = await db.execute<{ affectedRows: number }>(
-      `UPDATE setting_toggle
-          SET active = ?
-        WHERE field_name = ?`,
-      [active, field_name],
-    );
-
-    const affected = (result as { affectedRows?: number })?.affectedRows ?? 0;
-
-    if (affected > 0) {
-      await this.invalidateCache(field_name);
-    }
-
-    return affected > 0;
+    return (await this.update(db, field_name, { active })) !== null;
   }
 
-  /**
-   * Turn Redis caching ON / OFF for a toggle.
-   * Also invalidates the cache — turning it ON will re-cache on next read,
-   * turning it OFF removes any stale entry.
-   * Returns `true` if a row was updated.
-   */
   async setSaveInRedis(
     db: DbExecutor,
     field_name: string,
     save_in_redis: boolean,
   ): Promise<boolean> {
-    const [result] = await db.execute<{ affectedRows: number }>(
-      `UPDATE setting_toggle
-          SET save_in_redis = ?
-        WHERE field_name = ?`,
-      [save_in_redis, field_name],
-    );
-
-    const affected = (result as { affectedRows?: number })?.affectedRows ?? 0;
-
-    if (affected > 0) {
-      await this.invalidateCache(field_name);
-    }
-
-    return affected > 0;
+    return (await this.update(db, field_name, { save_in_redis })) !== null;
   }
 
-  /**
-   * Delete a toggle's cached entry.
-   * Internal helper — called by the setters above.
-   */
-  private async invalidateCache(field_name: string): Promise<void> {
+  /* ---------------- Internal: DB ---------------- */
+
+  private async loadAll(db: DbExecutor): Promise<SettingResult[]> {
+    const [rows] = await db.query<SettingRow[]>(
+      `SELECT field_name, active, save_in_redis FROM setting_toggle`,
+    );
+    if (!Array.isArray(rows)) return [];
+    return rows.map((r) => ({
+      field_name: r.field_name,
+      active: Boolean(r.active),
+      save_in_redis: Boolean(r.save_in_redis),
+    }));
+  }
+
+  private async loadOne(
+    db: DbExecutor,
+    field_name: string,
+  ): Promise<SettingResult | null> {
+    const [rows] = await db.query<SettingRow[]>(
+      `SELECT field_name, active, save_in_redis
+         FROM setting_toggle
+        WHERE field_name = ? LIMIT 1`,
+      [field_name],
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      field_name: r.field_name,
+      active: Boolean(r.active),
+      save_in_redis: Boolean(r.save_in_redis),
+    };
+  }
+
+  /* ---------------- Internal: cache map ---------------- */
+
+  private async mergeIntoCache(
+    field_name: string,
+    row: SettingResult,
+  ): Promise<void> {
     const redis = getRedis();
     if (!redis) return;
-
+    const key = cacheKey();
     try {
-      await redis.del(CACHE_PREFIX + field_name);
+      const cache = (await redis.get<SettingMap>(key)) ?? {};
+      cache[field_name] = row;
+      await redis.set(key, cache, { ex: CACHE_TTL_SECONDS });
     } catch (err) {
-      console.warn(
-        "[SettingService.invalidateCache] Redis delete failed:",
-        err,
-      );
+      console.warn("[SettingService.mergeIntoCache] Redis write failed:", err);
+    }
+  }
+
+  private async removeFromCache(field_name: string): Promise<void> {
+    const redis = getRedis();
+    if (!redis) return;
+    const key = cacheKey();
+    try {
+      const cache = await redis.get<SettingMap>(key);
+      if (!cache || !cache[field_name]) return;
+      delete cache[field_name];
+      await redis.set(key, cache, { ex: CACHE_TTL_SECONDS });
+    } catch (err) {
+      console.warn("[SettingService.removeFromCache] Redis write failed:", err);
     }
   }
 }
