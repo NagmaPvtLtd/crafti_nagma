@@ -1,113 +1,93 @@
-import type { CountryResponse, AsnResponse, Reader } from "maxmind";
-import maxmind from "maxmind";
-import { open, GeoIpDbName } from "geolite2-redist";
+const MAXMIND_ACCOUNT_ID = process.env.MAXMIND_ACCOUNT_ID;
+const MAXMIND_LICENSE_KEY = process.env.MAXMIND_LICENSE_KEY;
 
-/* =============================================================================
- *  isRequestFromIndia
- * =============================================================================
- *
- *  Determines whether an incoming request originates from India, using a
- *  fully offline detection stack. No API keys, no local database files to
- *  commit, no per-request HTTP calls.
- *
- *  Data sources
- *  ------------
- *
- *    1. GeoLite2-Country    Auto-downloaded and cached by geolite2-redist
- *                           on first use (~7 MB).
- *    2. GeoLite2-ASN        Same mechanism (~60 MB).
- *    3. Tor bulk exit list  Fetched from check.torproject.org once per
- *                           hour, held in memory (~15 KB).
- *    4. ASN keyword table   Static list, compiled into this module.
- *
- *  Evaluation order (first failure short-circuits)
- *  -----------------------------------------------
- *
- *    1. Dev bypass          Requests from localhost or private ranges in
- *                           NODE_ENV=development are allowed through so
- *                           the sign-in flow can be tested end-to-end.
- *    2. Country gate        GeoLite2-Country must resolve the IP to "IN".
- *    3. Tor gate            IP must not appear in the current Tor bulk
- *                           exit-node list.
- *    4. Hosting ASN gate    The IP's autonomous system organization name
- *                           must not contain any hosting, cloud, VPN, or
- *                           datacenter keyword.
- *
- *  Failure behaviour
- *  -----------------
- *
- *    • Missing client IP         Deny (fail-closed).
- *    • Lookup threw              Deny (fail-closed).
- *    • GeoLite2 download failed  Deny (fail-closed) — the outer try/catch
- *                                 covers the ensureInitialised() call.
- *    • Tor list fetch failed     Skip layer only; the set retains its
- *                                 previous contents (empty on cold start).
- *    • IP2Proxy removed          Not used in this version.
- *
- *  Coverage
- *  --------
- *
- *    Detected:
- *      - Tor exit nodes.
- *      - Commercial VPNs whose traffic egresses from a known hosting or
- *        cloud ASN (the majority of them).
- *      - Cloud VMs pretending to be residential users.
- *
- *    Not detected:
- *      - Residential proxies operating on real Indian ISP IP addresses.
- *      - Mobile proxies on Indian carrier networks.
- *
- *    The two undetected categories require a paid threat-intelligence
- *    feed such as IPQualityScore or IPRegistry.
- *
- *  Logging
- *  -------
- *
- *    Every decision emits a single `[geo]` prefixed line containing the
- *    resolved IP and every signal considered, so production logs can be
- *    filtered by IP, country, or flag without joining tables.
- * ========================================================================== */
+const MAXMIND_BASE = "https://geoip.maxmind.com/geoip/v2.1";
 
 /* -------------------------------------------------------------------------- */
-/*  GeoLite2 readers (lazy, module-scoped singletons)                         */
+/*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
-let countryReader: Reader<CountryResponse> | null = null;
-let asnReader: Reader<AsnResponse> | null = null;
-let initPromise: Promise<void> | null = null;
+interface MaxMindCityResponse {
+  country?: { iso_code?: string };
+  registered_country?: { iso_code?: string };
+  traits?: {
+    autonomous_system_number?: number;
+    autonomous_system_organization?: string;
+    is_anonymous_proxy?: boolean;
+    is_satellite_provider?: boolean;
+  };
+}
+
+interface IpIntel {
+  countryCode: string | null;
+  asnNumber: number | null;
+  asnOrg: string | null;
+  isAnonymousProxy: boolean;
+  isSatelliteProvider: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  MaxMind lookup                                                            */
+/* -------------------------------------------------------------------------- */
 
 /**
- * Opens both GeoLite2 databases exactly once per process. Subsequent
- * calls return the same promise, so concurrent sign-ins during a cold
- * start do not trigger parallel downloads.
+ * Calls the MaxMind GeoIP2 City endpoint for a single IP. Returns country
+ * code, ASN number, and ASN organization in one round trip.
+ *
+ * The City endpoint is used instead of Country because City includes the
+ * ASN fields we need for the hosting heuristic; Country does not.
+ *
+ * @returns A parsed `IpIntel` object, or `null` if the request failed.
  */
-async function ensureInitialised(): Promise<void> {
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    countryReader = await open(GeoIpDbName.Country, (path: string) =>
-      maxmind.open<CountryResponse>(path),
+async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
+  if (!MAXMIND_ACCOUNT_ID || !MAXMIND_LICENSE_KEY) {
+    console.error(
+      "[geo] MAXMIND_ACCOUNT_ID and MAXMIND_LICENSE_KEY must both be set",
     );
-    asnReader = await open(GeoIpDbName.ASN, (path: string) =>
-      maxmind.open<AsnResponse>(path),
-    );
-  })();
+    return null;
+  }
 
-  return initPromise;
+  const auth = Buffer.from(
+    `${MAXMIND_ACCOUNT_ID}:${MAXMIND_LICENSE_KEY}`,
+  ).toString("base64");
+
+  try {
+    const res = await fetch(`${MAXMIND_BASE}/city/${ip}`, {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        Accept: "application/json",
+      },
+    });
+
+    /* 404 means the IP is not in the database — not an error, just
+       unknown. Treat it as a null result so the caller can deny. */
+    if (res.status === 404) {
+      console.warn(`[geo] MaxMind has no record for ${ip}`);
+      return null;
+    }
+
+    if (!res.ok) {
+      console.warn(`[geo] MaxMind lookup failed: HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = (await res.json()) as MaxMindCityResponse;
+
+    return {
+      countryCode: data.country?.iso_code ?? null,
+      asnNumber: data.traits?.autonomous_system_number ?? null,
+      asnOrg: data.traits?.autonomous_system_organization ?? null,
+      isAnonymousProxy: data.traits?.is_anonymous_proxy ?? false,
+      isSatelliteProvider: data.traits?.is_satellite_provider ?? false,
+    };
+  } catch (err) {
+    console.error("[geo] MaxMind request threw:", err);
+    return null;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
 /*  Tor bulk exit list                                                        */
-/* -------------------------------------------------------------------------- */
-/*                                                                            */
-/*  Fetched from https://check.torproject.org/torbulkexitlist, which is a     */
-/*  plain-text file listing one IPv4 or IPv6 address per line, refreshed      */
-/*  hourly by the Tor Project. Held as an in-memory Set for O(1) lookups.     */
-/*                                                                            */
-/*  Refresh is fire-and-forget from the caller's perspective: the first       */
-/*  request after boot may complete before the download finishes, in which    */
-/*  case the Tor layer is skipped for that request only. Later requests in    */
-/*  the same process benefit from the populated set.                          */
 /* -------------------------------------------------------------------------- */
 
 const TOR_EXIT_LIST_URL = "https://check.torproject.org/torbulkexitlist";
@@ -120,13 +100,13 @@ let torFetching: Promise<void> | null = null;
 /**
  * Refreshes the Tor exit list if the cached copy is older than one hour.
  *
- * Concurrency: multiple callers within the TTL window return the same
+ * Concurrency: multiple callers within the TTL window share the same
  * in-flight promise, so a burst of sign-ins at cold start triggers at
  * most one HTTP request.
  *
  * Failure: a failed fetch leaves the previous set intact. If the list
- * has never been successfully loaded, the set is empty and the Tor
- * layer simply does not fire.
+ * has never been successfully loaded, the set is empty and the Tor layer
+ * does not fire.
  */
 async function loadTorExitList(): Promise<void> {
   const now = Date.now();
@@ -178,16 +158,16 @@ function isLoopback(ip: string): boolean {
  * Extracts the client's public IP from the request headers.
  *
  * Preference order:
- *   1. x-forwarded-for   — first public IP in the comma-separated chain.
- *   2. x-real-ip         — nginx default.
- *   3. cf-connecting-ip  — Cloudflare.
- *   4. x-vercel-ip       — Vercel.
+ *   1. x-forwarded-for   first public IP in the comma-separated chain
+ *   2. x-real-ip         nginx default
+ *   3. cf-connecting-ip  Cloudflare
+ *   4. x-vercel-ip       Vercel
  *
  * Behind a reverse proxy, x-forwarded-for is a list of hops. The first
  * public entry is the client; entries before it are private-range hops
- * from the same network (e.g. the proxy itself). In development, all
- * entries may be private — the first non-empty entry is returned so the
- * caller's dev-bypass logic can act on it.
+ * from the same network. In development all entries may be private —
+ * the first non-empty entry is returned so the dev-bypass logic can act
+ * on it.
  */
 function getClientIp(headers: Headers): string | null {
   const forwarded = headers.get("x-forwarded-for");
@@ -212,15 +192,6 @@ function getClientIp(headers: Headers): string | null {
 
 /* -------------------------------------------------------------------------- */
 /*  Hosting ASN keyword table                                                 */
-/* -------------------------------------------------------------------------- */
-/*                                                                            */
-/*  Matched case-insensitively against the ASN organization name returned     */
-/*  by GeoLite2-ASN. Covers general infrastructure terms plus the largest     */
-/*  cloud providers and VPN vendors that operate their own ASNs.              */
-/*                                                                            */
-/*  This is a heuristic, not a database. It catches the common case; it       */
-/*  misses small regional hosting providers whose ASN org names do not        */
-/*  contain any of these keywords.                                            */
 /* -------------------------------------------------------------------------- */
 
 const HOSTING_KEYWORDS = [
@@ -259,14 +230,9 @@ const HOSTING_KEYWORDS = [
  * Returns `true` when the request passes every geo and anonymiser gate,
  * `false` otherwise.
  *
- * The caller is expected to invoke this from the NextAuth `signIn`
- * callback and translate a `false` return into a redirect to the login
- * page with an appropriate error code.
- *
- * The function is safe to call concurrently. All shared state — the
- * GeoLite2 readers and the Tor exit set — is initialised through
- * deduplicated promises, so a cold start under load performs at most
- * one download per data source.
+ * Invoked from the NextAuth `signIn` callback. A `false` return should
+ * be translated into a redirect to the login page with an appropriate
+ * error code.
  *
  * @param headers  The request headers, obtained via `next/headers`.
  * @returns        `true` if the request is allowed, `false` otherwise.
@@ -277,65 +243,60 @@ export default async function isRequestFromIndia(
   const ip = getClientIp(headers);
 
   /* ---- Development bypass ------------------------------------------- */
-  /* Local requests have no meaningful public IP. Allowing them keeps
-     the sign-in flow testable without a tunnel or a staging domain. */
   if (IS_DEV && (!ip || isLoopback(ip) || isPrivateIp(ip))) {
     console.log(`[geo] dev bypass (ip=${ip ?? "none"}) -> ALLOWED`);
     return true;
   }
 
   if (!ip) {
-    console.warn("[geo] No client IP found — denying");
+    console.warn("[geo] No client IP found - denying");
     return false;
   }
 
-  try {
-    await ensureInitialised();
+  /* Kick off the Tor list refresh without awaiting it. */
+  void loadTorExitList();
 
-    /* Kick off the Tor list refresh without awaiting it. The current
-       request uses whatever is already in memory; later requests get
-       the fresh list. */
-    void loadTorExitList();
+  /* ---- MaxMind lookup ---------------------------------------------- */
+  const intel = await lookupMaxMind(ip);
 
-    /* ---- Country ---------------------------------------------------- */
-    const country = countryReader?.get(ip);
-    const countryCode = country?.country?.iso_code ?? null;
-
-    /* ---- ASN organization ------------------------------------------ */
-    const asn = asnReader?.get(ip);
-    const asnOrg = asn?.autonomous_system_organization ?? null;
-
-    /* ---- Tor exit --------------------------------------------------- */
-    const isTor = torExits.has(ip);
-
-    /* ---- Hosting ASN heuristic ------------------------------------- */
-    const orgLower = (asnOrg ?? "").toLowerCase();
-    const isHostingAsn = HOSTING_KEYWORDS.some((kw) => orgLower.includes(kw));
-
-    const log =
-      `[geo] ${ip} | country=${countryCode} | tor=${isTor} | ` +
-      `hostingAsn=${isHostingAsn} | asnOrg=${asnOrg}`;
-
-    /* ---- Gates ----------------------------------------------------- */
-    if (countryCode !== "IN") {
-      console.warn(`${log} -> NOT INDIA`);
-      return false;
-    }
-
-    if (isTor) {
-      console.warn(`${log} -> TOR EXIT`);
-      return false;
-    }
-
-    if (isHostingAsn) {
-      console.warn(`${log} -> HOSTING ASN`);
-      return false;
-    }
-
-    console.log(`${log} -> ALLOWED`);
-    return true;
-  } catch (err) {
-    console.error("[geo] Lookup failed:", err);
+  if (!intel) {
+    console.warn(`[geo] Lookup failed for ${ip} - denying`);
     return false;
   }
+
+  /* ---- Tor exit ---------------------------------------------------- */
+  const isTor = torExits.has(ip);
+
+  /* ---- Hosting ASN heuristic --------------------------------------- */
+  const orgLower = (intel.asnOrg ?? "").toLowerCase();
+  const isHostingAsn = HOSTING_KEYWORDS.some((kw) => orgLower.includes(kw));
+
+  const log =
+    `[geo] ${ip} | country=${intel.countryCode} | tor=${isTor} | ` +
+    `hostingAsn=${isHostingAsn} | anonProxy=${intel.isAnonymousProxy} | ` +
+    `asnOrg=${intel.asnOrg}`;
+
+  /* ---- Gates ------------------------------------------------------- */
+  if (intel.countryCode !== "IN") {
+    console.warn(`${log} -> NOT INDIA`);
+    return false;
+  }
+
+  if (intel.isAnonymousProxy) {
+    console.warn(`${log} -> ANONYMOUS PROXY`);
+    return false;
+  }
+
+  if (isTor) {
+    console.warn(`${log} -> TOR EXIT`);
+    return false;
+  }
+
+  if (isHostingAsn) {
+    console.warn(`${log} -> HOSTING ASN`);
+    return false;
+  }
+
+  console.log(`${log} -> ALLOWED`);
+  return true;
 }
