@@ -1,0 +1,3 @@
+field_name,active,save_in_redis
+backend:new_user_not_allowed_to_login,0,1
+backend:nobody_can_login,0,1

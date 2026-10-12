@@ -1,4 +1,4 @@
-import AdminDashboardClient from "../../(components)/Pages/Dashboard/AdminDashboardClient";
+import AdminDashboardClient from "../../(components)/Pages/Admin/DashboardClient";
 
 export const metadata = { title: "Dashboard · Admin" };
 
