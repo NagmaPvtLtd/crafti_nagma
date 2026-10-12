@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-
 import { auditLog } from "../../../../services/AuditLog.service";
 import { setting } from "../../../../services/Setting.service";
 import { requireAdmin } from "../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../lib/Database/main.db";
-import { createSettingSchema } from "../../../../utils/Validators/setting.validator.zod";
+import { createSettingSchema } from "../../../../utils/zod/setting.validator.zod";
 import type { SettingRow } from "../../../../types/Setting/setting.types";
 
 /**

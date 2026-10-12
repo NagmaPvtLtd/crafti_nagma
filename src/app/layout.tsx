@@ -11,6 +11,7 @@ import { websiteLink } from "../utils/main.util";
 import HomePageHeartbeat from "../hooks/Heartbeat.hook";
 import CustomLoader from "./(components)/CustomLoader";
 import Navbar from "./(components)/Navbar/Navbar";
+import IKProvider from "./(components)/Providers/Imagekit.Provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,9 +93,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full">
         <Suspense fallback={<CustomLoader label="Loading ..." />}>
-          <Navbar />
-          <HomePageHeartbeat />
-          {children}
+          <IKProvider>
+            <Navbar />
+            <HomePageHeartbeat />
+            {children}
+          </IKProvider>
         </Suspense>
 
         <Analytics />

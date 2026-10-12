@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@imagekit/next": "^2.1.6",
+    "@imagekit/nodejs": "^7.12.1",
     "@upstash/redis": "^1.39.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",

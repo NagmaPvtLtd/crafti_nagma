@@ -4,7 +4,7 @@ import { auditLog } from "../../../../../services/AuditLog.service";
 import { setting } from "../../../../../services/Setting.service";
 import { requireAdmin } from "../../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../../lib/Database/main.db";
-import { updateSettingSchema } from "../../../../../utils/Validators/setting.validator.zod";
+import { updateSettingSchema } from "../../../../../utils/zod/setting.validator.zod";
 import type { SettingRow } from "../../../../../types/Setting/setting.types";
 
 /**
