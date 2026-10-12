@@ -11,6 +11,8 @@ import { websiteLink } from "../utils/main.util";
 import HomePageHeartbeat from "../hooks/Heartbeat.hook";
 import CustomLoader from "./(components)/CustomLoader";
 import Navbar from "./(components)/Navbar/Navbar";
+import IKProvider from "./(components)/Providers/Imagekit.Provider";
+import Footer from "./(components)/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +25,7 @@ const geistMono = Geist_Mono({
 });
 
 const siteDescription =
-  "Shop handmade crochet gifts, embroidery hoops, and custom decor. Made with love by Crafti Nagma 💛";
+  "Shop handmade crochet gifts, embroidery hoops, and custom decor. Made with love by Crafti Nagma";
 
 export const metadata: Metadata = {
   metadataBase: new URL(websiteLink),
@@ -92,9 +94,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full">
         <Suspense fallback={<CustomLoader label="Loading ..." />}>
-          <Navbar />
-          <HomePageHeartbeat />
-          {children}
+          <IKProvider>
+            <Navbar />
+            <HomePageHeartbeat />
+            {children}
+            <Footer />
+          </IKProvider>
         </Suspense>
 
         <Analytics />

@@ -15,15 +15,6 @@ export default function GoBack({ href, label = "Go Back" }: GoBackButtonProps) {
   const router = useRouter();
 
   const handleGoBack = () => {
-    const isAdminRoute = href.includes("/admin");
-
-    if (isAdminRoute && typeof window !== "undefined") {
-      if (window.history.length > 1) {
-        router.back();
-        return;
-      }
-    }
-
     router.push(href);
   };
 

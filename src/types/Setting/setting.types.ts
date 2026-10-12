@@ -2,7 +2,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import type {
   Setting,
   UpdateSettingInput,
-} from "../../utils/Validators/setting.validator.zod";
+} from "../../utils/zod/setting.validator.zod";
 
 /* =============================================================================
  *  Setting types — DB-only concerns

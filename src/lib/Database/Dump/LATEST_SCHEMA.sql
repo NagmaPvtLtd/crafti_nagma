@@ -9,7 +9,7 @@ CREATE TABLE users (
     full_name VARCHAR(255) DEFAULT NULL,
     -- Authentication
     email VARCHAR(255) NOT NULL UNIQUE,
-    phone VARCHAR(20) NOT NULL UNIQUE,
+    phone VARCHAR(20) NULL,
     password_hash VARCHAR(255) DEFAULT NULL,
     google_id VARCHAR(255) DEFAULT NULL UNIQUE,
     google_profile_picture VARCHAR(500) DEFAULT NULL,

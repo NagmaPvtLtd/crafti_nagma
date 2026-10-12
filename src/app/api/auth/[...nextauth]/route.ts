@@ -17,7 +17,7 @@ import { generateULID } from "../../../../utils/generateULID.util";
 import { auditLog } from "../../../../services/AuditLog.service";
 import { setting } from "../../../../services/Setting.service";
 import isRequestFromIndia from "../../../../utils/Auth/Auth.isFromIndia.util";
-import { googleProfileSchema } from "../../../../utils/Validators/auth.valildator.zod";
+import { googleProfileSchema } from "../../../../utils/zod/auth.valildator.zod";
 import { getPool } from "../../../../lib/Database/main.db";
 
 /* -------------------------------------------------------------------------- */
@@ -219,24 +219,20 @@ const authOptions: NextAuthOptions = {
           maxLength: 40,
         });
 
-        // users.phone is NOT NULL UNIQUE but Google OAuth doesn't send one.
-        // PENDING_ + 12 chars = 20 chars, matching the column limit.
-        const tempPhone = `PENDING_${newId.slice(0, 12)}`;
-
         await pool.execute(
           `INSERT INTO users (
-             id, first_name, last_name, full_name,
-             email, phone, google_id, google_profile_picture,
-             email_verified, role, status,
-             profile_completed, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'customer', 'active', FALSE, ?)`,
+            id, first_name, last_name, full_name,
+            email, phone, google_id, google_profile_picture,
+            email_verified, role, status,
+            profile_completed, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'customer', 'active', FALSE, ?)`,
           [
             newId,
             firstName,
             lastName,
             fullName,
             email,
-            tempPhone,
+            null,
             googleId,
             googlePicture,
             now,

@@ -16,7 +16,7 @@ import {
   type Setting,
   type SettingsListResponse,
   type SettingResponse,
-} from "../../../utils/Validators/setting.validator.zod";
+} from "../../../utils/zod/setting.validator.zod";
 import getAxiosErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import GoBack from "../../(components)/GoBack";
 
@@ -226,7 +226,7 @@ export default function SettingsClient() {
       {/* Header */}
       <div className="border-b border-neutral-200 bg-white">
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6">
-          <GoBack href="/admin" label="Back to Admin" />
+          <GoBack href="/admin/dashboard" label="Back to Admin" />
           <h1 className="text-lg font-semibold tracking-tight text-neutral-900 sm:text-2xl">
             Feature Toggles
           </h1>
@@ -238,26 +238,29 @@ export default function SettingsClient() {
       </div>
 
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
-        {/* Stat tiles */}
-        <div className="mb-4 grid grid-cols-3 gap-2 sm:mb-8 sm:gap-4">
-          <StatTile
-            label="Total toggles"
-            shortLabel="Total"
-            value={stats.total}
-            tone="neutral"
-          />
-          <StatTile
-            label="Active"
-            shortLabel="Active"
-            value={stats.active}
-            tone="emerald"
-          />
-          <StatTile
-            label="Redis-cached"
-            shortLabel="Cached"
-            value={stats.cached}
-            tone="violet"
-          />
+        {/* Compact stats */}
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-500 sm:mb-5">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
+            <span className="font-semibold tabular-nums text-neutral-900">
+              {stats.total}
+            </span>
+            total
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="font-semibold tabular-nums text-emerald-700">
+              {stats.active}
+            </span>
+            active
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+            <span className="font-semibold tabular-nums text-violet-700">
+              {stats.cached}
+            </span>
+            cached
+          </span>
         </div>
 
         {/* Create section */}
@@ -563,45 +566,6 @@ export default function SettingsClient() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* =============================================================================
- *  Sub-components
- * ========================================================================== */
-
-function StatTile({
-  label,
-  shortLabel,
-  value,
-  tone,
-}: {
-  label: string;
-  shortLabel?: string;
-  value: number;
-  tone: "neutral" | "emerald" | "violet";
-}) {
-  const tones = {
-    neutral: { dot: "bg-neutral-400", value: "text-neutral-900" },
-    emerald: { dot: "bg-emerald-500", value: "text-emerald-700" },
-    violet: { dot: "bg-violet-500", value: "text-violet-700" },
-  }[tone];
-
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-2.5 py-2.5 sm:px-5 sm:py-4">
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tones.dot}`} />
-        <p className="truncate text-[10px] font-medium uppercase tracking-wide text-neutral-500 sm:text-xs">
-          <span className="sm:hidden">{shortLabel ?? label}</span>
-          <span className="hidden sm:inline">{label}</span>
-        </p>
-      </div>
-      <p
-        className={`mt-1.5 text-lg font-semibold tabular-nums sm:mt-2 sm:text-2xl ${tones.value}`}
-      >
-        {value}
-      </p>
     </div>
   );
 }

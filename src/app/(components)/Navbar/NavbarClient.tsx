@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signIn, signOut } from "next-auth/react";
 import {
@@ -22,14 +22,20 @@ import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
 /* ============================================================================
  * NAVBAR — the only navigation surface
  * ============================================================================
- * Desktop + Mobile:
+ * Desktop (>= 640px):
  *   [Logo]   [Search .......]   Browse  Notif  Profile▾  Cart
+ *   └─ Profile click → floating popup anchored right, never overflows.
  *
- * Profile dropdown holds every section the user can access, pulled from
- * getSectionsForRole() — the same source the (now-deleted) sidebar used.
+ * Mobile (< 640px):
+ *   [Logo]  [Search] [Profile] [Cart] [Hamburger]
+ *   └─ Profile click → opens the same drawer as the hamburger.
+ *      No floating popup is ever rendered on mobile.
  * ========================================================================== */
 
 type Props = { user: SessionUserClient | null };
+
+/** Tailwind's `sm` breakpoint (px). Below this → mobile behaviour. */
+const MOBILE_BREAKPOINT = 640;
 
 function isActiveLink(pathname: string, link: NavLink): boolean {
   if (link.exact) return pathname === link.href;
@@ -44,8 +50,24 @@ export default function NavbarClient({ user }: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
 
+  /* ---------------------------------------------------------------- */
+  /* Breakpoint tracking — drives profile click behaviour             */
+  /* ---------------------------------------------------------------- */
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  /* ---------------------------------------------------------------- */
+  /* Route change → close every transient UI                          */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
     const load = () => {
       setSearchOpen(false);
@@ -55,7 +77,11 @@ export default function NavbarClient({ user }: Props) {
     load();
   }, [pathname]);
 
+  /* ---------------------------------------------------------------- */
+  /* Click outside → close the desktop popup                          */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
+    if (!userMenuOpen) return;
     function onClick(e: MouseEvent) {
       if (
         userMenuRef.current &&
@@ -66,8 +92,11 @@ export default function NavbarClient({ user }: Props) {
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  }, [userMenuOpen]);
 
+  /* ---------------------------------------------------------------- */
+  /* Lock body scroll while mobile drawer is open                     */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => {
@@ -77,17 +106,35 @@ export default function NavbarClient({ user }: Props) {
 
   const sections = user ? getSectionsForRole(user.role) : [];
 
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const q = searchValue.trim();
-    if (!q) return;
-    router.push(`/products?q=${encodeURIComponent(q)}`);
-    setSearchOpen(false);
-    setSearchValue("");
-  }
+  const submitSearch = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const q = searchValue.trim();
+      if (!q) return;
+      router.push(`/products?q=${encodeURIComponent(q)}`);
+      setSearchOpen(false);
+      setSearchValue("");
+    },
+    [router, searchValue],
+  );
 
   function handleSignIn() {
     signIn("google", { callbackUrl: pathname });
+  }
+
+  /**
+   * Profile button handler.
+   *
+   * Mobile  → toggle the drawer (same one hamburger opens).
+   * Desktop → toggle the floating popup.
+   */
+  function handleProfileClick() {
+    if (isMobile) {
+      setUserMenuOpen(false);
+      setMobileOpen((v) => !v);
+    } else {
+      setUserMenuOpen((v) => !v);
+    }
   }
 
   return (
@@ -160,22 +207,31 @@ export default function NavbarClient({ user }: Props) {
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setUserMenuOpen((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={userMenuOpen}
+                  onClick={handleProfileClick}
+                  aria-haspopup={isMobile ? "dialog" : "menu"}
+                  aria-expanded={isMobile ? mobileOpen : userMenuOpen}
                   className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 pr-2 transition hover:bg-neutral-100"
                 >
                   <Avatar name={user.name} image={user.image} size={30} />
                   <ChevronDown
                     size={13}
                     className={`hidden text-neutral-400 transition-transform sm:block ${
-                      userMenuOpen ? "rotate-180" : ""
+                      !isMobile && userMenuOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
-                {userMenuOpen && (
-                  <div className="absolute top-full right-0 mt-2 max-h-[70vh] w-64 overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-black/5">
+                {/*
+                 * Desktop-only floating popup.
+                 * Anchored `right-0` so it always extends leftward and
+                 * capped to `100vw - 2rem` so it never spills off-screen
+                 * on narrow desktop / tablet viewports.
+                 */}
+                {!isMobile && userMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute top-full right-0 mt-2 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-black/5"
+                  >
                     {/* User header */}
                     <div className="border-b border-neutral-100 px-4 py-3">
                       <p className="truncate text-sm font-medium text-neutral-900">
@@ -191,7 +247,7 @@ export default function NavbarClient({ user }: Props) {
                       {sections.map((section, idx) => (
                         <div key={idx}>
                           {section.label && (
-                            <p className="mt-2 mb-1 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                            <p className="mt-2 mb-1 px-4 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
                               {section.label}
                             </p>
                           )}
@@ -276,7 +332,7 @@ export default function NavbarClient({ user }: Props) {
         </form>
       </header>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — also opened by tapping the profile avatar */}
       <div
         className={`fixed inset-x-0 top-16 bottom-0 z-30 overflow-y-auto bg-white transition-all duration-200 sm:hidden ${
           mobileOpen
@@ -287,6 +343,21 @@ export default function NavbarClient({ user }: Props) {
         aria-modal="true"
       >
         <nav className="mx-auto flex max-w-7xl flex-col gap-5 p-4 pb-24">
+          {/* Logged-in user header */}
+          {user && (
+            <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+              <Avatar name={user.name} image={user.image} size={40} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-neutral-900">
+                  {user.name}
+                </p>
+                <p className="truncate text-xs text-neutral-500">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          )}
+
           {!user && (
             <div className="space-y-0.5">
               <MobileLink href="/" onClose={() => setMobileOpen(false)}>
@@ -311,7 +382,7 @@ export default function NavbarClient({ user }: Props) {
             sections.map((section, idx) => (
               <div key={idx}>
                 {section.label && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                  <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
                     {section.label}
                   </p>
                 )}
