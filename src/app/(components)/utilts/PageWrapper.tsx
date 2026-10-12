@@ -61,7 +61,7 @@ export default function PageWrapper({
   const showImage = bgImage && finalOpacity > 0;
 
   return (
-    <div className={`relative min-h-screen ${className}`}>
+    <div className={`relative min-h-screen bg-white ${className}`}>
       {/* ---- Background layer ------------------------------------ */}
       {showImage && (
         <div
