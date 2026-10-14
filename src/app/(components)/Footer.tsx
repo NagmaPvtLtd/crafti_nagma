@@ -85,7 +85,7 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative border-t border-stone-200/60 bg-white/60 backdrop-blur-sm">
+    <footer className="relative border-t border-stone-200/60 bg-white ">
       {/* Soft rose glow — ties into landing's decorative glows */}
       <div
         aria-hidden
