@@ -200,7 +200,7 @@ export default function NavbarClient({ user }: Props) {
                       </p>
                     </div>
 
-                    <div className="py-1.5">
+                    <div className="py-1.5 bg-white/60">
                       {sections.map((section, idx) => (
                         <div key={idx}>
                           {section.label && (
@@ -305,7 +305,7 @@ export default function NavbarClient({ user }: Props) {
           className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-rose-100/60 blur-3xl"
         />
 
-        <nav className="relative mx-auto flex max-w-7xl flex-col gap-5 p-4 pb-24">
+        <nav className="relative mx-auto flex max-w-7xl flex-col gap-5 p-4 pb-24 ">
           {user && (
             <div className="relative flex items-center gap-3 overflow-hidden rounded-2xl border border-white/60 bg-white/85 px-3 py-3 backdrop-blur-sm">
               <div

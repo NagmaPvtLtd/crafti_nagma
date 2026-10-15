@@ -43,7 +43,7 @@ export default function CancellationRefundPage() {
   return (
     <PolicyLayout
       title="Cancellation & Refund Policy"
-      lastUpdated="10 October 2026"
+      lastUpdated="15 October 2026"
     >
       <div className="relative">
         <div

@@ -22,7 +22,6 @@ const LANDING_CONTENT = {
     tagline: "Stitch by stitch, made just for you.",
     description:
       "Cozy crochet gifts, embroidery hoops, and custom decor — every piece handcrafted in small batches by a tiny homegrown team, never mass-produced.",
-    imageBadge: "Handmade craft!",
     rating: 5,
     ratingCount: "120+",
     ratingCopy: "Happy {count} handcraft lovers!",
@@ -152,12 +151,35 @@ const PROCESS_ICONS = {
   sparkle: Star,
 } as const;
 
+const HERO_CSS = `
+@keyframes hero-spin { to { transform: rotate(360deg); } }
+@keyframes hero-glow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.06); }
+}
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50%      { transform: translateY(-7px) rotate(6deg); }
+}
+@keyframes hero-badge {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-anim-spin, .hero-anim-glow, .hero-anim-float, .hero-anim-badge {
+    animation: none !important;
+  }
+}
+`;
+
 export default function Landing() {
   const { hero, stats, story, offerings, process, testimonials, finalCta } =
     LANDING_CONTENT;
 
   return (
     <PageWrapper variant="content" position="fixed">
+      <style dangerouslySetInnerHTML={{ __html: HERO_CSS }} />
+
       <div className="relative flex flex-col overflow-hidden text-stone-800">
         <div
           aria-hidden
@@ -221,20 +243,56 @@ export default function Landing() {
             </div>
 
             <div className="w-full flex-1">
-              <div className="relative mx-auto aspect-square w-full max-w-55 overflow-hidden rounded-3xl border border-white/60 bg-white/85 p-2 shadow-xl shadow-rose-100/40 backdrop-blur-sm sm:max-w-xs sm:rounded-4xl md:max-w-sm">
-                <div className="relative h-full w-full overflow-hidden rounded-2xl sm:rounded-[1.6rem]">
-                  <Image
-                    src={CraftiNagma}
-                    alt="Crafti Nagma handmade crochet and embroidery"
-                    fill
-                    sizes="(max-width: 640px) 220px, (max-width: 768px) 320px, 384px"
-                    className="object-cover"
-                    priority
+              <div className="relative mx-auto aspect-square w-full max-w-55 sm:max-w-xs md:max-w-sm">
+                <svg
+                  aria-hidden
+                  viewBox="0 0 100 100"
+                  fill="none"
+                  className="hero-anim-spin pointer-events-none absolute -inset-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] text-rose-300/70"
+                  style={{ animation: "hero-spin 22s linear infinite" }}
+                >
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="48"
+                    stroke="currentColor"
+                    strokeWidth="0.6"
+                    strokeLinecap="round"
+                    strokeDasharray="1 3"
                   />
-                </div>
-                <div className="absolute bottom-4 left-4 flex items-center gap-1 rounded-full border border-rose-200/70 bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-rose-500 shadow-sm backdrop-blur sm:bottom-5 sm:left-5 sm:px-3 sm:py-1.5 sm:text-[11px]">
-                  <Heart className="h-2.5 w-2.5 fill-current sm:h-3 sm:w-3" />
-                  {hero.imageBadge}
+                </svg>
+
+                <div
+                  aria-hidden
+                  className="hero-anim-glow pointer-events-none absolute inset-3 rounded-full bg-rose-200/55 blur-2xl"
+                  style={{ animation: "hero-glow 4s ease-in-out infinite" }}
+                />
+
+                <Heart
+                  aria-hidden
+                  className="hero-anim-float pointer-events-none absolute -top-2 -left-2 h-5 w-5 fill-rose-300 text-rose-300 drop-shadow-sm"
+                  style={{ animation: "hero-float 3.2s ease-in-out infinite" }}
+                />
+                <Sparkles
+                  aria-hidden
+                  className="hero-anim-float pointer-events-none absolute -right-2 -bottom-2 h-5 w-5 text-rose-400 drop-shadow-sm"
+                  style={{
+                    animation: "hero-float 3.8s ease-in-out infinite",
+                    animationDelay: "1.2s",
+                  }}
+                />
+
+                <div className="relative aspect-square w-full -rotate-1 overflow-hidden rounded-3xl border border-white/60 bg-white/85 p-2 shadow-xl shadow-rose-100/40 backdrop-blur-sm transition-transform duration-500 hover:rotate-0 sm:rounded-4xl">
+                  <div className="relative h-full w-full overflow-hidden rounded-2xl border border-dashed border-rose-200/70 sm:rounded-[1.6rem]">
+                    <Image
+                      src={CraftiNagma}
+                      alt="Crafti Nagma handmade crochet and embroidery"
+                      fill
+                      sizes="(max-width: 640px) 220px, (max-width: 768px) 320px, 384px"
+                      className="object-cover"
+                      priority
+                    />
+                  </div>
                 </div>
               </div>
             </div>

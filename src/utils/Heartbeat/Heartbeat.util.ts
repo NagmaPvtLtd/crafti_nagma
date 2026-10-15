@@ -74,7 +74,6 @@ export async function runHeartbeat(): Promise<HeartbeatResponseDTO> {
 
     return {
       success: true,
-      message: "Heartbeat successful - MySQL and Redis connections active",
       timestamp: new Date().toISOString(),
     };
   } catch (error: unknown) {
@@ -82,7 +81,6 @@ export async function runHeartbeat(): Promise<HeartbeatResponseDTO> {
 
     return {
       success: false,
-      message: "Heartbeat failed - connection issues detected",
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }

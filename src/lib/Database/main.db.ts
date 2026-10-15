@@ -12,11 +12,12 @@ let initializedPromise: Promise<void> | null = null;
 export async function initServer() {
   if (!initializedPromise) {
     initializedPromise = (async () => {
+      console.log("[SERVER - CHECKING] Initializing database connection");
       await initializeDatabase();
       const isProduction: boolean = getProduction();
-      console.log("[READY] ✅ Database initialized");
+      console.log(`[SERVER - READY] >_ Database initialized`);
       console.log(
-        `[ENVIRONMENT] ${isProduction ? "✅ Production" : "👩‍💻 Development"}`,
+        `[SERVER - ENV] ➤ Running in ${isProduction ? "production" : "development"} mode`,
       );
     })();
   }

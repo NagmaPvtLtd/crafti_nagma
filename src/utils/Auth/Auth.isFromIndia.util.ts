@@ -42,7 +42,7 @@ interface IpIntel {
 async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
   if (!MAXMIND_ACCOUNT_ID || !MAXMIND_LICENSE_KEY) {
     console.error(
-      "[geo] MAXMIND_ACCOUNT_ID and MAXMIND_LICENSE_KEY must both be set",
+      "[GEO - CONFIG] ✕ Missing MaxMind credentials (MAXMIND_ACCOUNT_ID, MAXMIND_LICENSE_KEY)",
     );
     return null;
   }
@@ -62,13 +62,15 @@ async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
     /* 404 means the IP is not in the database — not an error, just
        unknown. Treat it as a null result so the caller can deny. */
     if (res.status === 404) {
-      console.warn(`[geo] MaxMind has no record for ${ip}`);
+      console.warn(`[GEO - LOOKUP] ➤ No MaxMind record for ${ip}`);
       return null;
     }
 
     if (!res.ok) {
       const body = await res.text();
-      console.warn(`[geo] MaxMind lookup failed: HTTP ${res.status} ${body}`);
+      console.warn(
+        `[GEO - LOOKUP] ✕ MaxMind lookup failed — HTTP ${res.status} : ${body}`,
+      );
       return null;
     }
 
@@ -82,7 +84,7 @@ async function lookupMaxMind(ip: string): Promise<IpIntel | null> {
       isSatelliteProvider: data.traits?.is_satellite_provider ?? false,
     };
   } catch (err) {
-    console.error("[geo] MaxMind request threw:", err);
+    console.error("[GEO - LOOKUP] ✕ MaxMind request threw :", err);
     return null;
   }
 }
@@ -128,9 +130,11 @@ async function loadTorExitList(): Promise<void> {
       );
       torFetchedAt = Date.now();
 
-      console.log(`[geo] Tor exit list loaded (${torExits.size} entries)`);
+      console.log(
+        `[GEO - TOR] >_ Tor exit list loaded (${torExits.size} entries)`,
+      );
     } catch (err) {
-      console.warn("[geo] Tor exit list refresh failed:", err);
+      console.warn("[GEO - TOR] ✕ Tor exit list refresh failed :", err);
     } finally {
       torFetching = null;
     }
@@ -245,12 +249,12 @@ export default async function isRequestFromIndia(
 
   /* ---- Development bypass ------------------------------------------- */
   if (IS_DEV && (!ip || isLoopback(ip) || isPrivateIp(ip))) {
-    console.log(`[geo] dev bypass (ip=${ip ?? "none"}) -> ALLOWED`);
+    console.log(`[GEO - DEV] ➤ Dev bypass (ip=${ip ?? "none"}) — allowed`);
     return true;
   }
 
   if (!ip) {
-    console.warn("[geo] No client IP found - denying");
+    console.warn("[GEO - DENY] ✕ No client IP found");
     return false;
   }
 
@@ -261,7 +265,7 @@ export default async function isRequestFromIndia(
   const intel = await lookupMaxMind(ip);
 
   if (!intel) {
-    console.warn(`[geo] Lookup failed for ${ip} - denying`);
+    console.warn(`[GEO - DENY] ✕ Lookup failed for ${ip}`);
     return false;
   }
 
@@ -272,32 +276,32 @@ export default async function isRequestFromIndia(
   const orgLower = (intel.asnOrg ?? "").toLowerCase();
   const isHostingAsn = HOSTING_KEYWORDS.some((kw) => orgLower.includes(kw));
 
-  const log =
-    `[geo] ${ip} | country=${intel.countryCode} | tor=${isTor} | ` +
+  const ctx =
+    `${ip} | country=${intel.countryCode} | tor=${isTor} | ` +
     `hostingAsn=${isHostingAsn} | anonProxy=${intel.isAnonymousProxy} | ` +
     `asnOrg=${intel.asnOrg}`;
 
   /* ---- Gates ------------------------------------------------------- */
   if (intel.countryCode !== "IN") {
-    console.warn(`${log} -> NOT INDIA`);
+    console.warn(`[GEO - DENY] ✕ Not India — ${ctx}`);
     return false;
   }
 
   if (intel.isAnonymousProxy) {
-    console.warn(`${log} -> ANONYMOUS PROXY`);
+    console.warn(`[GEO - DENY] ✕ Anonymous proxy — ${ctx}`);
     return false;
   }
 
   if (isTor) {
-    console.warn(`${log} -> TOR EXIT`);
+    console.warn(`[GEO - DENY] ✕ Tor exit — ${ctx}`);
     return false;
   }
 
   if (isHostingAsn) {
-    console.warn(`${log} -> HOSTING ASN`);
+    console.warn(`[GEO - DENY] ✕ Hosting ASN — ${ctx}`);
     return false;
   }
 
-  console.log(`${log} -> ALLOWED`);
+  console.log(`[GEO - ALLOW] >_ ${ctx}`);
   return true;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Mail, MessageCircle } from "lucide-react";
+import { Heart, Mail } from "lucide-react";
 import CraftiNagmaLogo from "../../assets/images/logo_v1.png";
 import {
   instagramLink,
@@ -8,7 +8,7 @@ import {
   supportMail,
   whatsappNumberLink,
 } from "../../utils/main.util";
-import { InstagramIcon } from "./utils/SocialIcons";
+import { InstagramIcon, WhatsAppIcon } from "./utils/SocialIcons";
 import { SectionDivider } from "./utils/SectionDiv";
 
 const FOOTER_CONTENT = {
@@ -77,7 +77,7 @@ const FOOTER_CONTENT = {
 
 const SOCIAL_ICONS = {
   instagram: InstagramIcon,
-  whatsapp: MessageCircle,
+  whatsapp: WhatsAppIcon,
   mail: Mail,
 } as const;
 
