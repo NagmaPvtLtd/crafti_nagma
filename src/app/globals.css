@@ -54,3 +54,93 @@ body {
 *::-webkit-scrollbar-thumb {
   background: transparent;
 }
+
+/* ==========================================================================
+ * Custom Loader CSS
+ * ========================================================================== */
+
+@theme {
+  --animate-cl-squish: cl-squish 2.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  --animate-cl-spin-slow: cl-spin 9s linear infinite;
+  --animate-cl-spin-rev: cl-spin-rev 6s linear infinite;
+  --animate-cl-float: cl-float-up 3s ease-in-out infinite;
+  --animate-cl-bead: cl-bead 1.3s ease-in-out infinite;
+  --animate-cl-glow: cl-glow 3s ease-in-out infinite;
+
+  @keyframes cl-squish {
+
+    0%,
+    100% {
+      transform: scale(1, 1);
+    }
+
+    28% {
+      transform: scale(1.1, 0.9);
+    }
+
+    55% {
+      transform: scale(0.94, 1.06);
+    }
+
+    78% {
+      transform: scale(1.03, 0.97);
+    }
+  }
+
+  @keyframes cl-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes cl-spin-rev {
+    to {
+      transform: rotate(-360deg);
+    }
+  }
+
+  @keyframes cl-float-up {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.5) rotate(-8deg);
+    }
+
+    25% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+      transform: translateY(-44px) scale(1.05) rotate(8deg);
+    }
+  }
+
+  @keyframes cl-bead {
+
+    0%,
+    70%,
+    100% {
+      transform: translateY(0) scale(0.85);
+      opacity: 0.45;
+    }
+
+    35% {
+      transform: translateY(-7px) scale(1.15);
+      opacity: 1;
+    }
+  }
+
+  @keyframes cl-glow {
+
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.7;
+      transform: scale(1.14);
+    }
+  }
+}

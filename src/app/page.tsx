@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Landing from "./(components)/Pages/Landing";
-import PageWrapper from "./(components)/utilts/PageWrapper";
+import PageWrapper from "./(components)/utils/PageWrapper";
 
 export const metadata: Metadata = {
   title: "Crafti Nagma — Handmade Crochet & Embroidery",

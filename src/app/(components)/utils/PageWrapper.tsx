@@ -88,7 +88,7 @@ export default function PageWrapper({
       )}
 
       {/* ---- Content layer --------------------------------------- */}
-      <div className="relative z-10 max-w-7xls">{children}</div>
+      <div className="relative z-10 ">{children}</div>
     </div>
   );
 }

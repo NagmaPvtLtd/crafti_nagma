@@ -13,6 +13,7 @@ import CustomLoader from "./(components)/CustomLoader";
 import Navbar from "./(components)/Navbar/Navbar";
 import IKProvider from "./(components)/Providers/Imagekit.Provider";
 import Footer from "./(components)/Footer";
+import ScrollToTop from "./(components)/utils/ScrollToTop";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -98,6 +99,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <Navbar />
             <HomePageHeartbeat />
             {children}
+            <ScrollToTop />
             <Footer />
           </IKProvider>
         </Suspense>
