@@ -1,13 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Mail, MessageCircle } from "lucide-react";
+import { Heart, Mail } from "lucide-react";
 import CraftiNagmaLogo from "../../assets/images/logo_v1.png";
-import { supportMail } from "../../utils/main.util";
-import { InstagramIcon } from "./utilts/SocialIcons";
-
-/* ============================================================================
- * FOOTER CONTENT — edit here only
- * ========================================================================== */
+import {
+  instagramLink,
+  itsmeprinceWebsiteLink,
+  supportMail,
+  whatsappNumberLink,
+} from "../../utils/main.util";
+import { InstagramIcon, WhatsAppIcon } from "./utils/SocialIcons";
+import { SectionDivider } from "./utils/SectionDiv";
 
 const FOOTER_CONTENT = {
   tagline: "Handmade with love, stitched with care.",
@@ -51,12 +53,12 @@ const FOOTER_CONTENT = {
   socials: [
     {
       label: "Instagram",
-      href: "https://www.instagram.com/crafti_nagma",
+      href: instagramLink,
       icon: "instagram" as const,
     },
     {
       label: "WhatsApp",
-      href: "https://wa.me/919999999999",
+      href: whatsappNumberLink,
       icon: "whatsapp" as const,
     },
     {
@@ -67,35 +69,30 @@ const FOOTER_CONTENT = {
   ],
   madeWith: {
     before: "Made with",
-    after: "in India",
+    after: "by",
+    authorHandle: "@itsmeprince",
+    authorHref: itsmeprinceWebsiteLink,
   },
 } as const;
 
 const SOCIAL_ICONS = {
   instagram: InstagramIcon,
-  whatsapp: MessageCircle,
+  whatsapp: WhatsAppIcon,
   mail: Mail,
 } as const;
-
-/* ============================================================================
- * Footer
- * ========================================================================== */
 
 export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative border-t border-stone-200/60 bg-white ">
-      {/* Soft rose glow — ties into landing's decorative glows */}
+    <footer className="relative w-full bg-white px-4 pb-6 pt-10">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-16 right-0 h-16 w-64 rounded-full bg-rose-100/30 blur-3xl"
+        className="pointer-events-none absolute -top-8 right-10 h-16 w-64 rounded-full bg-linear-to-t from-rose-200 to-white blur-3xl"
       />
 
-      <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-        {/* ---- Top: brand + columns --------------------------------- */}
+      <div className="relative mx-auto max-w-7xl overflow-hidden px-5 py-8 backdrop-blur-sm sm:rounded-3xl sm:px-8 sm:py-12">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-6 lg:gap-8">
-          {/* Brand block — spans 2 cols on lg */}
           <div className="lg:col-span-2">
             <Link href="/" aria-label="Home" className="inline-block">
               <Image
@@ -111,16 +108,14 @@ export default function Footer() {
               {FOOTER_CONTENT.tagline}
             </p>
 
-            {/* Direct contact line — supportMail front & centre */}
             <a
               href={`mailto:${supportMail}`}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 transition-colors hover:text-rose-700"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-100 hover:text-rose-700"
             >
               <Mail className="h-3.5 w-3.5" />
               {supportMail}
             </a>
 
-            {/* Socials */}
             <div className="mt-5 flex items-center gap-2">
               {FOOTER_CONTENT.socials.map((s) => {
                 const Icon = SOCIAL_ICONS[s.icon];
@@ -132,7 +127,7 @@ export default function Footer() {
                     aria-label={s.label}
                     target={external ? "_blank" : undefined}
                     rel={external ? "noopener noreferrer" : undefined}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200/80 bg-white/80 text-stone-600 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-rose-50/60 text-rose-500 transition-colors hover:border-rose-300 hover:bg-rose-100 hover:text-rose-600"
                   >
                     <Icon className="h-4 w-4" />
                   </Link>
@@ -141,7 +136,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Link columns */}
           {FOOTER_CONTENT.columns.map((col) => (
             <div key={col.title}>
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-900">
@@ -163,8 +157,9 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* ---- Bottom bar ------------------------------------------ */}
-        <div className="mt-10 flex flex-col items-center gap-3 border-t border-stone-200/60 pt-6 text-center sm:mt-12 sm:flex-row sm:justify-between sm:text-left">
+        <SectionDivider className="mt-10 sm:mt-12" />
+
+        <div className="mt-6 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <p className="text-xs text-stone-500">
             © {year}{" "}
             <Link
@@ -178,8 +173,19 @@ export default function Footer() {
 
           <p className="flex items-center gap-1.5 text-xs text-stone-500">
             {FOOTER_CONTENT.madeWith.before}
-            <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+            <Heart
+              aria-hidden
+              className="animate-cl-heartbeat motion-reduce:animate-none h-3 w-3 fill-rose-500 text-rose-500"
+            />
             {FOOTER_CONTENT.madeWith.after}
+            <Link
+              href={FOOTER_CONTENT.madeWith.authorHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono font-medium text-rose-500 underline decoration-rose-300 decoration-dashed underline-offset-4 transition-colors hover:text-rose-600"
+            >
+              {FOOTER_CONTENT.madeWith.authorHandle}
+            </Link>
           </p>
         </div>
       </div>

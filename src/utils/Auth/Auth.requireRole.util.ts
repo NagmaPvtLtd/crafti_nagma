@@ -40,9 +40,9 @@
  *
  * LOGS
  * ────
- *   Every line is prefixed with [auth:guard] for easy filtering.
+ *   Every line is prefixed with [AUTH] for easy filtering.
  *   The route label is auto-derived from the caller's file path
- *   (e.g. "GET app/api/admin/settings/route.ts") unless you pass
+ *   (e.g. "app/api/admin/settings/route.ts") unless you pass
  *   `label` explicitly.
  *
  * ═════════════════════════════════════════════════════════════════════
@@ -83,22 +83,6 @@ export interface GuardOptions {
 /*  Internal utilities                                                 */
 /* ------------------------------------------------------------------ */
 
-type LogLevel = "info" | "warn" | "error";
-
-function log(
-  level: LogLevel,
-  message: string,
-  meta?: Record<string, unknown>,
-): void {
-  const now = new Date();
-  const ts = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
-  const prefix = `[auth:guard] [${ts}] [${level.toUpperCase()}]`;
-
-  if (level === "error") console.error(prefix, message, meta ?? "");
-  else if (level === "warn") console.warn(prefix, message, meta ?? "");
-  else console.log(prefix, message, meta ?? "");
-}
-
 /**
  * Walks the stack trace and returns something like:
  *   "app/api/admin/settings/route.ts"
@@ -138,7 +122,9 @@ export async function requireRole(
 
   /* ---- 0. sanity check the caller -------------------------------- */
   if (!Array.isArray(allowed) || allowed.length === 0) {
-    log("error", `✗ ${label} — requireRole called with empty role list`);
+    console.error(
+      `[AUTH - CONFIG] ✕ ${label} — requireRole called with empty role list`,
+    );
     return {
       ok: false,
       response: NextResponse.json(
@@ -148,16 +134,14 @@ export async function requireRole(
     };
   }
 
-  log("info", `→ ${label} — checking access`, { required: allowed });
+  console.log(`[AUTH - CHECKING] ➤ ${label} — required: ${allowed.join(", ")}`);
 
   /* ---- 1. read the session -------------------------------------- */
   let session: Session | null = null;
   try {
     session = await getServerSession(authOptions);
   } catch (err) {
-    log("error", `✗ ${label} — getServerSession threw`, {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    console.error(`[AUTH - FAILED] ✕ ${label} — getServerSession threw :`, err);
     return {
       ok: false,
       response: NextResponse.json(
@@ -169,7 +153,7 @@ export async function requireRole(
 
   /* ---- 2. no session → 401 -------------------------------------- */
   if (!session?.user) {
-    log("warn", `✗ ${label} — no session`);
+    console.warn(`[AUTH - DENY] ✕ ${label} — no session`);
     return {
       ok: false,
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
@@ -177,11 +161,11 @@ export async function requireRole(
   }
 
   const { id, email, role, status } = session.user;
-  const who = { id, email, role, status };
+  const who = `id=${id} email=${email} role=${role} status=${status}`;
 
   /* ---- 3. inactive / banned → 403 ------------------------------- */
   if (status !== "active") {
-    log("warn", `✗ ${label} — account not active`, who);
+    console.warn(`[AUTH - DENY] ✕ ${label} — account not active | ${who}`);
     return {
       ok: false,
       response: NextResponse.json(
@@ -193,7 +177,7 @@ export async function requireRole(
 
   /* ---- 4. no role assigned → 403 -------------------------------- */
   if (!role) {
-    log("warn", `✗ ${label} — user has no role`, who);
+    console.warn(`[AUTH - DENY] ✕ ${label} — user has no role | ${who}`);
     return {
       ok: false,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
@@ -213,11 +197,9 @@ export async function requireRole(
   }
 
   if (!passes) {
-    log("warn", `✗ ${label} — insufficient role`, {
-      ...who,
-      required: allowed,
-      allowHigherRoles,
-    });
+    console.warn(
+      `[AUTH - DENY] ✕ ${label} — insufficient role | ${who} | required=${allowed.join(", ")} allowHigherRoles=${allowHigherRoles}`,
+    );
     return {
       ok: false,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
@@ -225,7 +207,7 @@ export async function requireRole(
   }
 
   /* ---- 6. granted ----------------------------------------------- */
-  log("info", `✓ ${label} — access granted`, { id, role });
+  console.log(`[AUTH - ALLOW] >_ ${label} — access granted | ${who}`);
 
   return { ok: true, session };
 }

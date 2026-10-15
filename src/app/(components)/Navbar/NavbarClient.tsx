@@ -18,23 +18,10 @@ import {
 import type { SessionUserClient } from "../../../types/User/JWT.types";
 import { getSectionsForRole, type NavLink } from "./navLinks";
 import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
-
-/* ============================================================================
- * NAVBAR — the only navigation surface
- * ============================================================================
- * Desktop (>= 640px):
- *   [Logo]   [Search .......]   Browse  Notif  Profile▾  Cart
- *   └─ Profile click → floating popup anchored right, never overflows.
- *
- * Mobile (< 640px):
- *   [Logo]  [Search] [Profile] [Cart] [Hamburger]
- *   └─ Profile click → opens the same drawer as the hamburger.
- *      No floating popup is ever rendered on mobile.
- * ========================================================================== */
+import { SectionDivider } from "../utils/SectionDiv";
 
 type Props = { user: SessionUserClient | null };
 
-/** Tailwind's `sm` breakpoint (px). Below this → mobile behaviour. */
 const MOBILE_BREAKPOINT = 640;
 
 function isActiveLink(pathname: string, link: NavLink): boolean {
@@ -54,9 +41,6 @@ export default function NavbarClient({ user }: Props) {
 
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  /* ---------------------------------------------------------------- */
-  /* Breakpoint tracking — drives profile click behaviour             */
-  /* ---------------------------------------------------------------- */
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const update = () => setIsMobile(mq.matches);
@@ -65,9 +49,6 @@ export default function NavbarClient({ user }: Props) {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  /* ---------------------------------------------------------------- */
-  /* Route change → close every transient UI                          */
-  /* ---------------------------------------------------------------- */
   useEffect(() => {
     const load = () => {
       setSearchOpen(false);
@@ -77,9 +58,6 @@ export default function NavbarClient({ user }: Props) {
     load();
   }, [pathname]);
 
-  /* ---------------------------------------------------------------- */
-  /* Click outside → close the desktop popup                          */
-  /* ---------------------------------------------------------------- */
   useEffect(() => {
     if (!userMenuOpen) return;
     function onClick(e: MouseEvent) {
@@ -94,9 +72,6 @@ export default function NavbarClient({ user }: Props) {
     return () => document.removeEventListener("mousedown", onClick);
   }, [userMenuOpen]);
 
-  /* ---------------------------------------------------------------- */
-  /* Lock body scroll while mobile drawer is open                     */
-  /* ---------------------------------------------------------------- */
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => {
@@ -122,12 +97,6 @@ export default function NavbarClient({ user }: Props) {
     signIn("google", { callbackUrl: pathname });
   }
 
-  /**
-   * Profile button handler.
-   *
-   * Mobile  → toggle the drawer (same one hamburger opens).
-   * Desktop → toggle the floating popup.
-   */
   function handleProfileClick() {
     if (isMobile) {
       setUserMenuOpen(false);
@@ -139,9 +108,8 @@ export default function NavbarClient({ user }: Props) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white">
+      <header className="sticky top-0 z-40 border-b border-white/60 bg-white backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
-          {/* LEFT — Logo */}
           <Link href="/" aria-label="Home" className="shrink-0">
             <Image
               src={CraftiNagmaPNG}
@@ -153,7 +121,6 @@ export default function NavbarClient({ user }: Props) {
             />
           </Link>
 
-          {/* MIDDLE — Desktop search */}
           <form
             onSubmit={submitSearch}
             className="hidden flex-1 items-center justify-center md:flex"
@@ -161,19 +128,18 @@ export default function NavbarClient({ user }: Props) {
             <div className="relative w-full max-w-xl">
               <Search
                 size={15}
-                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-neutral-400"
+                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-stone-400"
               />
               <input
                 type="search"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="Search handmade treasures..."
-                className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2 pr-4 pl-10 text-sm text-neutral-900 transition outline-none placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
+                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-4 pl-10 text-sm text-stone-900 transition outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
               />
             </div>
           </form>
 
-          {/* RIGHT — Actions */}
           <div className="flex shrink-0 items-center gap-1">
             <IconButton
               label="Search"
@@ -202,7 +168,6 @@ export default function NavbarClient({ user }: Props) {
               <Bell size={16} />
             </RightLink>
 
-            {/* Profile / Sign-in */}
             {user ? (
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -210,44 +175,36 @@ export default function NavbarClient({ user }: Props) {
                   onClick={handleProfileClick}
                   aria-haspopup={isMobile ? "dialog" : "menu"}
                   aria-expanded={isMobile ? mobileOpen : userMenuOpen}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 pr-2 transition hover:bg-neutral-100"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 pr-2 transition hover:bg-rose-50/60"
                 >
                   <Avatar name={user.name} image={user.image} size={30} />
                   <ChevronDown
                     size={13}
-                    className={`hidden text-neutral-400 transition-transform sm:block ${
+                    className={`hidden text-stone-400 transition-transform sm:block ${
                       !isMobile && userMenuOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
-                {/*
-                 * Desktop-only floating popup.
-                 * Anchored `right-0` so it always extends leftward and
-                 * capped to `100vw - 2rem` so it never spills off-screen
-                 * on narrow desktop / tablet viewports.
-                 */}
                 {!isMobile && userMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute top-full right-0 mt-2 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-black/5"
+                    className="absolute top-full right-0 mt-2 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/60 bg-white/95 shadow-xl shadow-rose-100/40 backdrop-blur-md"
                   >
-                    {/* User header */}
-                    <div className="border-b border-neutral-100 px-4 py-3">
-                      <p className="truncate text-sm font-medium text-neutral-900">
+                    <div className="border-b border-stone-100 px-4 py-3">
+                      <p className="truncate text-sm font-medium text-stone-900">
                         {user.name}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-neutral-500">
+                      <p className="mt-0.5 truncate text-xs text-stone-500">
                         {user.email}
                       </p>
                     </div>
 
-                    {/* Role-based sections */}
-                    <div className="py-1.5">
+                    <div className="py-1.5 bg-white/60">
                       {sections.map((section, idx) => (
                         <div key={idx}>
                           {section.label && (
-                            <p className="mt-2 mb-1 px-4 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
+                            <p className="mt-2 mb-1 px-4 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
                               {section.label}
                             </p>
                           )}
@@ -265,11 +222,10 @@ export default function NavbarClient({ user }: Props) {
                       ))}
                     </div>
 
-                    {/* Sign out */}
                     <button
                       type="button"
                       onClick={() => signOut({ callbackUrl: "/" })}
-                      className="flex w-full cursor-pointer items-center gap-2 border-t border-neutral-100 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                      className="flex w-full cursor-pointer items-center gap-2 border-t border-stone-100 px-4 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
                     >
                       <LogOut size={16} />
                       Sign out
@@ -281,7 +237,7 @@ export default function NavbarClient({ user }: Props) {
               <button
                 type="button"
                 onClick={handleSignIn}
-                className="ml-1 flex cursor-pointer items-center rounded-full bg-neutral-900 px-4 py-2 text-xs font-medium text-white transition hover:bg-neutral-800 active:scale-[0.98]"
+                className="ml-1 flex cursor-pointer items-center rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
                 Sign in
               </button>
@@ -306,10 +262,9 @@ export default function NavbarClient({ user }: Props) {
           </div>
         </div>
 
-        {/* Mobile search bar */}
         <form
           onSubmit={submitSearch}
-          className={`overflow-hidden border-t border-neutral-200 transition-all duration-200 md:hidden ${
+          className={`overflow-hidden border-t border-white/60 transition-all duration-200 md:hidden ${
             searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
@@ -317,7 +272,7 @@ export default function NavbarClient({ user }: Props) {
             <div className="relative">
               <Search
                 size={15}
-                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-neutral-400"
+                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-stone-400"
               />
               <input
                 autoFocus={searchOpen}
@@ -325,14 +280,13 @@ export default function NavbarClient({ user }: Props) {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="Search..."
-                className="w-full rounded-full border border-neutral-200 bg-neutral-50 py-2 pr-4 pl-10 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
+                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-4 pl-10 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
               />
             </div>
           </div>
         </form>
       </header>
 
-      {/* Mobile drawer — also opened by tapping the profile avatar */}
       <div
         className={`fixed inset-x-0 top-16 bottom-0 z-30 overflow-y-auto bg-white transition-all duration-200 sm:hidden ${
           mobileOpen
@@ -342,21 +296,33 @@ export default function NavbarClient({ user }: Props) {
         role="dialog"
         aria-modal="true"
       >
-        <nav className="mx-auto flex max-w-7xl flex-col gap-5 p-4 pb-24">
-          {/* Logged-in user header */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-rose-100/60 blur-3xl"
+        />
+
+        <nav className="relative mx-auto flex max-w-7xl flex-col gap-5 p-4 pb-24 ">
           {user && (
-            <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
+            <div className="relative flex items-center gap-3 overflow-hidden rounded-2xl border border-white/60 bg-white/85 px-3 py-3 backdrop-blur-sm">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -top-8 -right-8 h-20 w-20 rounded-full bg-rose-200/50 blur-2xl"
+              />
               <Avatar name={user.name} image={user.image} size={40} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-neutral-900">
+              <div className="relative min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-stone-900">
                   {user.name}
                 </p>
-                <p className="truncate text-xs text-neutral-500">
-                  {user.email}
-                </p>
+                <p className="truncate text-xs text-stone-500">{user.email}</p>
               </div>
             </div>
           )}
+
+          {user && <SectionDivider size={11} />}
 
           {!user && (
             <div className="space-y-0.5">
@@ -382,7 +348,7 @@ export default function NavbarClient({ user }: Props) {
             sections.map((section, idx) => (
               <div key={idx}>
                 {section.label && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-neutral-400 uppercase">
+                  <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
                     {section.label}
                   </p>
                 )}
@@ -418,7 +384,7 @@ export default function NavbarClient({ user }: Props) {
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 px-3 py-3 text-sm text-red-600 transition hover:bg-red-50"
+                className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-3 text-sm text-rose-600 transition hover:bg-rose-100"
               >
                 <LogOut size={16} />
                 Sign out
@@ -430,21 +396,19 @@ export default function NavbarClient({ user }: Props) {
                   setMobileOpen(false);
                   handleSignIn();
                 }}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-neutral-900 px-3 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-rose-500 px-3 py-3 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
                 Sign in with Google
               </button>
             )}
           </div>
+
+          <SectionDivider className="mt-2" size={11} />
         </nav>
       </div>
     </>
   );
 }
-
-/* ============================================================================
- * Small components
- * ========================================================================== */
 
 function Avatar({
   name,
@@ -462,7 +426,7 @@ function Avatar({
     return (
       <span
         style={{ width: size, height: size }}
-        className="flex shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100 text-xs font-medium text-neutral-700"
+        className="flex shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-xs font-medium text-rose-500"
       >
         {initials}
       </span>
@@ -476,7 +440,7 @@ function Avatar({
       width={size}
       height={size}
       onError={() => setFailed(true)}
-      className="shrink-0 rounded-full border border-neutral-200 object-cover"
+      className="shrink-0 rounded-full border border-rose-200 object-cover"
       style={{ width: size, height: size }}
     />
   );
@@ -499,7 +463,7 @@ function IconButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 ${className}`}
+      className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-stone-600 transition hover:bg-rose-50/60 hover:text-rose-600 ${className}`}
     >
       {children}
     </button>
@@ -525,8 +489,8 @@ function RightLink({
       aria-label={label}
       className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition ${
         active
-          ? "bg-neutral-100 text-neutral-900"
-          : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          ? "bg-rose-50/70 text-rose-600"
+          : "text-stone-600 hover:bg-rose-50/60 hover:text-rose-600"
       } ${className}`}
     >
       {children}
@@ -550,11 +514,11 @@ function MenuItem({
       href={href}
       className={`flex items-center gap-2.5 px-4 py-2 text-sm transition ${
         active
-          ? "bg-neutral-100 text-neutral-900"
-          : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+          ? "bg-rose-50/70 text-rose-600"
+          : "text-stone-700 hover:bg-rose-50/60 hover:text-rose-600"
       }`}
     >
-      {Icon && <Icon size={15} className="shrink-0 text-neutral-500" />}
+      {Icon && <Icon size={15} className="shrink-0 text-stone-400" />}
       <span className="truncate">{children}</span>
     </Link>
   );
@@ -575,7 +539,7 @@ function MobileLink({
     <Link
       href={href}
       onClick={onClose}
-      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900"
+      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-stone-700 transition hover:bg-rose-50/60 hover:text-rose-600"
     >
       {Icon && <Icon size={16} className="shrink-0" />}
       <span>{children}</span>

@@ -165,7 +165,7 @@ export class RateLimiter {
       await redis.ping();
       return redis;
     } catch (error: unknown) {
-      console.error("[RateLimit] Redis connection error:", error);
+      console.error("[RATELIMIT - FAILED] Redis connection error :", error);
       return null;
     }
   }
@@ -258,7 +258,7 @@ export class RateLimiter {
       // Fallback if Redis is unavailable
       if (!redis) {
         console.warn(
-          "[RateLimit] Redis not available, using in-memory fallback",
+          "[RATELIMIT - FALLBACK] ➤ Redis unavailable, using in-memory fallback",
         );
         return this.fallbackResponse(ip, config);
       }
@@ -298,20 +298,18 @@ export class RateLimiter {
 
         // Log blocking for monitoring
         console.log(
-          `[RateLimit] Blocked IP: ${ip}, Path: ${pathname}, ` +
-            `Retry after: ${response.retryAfter}s`,
+          `[RATELIMIT - BLOCK] ➤ IP ${ip} on ${pathname} — retry after ${response.retryAfter}s`,
         );
       } else if (remaining <= 2) {
         // Warning for near-limit
-        console.log(
-          `[RateLimit] Warning: IP ${ip} approaching limit ` +
-            `(${config.maxRequests - remaining}/${config.maxRequests})`,
+        console.warn(
+          `[RATELIMIT - WARN] ➤ IP ${ip} approaching limit (${config.maxRequests - remaining}/${config.maxRequests})`,
         );
       }
 
       return response;
     } catch (error: unknown) {
-      console.error("[RateLimit] Error:", error);
+      console.error("[RATELIMIT - FAILED] Rate limit check failed :", error);
       return this.fallbackResponse(ip, config);
     }
   }

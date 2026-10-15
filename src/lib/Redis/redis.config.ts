@@ -9,7 +9,7 @@ export function getRedis() {
       token: process.env.UPSTASH_REDIS_REST_TOKEN!,
     });
 
-    console.log("✅ Upstash Redis client initialized");
+    console.log("[REDIS - READY] >_ Upstash Redis client initialized");
   }
   return redis;
 }

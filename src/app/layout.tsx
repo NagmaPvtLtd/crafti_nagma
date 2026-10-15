@@ -13,6 +13,8 @@ import CustomLoader from "./(components)/CustomLoader";
 import Navbar from "./(components)/Navbar/Navbar";
 import IKProvider from "./(components)/Providers/Imagekit.Provider";
 import Footer from "./(components)/Footer";
+import ScrollToTop from "./(components)/utils/ScrollToTop";
+import WhatsAppFloat from "./(components)/utils/WhatsappFloating";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,17 +69,9 @@ export const metadata: Metadata = {
     siteName: "Crafti Nagma",
     title: "Crafti Nagma — Handmade Crochet & Embroidery",
     description: siteDescription,
-    images: [
-      {
-        url: "/assets/avatar_v1.png",
-        width: 1200,
-        height: 630,
-        alt: "Crafti Nagma Logo",
-      },
-    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Crafti Nagma — Handmade Crochet & Embroidery",
     description: siteDescription,
   },
@@ -98,6 +92,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <Navbar />
             <HomePageHeartbeat />
             {children}
+            <ScrollToTop />
+
+            <WhatsAppFloat />
             <Footer />
           </IKProvider>
         </Suspense>

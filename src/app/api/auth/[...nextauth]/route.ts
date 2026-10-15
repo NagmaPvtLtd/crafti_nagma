@@ -133,17 +133,17 @@ const authOptions: NextAuthOptions = {
 
       /* ---- 1. Geo ---------------------------------------------------- */
       if (!(await isRequestFromIndia(reqHeaders))) {
-        console.log("[auth:signIn] ✗ region_blocked");
+        console.warn("[AUTH - SIGNIN] ✕ region_blocked");
         return loginRedirect("region_error");
       }
 
       /* ---- 2. Global lock -------------------------------------------- */
       const globalLock = await setting.isActive(pool, TOGGLE_NOBODY_CAN_LOGIN);
       console.log(
-        `[auth:signIn] toggle "${TOGGLE_NOBODY_CAN_LOGIN}" = ${globalLock}`,
+        `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NOBODY_CAN_LOGIN}" = ${globalLock}`,
       );
       if (globalLock) {
-        console.log("[auth:signIn] ✗ service_offline");
+        console.warn("[AUTH - SIGNIN] ✕ service_offline");
         return loginRedirect("service_offline");
       }
 
@@ -151,8 +151,7 @@ const authOptions: NextAuthOptions = {
       const parsed = googleProfileSchema.safeParse(profile);
       if (!parsed.success) {
         console.warn(
-          "[auth:signIn] ✗ invalid Google profile",
-          parsed.error.flatten().fieldErrors,
+          `[AUTH - SIGNIN] ✕ invalid Google profile : ${JSON.stringify(parsed.error.flatten().fieldErrors)}`,
         );
         return false;
       }
@@ -182,10 +181,10 @@ const authOptions: NextAuthOptions = {
             TOGGLE_NEW_USER_BLOCKED,
           );
           console.log(
-            `[auth:signIn] toggle "${TOGGLE_NEW_USER_BLOCKED}" = ${newUserBlocked} [new: ${email}]`,
+            `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NEW_USER_BLOCKED}" = ${newUserBlocked} | new user: ${email}`,
           );
           if (newUserBlocked) {
-            console.log(`[auth:signIn] ✗ signups_closed [${email}]`);
+            console.warn(`[AUTH - SIGNIN] ✕ signups_closed | ${email}`);
             return loginRedirect("signups_closed");
           }
         }
@@ -193,7 +192,7 @@ const authOptions: NextAuthOptions = {
         /* ---- 4b. Banned -------------------------------------------- */
         if (userExists) {
           if (rows[0].status === "banned") {
-            console.log(`[auth:signIn] ✗ account_banned [${email}]`);
+            console.warn(`[AUTH - SIGNIN] ✕ account_banned | ${email}`);
             return loginRedirect("account_banned");
           }
 
@@ -208,7 +207,7 @@ const authOptions: NextAuthOptions = {
             [googleId, googlePicture, fullName, now, email],
           );
 
-          console.log(`[auth:signIn] ✓ existing user [${email}]`);
+          console.log(`[AUTH - SIGNIN] >_ existing user | ${email}`);
           return true;
         }
 
@@ -246,10 +245,10 @@ const authOptions: NextAuthOptions = {
           description: `New user registered via Google OAuth. [email=${email}]`,
         });
 
-        console.log(`[auth:signIn] ✓ new user created [${email}]`);
+        console.log(`[AUTH - SIGNIN] >_ new user created | ${email}`);
         return true;
       } catch (error: unknown) {
-        console.error("[auth:signIn] error:", error);
+        console.error("[AUTH - SIGNIN] ✕ sign-in flow failed :", error);
         return false;
       }
     },

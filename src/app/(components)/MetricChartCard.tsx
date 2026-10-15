@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { BarChart3, TrendingDown, TrendingUp } from "lucide-react";
-import TrendChart, { TrendPoint } from "./utilts/TrendChart";
+import TrendChart, { TrendPoint } from "./utils/TrendChart";
 
 type RangeType = "30d" | "90d" | "365d" | "lifetime";
 

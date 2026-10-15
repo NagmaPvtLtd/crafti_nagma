@@ -107,7 +107,7 @@ export class SettingService {
           return row.active;
         }
       } catch (err) {
-        console.warn("[SettingService.isActive] Redis read failed:", err);
+        console.warn("[SETTING - READ] ✕ Redis read failed :", err);
       }
     }
 
@@ -121,7 +121,7 @@ export class SettingService {
       try {
         await redis.set(key, map, { ex: ttl });
       } catch (err) {
-        console.warn("[SettingService.isActive] Redis write failed:", err);
+        console.warn("[SETTING - WRITE] ✕ Redis write failed :", err);
       }
     }
 
@@ -328,7 +328,7 @@ export class SettingService {
       cache[field_name] = row;
       await redis.set(key, cache, { ex: ttl });
     } catch (err) {
-      console.warn("[SettingService.mergeIntoCache] Redis write failed:", err);
+      console.warn("[SETTING - MERGE] ✕ Redis write failed :", err);
     }
   }
 
@@ -350,7 +350,7 @@ export class SettingService {
       delete cache[field_name];
       await redis.set(key, cache, { ex: ttl });
     } catch (err) {
-      console.warn("[SettingService.removeFromCache] Redis write failed:", err);
+      console.warn("[SETTING - REMOVE] ✕ Redis write failed :", err);
     }
   }
 }

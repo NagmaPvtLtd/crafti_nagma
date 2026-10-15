@@ -88,7 +88,10 @@ export class ImageKitService {
 
       return Buffer.from(await response.arrayBuffer());
     } catch (error: unknown) {
-      console.error("[ImageKitService.getFileAsBuffer] Failed:", error);
+      console.error(
+        "[IMAGEKIT - FETCH] ✕ Failed to fetch file as buffer :",
+        error,
+      );
       throw error;
     }
   }
@@ -121,11 +124,8 @@ export class ImageKitService {
       );
     }
 
-    console.log("[IMAGEKIT UPLOADER - SERVER] Uploading file:");
-    console.log(`[IMAGEKIT UPLOADER - SERVER] Name: ${opts.fileName}`);
-    console.log(`[IMAGEKIT UPLOADER - SERVER] Folder: ${finalFolder}`);
     console.log(
-      `[IMAGEKIT UPLOADER - SERVER] Private: ${opts.isPrivateFile ?? false}`,
+      `[IMAGEKIT - UPLOAD] >_ ${opts.fileName} → ${finalFolder} (private: ${opts.isPrivateFile ?? false})`,
     );
 
     const uploadFile =
@@ -155,12 +155,12 @@ export class ImageKitService {
     if (!fileId) return;
 
     try {
-      console.log(`[IMAGEKIT DELETOR - FILE] Deleting: ${fileId}`);
+      console.log(`[IMAGEKIT - DELETE] >_ File ${fileId}`);
       const imagekit = imagekitClient();
       await imagekit.files.delete(fileId);
     } catch (err: unknown) {
       console.error(
-        `[ImageKitService.deleteFile] Delete failed for ${fileId}:`,
+        `[IMAGEKIT - DELETE] ✕ Failed to delete file ${fileId} :`,
         err,
       );
     }
@@ -201,12 +201,12 @@ export class ImageKitService {
 
       const folderPath = `/${segments.join("/")}`;
 
-      console.log(`[IMAGEKIT DELETOR - FOLDER] Deleting: ${folderPath}`);
+      console.log(`[IMAGEKIT - DELETE] >_ Folder ${folderPath}`);
 
       const imagekit = imagekitClient();
       await imagekit.folders.delete({ folderPath });
     } catch (err: unknown) {
-      console.error("[ImageKitService.deleteFolder] Delete failed:", err);
+      console.error("[IMAGEKIT - DELETE] ✕ Failed to delete folder :", err);
     }
   }
 }
