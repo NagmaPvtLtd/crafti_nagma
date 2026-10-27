@@ -8,11 +8,13 @@ import {
   LayoutDashboard,
   Boxes,
   Tags,
-  Users,
-  Receipt,
   ScrollText,
-  Settings,
   ShieldCheck,
+  ReceiptIndianRupee,
+  MessageSquare,
+  TicketPercent,
+  TrendingUp,
+  UserCog,
 } from "lucide-react";
 import type { UserRole } from "../../../types/User/UserRow.types";
 
@@ -20,6 +22,7 @@ export interface NavLink {
   href: string;
   label: string;
   icon: ElementType;
+  /** Only match exact pathname — use for terminal/root routes only */
   exact?: boolean;
 }
 
@@ -28,36 +31,52 @@ export interface NavSection {
   links: NavLink[];
 }
 
+/* ------------------------------------------------------------------ */
+/*  CUSTOMER — A-Z                                                     */
+/* ------------------------------------------------------------------ */
 export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/", label: "Home", icon: Home, exact: true },
-  { href: "/products", label: "Shop", icon: ShoppingBag },
-  { href: "/cart", label: "Cart", icon: ShoppingCart },
+  { href: "/cart", label: "My Cart", icon: ShoppingCart },
   { href: "/orders", label: "My Orders", icon: Package },
-  { href: "/profile", label: "Profile", icon: UserIcon },
+  { href: "/profile", label: "My Profile", icon: UserIcon },
+  { href: "/products", label: "Shop", icon: ShoppingBag },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  MANAGER — A-Z                                                      */
+/* ------------------------------------------------------------------ */
 export const MANAGER_LINKS: NavLink[] = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/products", label: "Products", icon: Boxes },
-  { href: "/admin/categories", label: "Categories", icon: Tags },
-  { href: "/admin/orders", label: "Orders", icon: Package },
+  { href: "/admin/orders", label: "Enquiries / Orders", icon: Package },
+  { href: "/admin/categories", label: "Manage Categories", icon: Tags },
+  { href: "/admin/products", label: "Manage Products", icon: Boxes },
+  { href: "/admin/store", label: "Store Dashboard", icon: LayoutDashboard },
+  { href: "/admin/wishlist-trend", label: "Wishlist Trend", icon: TrendingUp },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  ADMIN — A-Z                                                        */
+/* ------------------------------------------------------------------ */
 export const ADMIN_LINKS: NavLink[] = [
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/payments", label: "Payments", icon: Receipt },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: ScrollText },
+  { href: "/admin/discounts", label: "Manage Discounts", icon: TicketPercent },
+  { href: "/admin/reviews", label: "Review Manager", icon: MessageSquare },
+  { href: "/admin/payments", label: "Transactions", icon: ReceiptIndianRupee },
+  { href: "/admin/user-manager", label: "User Manager", icon: UserCog },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  SUPER ADMIN — A-Z                                                  */
+/* ------------------------------------------------------------------ */
 export const SUPER_ADMIN_LINKS: NavLink[] = [
-  { href: "/admin/settings", label: "Settings", icon: Settings },
-  { href: "/admin/roles", label: "Roles & Permissions", icon: ShieldCheck },
+  { href: "/admin/settings", label: "Access Control", icon: ShieldCheck },
+  {
+    href: "/admin/dashboard",
+    label: "Admin Dashboard",
+    icon: LayoutDashboard,
+    exact: true,
+  },
 ];
 
-/**
- * Returns the nav sections visible to a given role.
- * Pure customers get a single unlabeled section; staff get tiered sections.
- */
 export function getSectionsForRole(role: UserRole): NavSection[] {
   const isSuperAdmin = role === "super_admin";
   const isAdmin = role === "admin" || isSuperAdmin;
@@ -68,11 +87,12 @@ export function getSectionsForRole(role: UserRole): NavSection[] {
   }
 
   const sections: NavSection[] = [];
+  sections.push({ label: "Shop", links: CUSTOMER_LINKS });
+  sections.push({ label: "Store Manager", links: MANAGER_LINKS });
+  if (isAdmin) sections.push({ label: "Admin", links: ADMIN_LINKS });
   if (isSuperAdmin)
     sections.push({ label: "Super Admin", links: SUPER_ADMIN_LINKS });
-  if (isAdmin) sections.push({ label: "Admin", links: ADMIN_LINKS });
-  sections.push({ label: "Store Manager", links: MANAGER_LINKS });
-  sections.push({ label: "Shop", links: CUSTOMER_LINKS });
+
   return sections;
 }
 
