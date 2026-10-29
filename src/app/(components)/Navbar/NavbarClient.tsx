@@ -325,35 +325,41 @@ export default function NavbarClient({ user }: Props) {
           <SectionDivider size={11} />
 
           {user &&
-            sections.map((section, idx) => (
-              <div key={idx}>
-                {section.label && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
-                    {section.label}
-                  </p>
-                )}
-                <div className="space-y-0.5">
-                  {section.links.map((link) => (
-                    <MobileLink
-                      key={link.href}
-                      href={link.href}
-                      onClose={() => setMobileOpen(false)}
-                      icon={link.icon}
-                    >
-                      {link.label}
-                    </MobileLink>
-                  ))}
-                  {/* TODO: will add notification count in here */}
-                  <MobileLink
-                    href="/notifications"
-                    onClose={() => setMobileOpen(false)}
-                    icon={Bell}
-                  >
-                    Notifications
-                  </MobileLink>
+            sections.map((section, idx) => {
+              const isLast = idx === sections.length - 1;
+              return (
+                <div key={idx}>
+                  {section.label && (
+                    <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
+                      {section.label}
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.links.map((link) => (
+                      <MobileLink
+                        key={link.href}
+                        href={link.href}
+                        onClose={() => setMobileOpen(false)}
+                        icon={link.icon}
+                      >
+                        {link.label}
+                      </MobileLink>
+                    ))}
+
+                    {isLast && (
+                      <MobileLink
+                        href="/notifications"
+                        onClose={() => setMobileOpen(false)}
+                        icon={Bell}
+                      >
+                        Notifications
+                        {/* TODO: add notification count badge here */}
+                      </MobileLink>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
           <div className="mt-2">
             {user ? (

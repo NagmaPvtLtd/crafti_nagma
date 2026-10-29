@@ -15,6 +15,7 @@ import TextInput from "../../utils/Form/TextInput";
 import PasswordInput from "../../utils/Form/PasswordInput";
 import { ProfileResponse } from "../../../../types/User/ProfileClient.types";
 import { profileUpdateSchema } from "../../../../utils/zod/auth.profile.zod";
+import CustomLoader from "../../CustomLoader";
 
 type EditFormState = {
   first_name: string;
@@ -82,7 +83,7 @@ export default function ProfileClient() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const load = async () => {
       try {
         const { data } = await axios.get<ProfileResponse>("/api/auth/profile");
         if (!cancelled) setProfile(data);
@@ -96,8 +97,8 @@ export default function ProfileClient() {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-
+    };
+    load();
     return () => {
       cancelled = true;
     };
@@ -111,11 +112,7 @@ export default function ProfileClient() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-rose-500" />
-      </div>
-    );
+    return <CustomLoader />;
   }
 
   if (loadError || !profile) {
