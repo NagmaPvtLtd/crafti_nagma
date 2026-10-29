@@ -20,7 +20,7 @@ export default function ScrollToTop() {
       type="button"
       aria-label="Go to top"
       onClick={scrollTop}
-      className={`fixed bottom-6 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-rose-500 shadow-lg shadow-rose-200/40 backdrop-blur-sm transition-all duration-300 hover:bg-rose-50 hover:text-rose-600 sm:right-8 cursor-pointer ${
+      className={`fixed bottom-5 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-rose-500 shadow-lg shadow-rose-200/40 backdrop-blur-sm transition-all duration-300 hover:bg-rose-50 hover:text-rose-600 cursor-pointer ${
         visible
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-3 opacity-0"

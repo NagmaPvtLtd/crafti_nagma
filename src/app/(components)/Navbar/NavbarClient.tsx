@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { signIn, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import {
   Bell,
   ChevronDown,
@@ -15,7 +15,7 @@ import {
   ShoppingCart,
   X,
 } from "lucide-react";
-import type { SessionUserClient } from "../../../types/User/JWT.types";
+import { SessionUserClient } from "../../../types/User/JWT.types";
 import { getSectionsForRole, type NavLink } from "./navLinks";
 import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
 import { SectionDivider } from "../utils/SectionDiv";
@@ -94,7 +94,7 @@ export default function NavbarClient({ user }: Props) {
   );
 
   function handleSignIn() {
-    signIn("google", { callbackUrl: pathname });
+    router.push(`/login`);
   }
 
   function handleProfileClick() {
@@ -228,7 +228,7 @@ export default function NavbarClient({ user }: Props) {
                       className="flex w-full cursor-pointer items-center gap-2 border-t border-stone-100 px-4 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
                     >
                       <LogOut size={16} />
-                      Sign out
+                      Logout
                     </button>
                   </div>
                 )}
@@ -239,7 +239,7 @@ export default function NavbarClient({ user }: Props) {
                 onClick={handleSignIn}
                 className="ml-1 flex cursor-pointer items-center rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
-                Sign in
+                Login
               </button>
             )}
 
@@ -322,62 +322,44 @@ export default function NavbarClient({ user }: Props) {
             </div>
           )}
 
-          {user && <SectionDivider size={11} />}
-
-          {!user && (
-            <div className="space-y-0.5">
-              <MobileLink href="/" onClose={() => setMobileOpen(false)}>
-                Home
-              </MobileLink>
-              <MobileLink href="/products" onClose={() => setMobileOpen(false)}>
-                Browse
-              </MobileLink>
-              <MobileLink
-                href="/notifications"
-                onClose={() => setMobileOpen(false)}
-              >
-                Notifications
-              </MobileLink>
-              <MobileLink href="/cart" onClose={() => setMobileOpen(false)}>
-                Cart
-              </MobileLink>
-            </div>
-          )}
+          <SectionDivider size={11} />
 
           {user &&
-            sections.map((section, idx) => (
-              <div key={idx}>
-                {section.label && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
-                    {section.label}
-                  </p>
-                )}
-                <div className="space-y-0.5">
-                  {section.links.map((link) => (
-                    <MobileLink
-                      key={link.href}
-                      href={link.href}
-                      onClose={() => setMobileOpen(false)}
-                      icon={link.icon}
-                    >
-                      {link.label}
-                    </MobileLink>
-                  ))}
-                </div>
-              </div>
-            ))}
+            sections.map((section, idx) => {
+              const isLast = idx === sections.length - 1;
+              return (
+                <div key={idx}>
+                  {section.label && (
+                    <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-wider text-rose-400 uppercase">
+                      {section.label}
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.links.map((link) => (
+                      <MobileLink
+                        key={link.href}
+                        href={link.href}
+                        onClose={() => setMobileOpen(false)}
+                        icon={link.icon}
+                      >
+                        {link.label}
+                      </MobileLink>
+                    ))}
 
-          {user && (
-            <div className="space-y-0.5">
-              <MobileLink
-                href="/notifications"
-                onClose={() => setMobileOpen(false)}
-                icon={Bell}
-              >
-                Notifications
-              </MobileLink>
-            </div>
-          )}
+                    {isLast && (
+                      <MobileLink
+                        href="/notifications"
+                        onClose={() => setMobileOpen(false)}
+                        icon={Bell}
+                      >
+                        Notifications
+                        {/* TODO: add notification count badge here */}
+                      </MobileLink>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
 
           <div className="mt-2">
             {user ? (
@@ -387,7 +369,7 @@ export default function NavbarClient({ user }: Props) {
                 className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-3 text-sm text-rose-600 transition hover:bg-rose-100"
               >
                 <LogOut size={16} />
-                Sign out
+                Logout
               </button>
             ) : (
               <button
@@ -398,7 +380,7 @@ export default function NavbarClient({ user }: Props) {
                 }}
                 className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-rose-500 px-3 py-3 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
-                Sign in with Google
+                Login
               </button>
             )}
           </div>

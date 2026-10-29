@@ -1,0 +1,21 @@
+export type ProfileResponse = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  has_password: boolean;
+  address_line_1: string;
+  address_line_2: string;
+  landmark: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  company_name: string;
+  gstin: string;
+  image: string | null;
+};
