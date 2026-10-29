@@ -12,6 +12,7 @@ import {
 import Field from "../utils/Form/Field";
 import TextInput from "../utils/Form/TextInput";
 import PasswordInput from "../utils/Form/PasswordInput";
+import PageWrapper from "../utils/PageWrapper";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -67,102 +68,95 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-linear-to-b from-white to-rose-50/40 px-4 py-10 sm:py-14">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-rose-100/60 blur-3xl"
-      />
+    <PageWrapper variant="form">
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10 sm:py-14">
+        <div className="w-full max-w-md">
+          <div className="rounded-3xl bg-white/60 p-6 backdrop-blur-md shadow-sm shadow-stone-900/5 sm:p-8">
+            <h1 className="mt-5 text-xl font-semibold text-center text-stone-900">
+              Welcome back
+            </h1>
+            <p className="mt-1 text-sm text-center leading-relaxed text-stone-600">
+              Login to manage your account.
+            </p>
 
-      <div className="relative mx-auto w-full max-w-md">
-        <div className="rounded-3xl p-6 backdrop-blur-md sm:p-8">
-          <h1 className="mt-5 text-xl font-semibold text-center text-stone-900">
-            Welcome back
-          </h1>
-          <p className="mt-1 text-sm text-center leading-relaxed text-stone-600">
-            Login to manage your account.
-          </p>
-
-          {message && (
-            <div
-              role="alert"
-              aria-live="polite"
-              className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
-            >
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <div className="space-y-1.5">
-                <p>{message}</p>
+            {message && (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
+              >
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <div className="space-y-1.5">
+                  <p>{message}</p>
+                </div>
               </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={isBusy}
-            className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:border-rose-200 hover:bg-rose-50/40 disabled:opacity-60"
-          >
-            {busy === "google" ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <GoogleIcon />
             )}
-            Continue with Google
-          </button>
-
-          <div className="my-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-stone-200" />
-            <span className="text-[11px] font-medium tracking-wider text-stone-400 uppercase">
-              or
-            </span>
-            <span className="h-px flex-1 bg-stone-200" />
-          </div>
-
-          <form onSubmit={handleCredentials} className="space-y-3" noValidate>
-            <Field label="Email" required>
-              <TextInput
-                type="email"
-                required
-                autoFocus
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </Field>
-
-            <Field label="Password" required>
-              <PasswordInput
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-            </Field>
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleGoogle}
               disabled={isBusy}
-              className="mt-1 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 disabled:opacity-60 active:scale-[0.98]"
+              className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:border-rose-200 hover:bg-rose-50/40 disabled:opacity-60"
             >
-              {busy === "credentials" && (
+              {busy === "google" ? (
                 <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <GoogleIcon />
               )}
-              Login
+              Continue with Google
             </button>
-          </form>
 
-          <p className="mt-5 flex items-center justify-center text-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors">
-            <span className="text-rose-600">New User?</span> Signup with Google
-            today!
-          </p>
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-stone-200" />
+              <span className="text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                or
+              </span>
+              <span className="h-px flex-1 bg-stone-200" />
+            </div>
+
+            <form onSubmit={handleCredentials} className="space-y-3" noValidate>
+              <Field label="Email" required>
+                <TextInput
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </Field>
+
+              <Field label="Password" required>
+                <PasswordInput
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
+
+              <button
+                type="submit"
+                disabled={isBusy}
+                className="mt-1 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 disabled:opacity-60 active:scale-[0.98]"
+              >
+                {busy === "credentials" && (
+                  <Loader2 size={16} className="animate-spin" />
+                )}
+                Login
+              </button>
+            </form>
+
+            <p className="mt-5 flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-center text-xs font-medium text-stone-600 transition-colors">
+              <span className="text-rose-600">New User?</span> Signup with
+              Google today!
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   );
 }
