@@ -38,7 +38,7 @@ export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/", label: "Home", icon: Home, exact: true },
   { href: "/cart", label: "My Cart", icon: ShoppingCart },
   { href: "/orders", label: "My Orders", icon: Package },
-  { href: "/profile", label: "My Profile", icon: UserIcon },
+  { href: "/dashboard/profile", label: "My Profile", icon: UserIcon },
   { href: "/products", label: "Shop", icon: ShoppingBag },
 ];
 
