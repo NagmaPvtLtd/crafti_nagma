@@ -16,7 +16,7 @@ import {
   TrendingUp,
   UserCog,
 } from "lucide-react";
-import type { UserRole } from "../../../types/User/UserRow.types";
+import { UserRole } from "../../../types/User/UserRow.types";
 
 export interface NavLink {
   href: string;

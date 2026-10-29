@@ -1,7 +1,6 @@
-import type { JWT } from "next-auth/jwt";
 import type { UserRole, UserStatus } from "./UserRow.types";
 
-export type MyJWT = JWT & {
+export interface MyJWT {
   id?: string;
   name?: string;
   email?: string;
@@ -9,13 +8,16 @@ export type MyJWT = JWT & {
   role?: UserRole;
   status?: UserStatus;
   profile_completed?: boolean;
-};
+  [key: string]: unknown;
+}
 
 /**
- * Client-safe subset of the session user, useful for passing into
- * `AppShell` and other client components.
+ * Shape guaranteed by the session() callback in the auth route.
+ * Every field below is always populated server-side, so mark them
+ * required here — otherwise every consumer has to defend against
+ * `undefined` for values that will never actually be missing.
  */
-export type SessionUserClient = {
+export interface SessionUserClient {
   id: string;
   name: string;
   email: string;
@@ -23,4 +25,4 @@ export type SessionUserClient = {
   role: UserRole;
   status: UserStatus;
   profile_completed: boolean;
-};
+}
