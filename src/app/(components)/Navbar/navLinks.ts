@@ -15,6 +15,7 @@ import {
   TicketPercent,
   TrendingUp,
   UserCog,
+  Heart,
 } from "lucide-react";
 import { UserRole } from "../../../types/User/UserRow.types";
 
@@ -39,6 +40,7 @@ export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/cart", label: "My Cart", icon: ShoppingCart },
   { href: "/dashboard/orders", label: "My Orders", icon: Package },
   { href: "/dashboard/profile", label: "My Profile", icon: UserIcon },
+  { href: "/dashboard/wishlist", label: "My Wishlist", icon: Heart },
   { href: "/shop", label: "Shop", icon: ShoppingBag },
 ];
 
