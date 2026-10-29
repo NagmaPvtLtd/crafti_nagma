@@ -16,6 +16,7 @@ import PasswordInput from "../../utils/Form/PasswordInput";
 import { ProfileResponse } from "../../../../types/User/ProfileClient.types";
 import { profileUpdateSchema } from "../../../../utils/zod/auth.profile.zod";
 import CustomLoader from "../../CustomLoader";
+import PageWrapper from "../../utils/PageWrapper";
 
 type EditFormState = {
   first_name: string;
@@ -117,83 +118,78 @@ export default function ProfileClient() {
 
   if (loadError || !profile) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 text-center">
-        <div className="space-y-2">
-          <p className="text-sm text-rose-600">
-            {loadError ?? "Profile unavailable."}
-          </p>
-          <Link
-            href="/"
-            className="inline-block text-xs text-stone-500 hover:text-rose-600"
-          >
-            ← Back to home
-          </Link>
+      <PageWrapper variant="plain">
+        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 text-center">
+          <div className="space-y-2">
+            <p className="text-sm text-rose-600">
+              {loadError ?? "Profile unavailable."}
+            </p>
+            <Link
+              href="/"
+              className="inline-block text-xs text-stone-500 hover:text-rose-600"
+            >
+              ← Back to home
+            </Link>
+          </div>
         </div>
-      </div>
+      </PageWrapper>
     );
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-linear-to-b from-white to-rose-50/40 px-4 py-10 sm:py-14">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-rose-100/60 blur-3xl"
-      />
+    <PageWrapper variant="form">
+      <div className="flex min-h-[calc(100vh-4rem)] items-start justify-center px-4 py-10 sm:py-14">
+        <div className="w-full max-w-2xl">
+          <div className="rounded-3xl bg-white/60 p-6 shadow-sm shadow-stone-900/5 backdrop-blur-md sm:p-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-semibold text-stone-900">
+                  My Profile
+                </h1>
+                <p className="mt-0.5 text-sm text-stone-500">
+                  Manage your personal information and security.
+                </p>
+              </div>
 
-      <div className="relative mx-auto w-full max-w-2xl">
-        <div className="rounded-3xl p-6 sm:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold text-stone-900">
-                My Profile
-              </h1>
-              <p className="mt-0.5 text-sm text-stone-500">
-                Manage your personal information and security.
-              </p>
+              {!editing ? (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
+                >
+                  <Pencil size={13} />
+                  Edit
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
+                >
+                  <X size={13} />
+                  Cancel
+                </button>
+              )}
             </div>
 
-            {!editing ? (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
-              >
-                <Pencil size={13} />
-                Edit
-              </button>
+            <SectionDivider className="my-6" size={11} />
+
+            {editing ? (
+              <EditForm
+                profile={profile}
+                onSaved={async () => {
+                  setEditing(false);
+                  await refetchProfile();
+                }}
+                onCancel={() => setEditing(false)}
+              />
             ) : (
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
-              >
-                <X size={13} />
-                Cancel
-              </button>
+              <ViewMode profile={profile} />
             )}
           </div>
-
-          <SectionDivider className="my-6" size={11} />
-
-          {editing ? (
-            <EditForm
-              profile={profile}
-              onSaved={async () => {
-                setEditing(false);
-                await refetchProfile();
-              }}
-              onCancel={() => setEditing(false)}
-            />
-          ) : (
-            <ViewMode profile={profile} />
-          )}
         </div>
       </div>
-    </div>
+    </PageWrapper>
   );
 }
 
@@ -223,10 +219,10 @@ function ViewMode({ profile }: { profile: ProfileResponse }) {
           <p className="truncate text-base font-medium text-stone-900">
             {displayName}
           </p>
-          <p className="truncate text-sm flex gap-2 items-center text-stone-500">
+          <p className="flex items-center gap-2 truncate text-sm text-stone-500">
             {profile.email}{" "}
             {profile.email_verified ? (
-              <span className="inline-flex items-center gap-1 rounded-full  text-xs font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1 rounded-full text-xs font-medium text-emerald-700">
                 <ShieldCheck size={14} className="mb-0.5" />
               </span>
             ) : null}
@@ -242,7 +238,7 @@ function ViewMode({ profile }: { profile: ProfileResponse }) {
           value={profile.phone ? `+91${profile.phone}` : ``}
           badge={
             profile.phone && profile.phone_verified ? (
-              <span className="inline-flex items-center gap-1 rounded-full  text-xs font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1 rounded-full text-xs font-medium text-emerald-700">
                 <ShieldCheck size={14} className="mb-0.5" />
               </span>
             ) : profile.phone ? (
