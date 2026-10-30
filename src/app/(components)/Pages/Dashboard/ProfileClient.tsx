@@ -140,7 +140,7 @@ export default function ProfileClient() {
     <PageWrapper variant="form">
       <div className="flex min-h-[calc(100vh-4rem)] items-start justify-center px-4 py-10 sm:py-14">
         <div className="w-full max-w-2xl">
-          <div className="rounded-3xl bg-white/60 p-6 shadow-sm shadow-stone-900/5 backdrop-blur-md sm:p-8">
+          <div className="rounded-3xl  p-6 sm:p-8">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h1 className="text-xl font-semibold text-stone-900">
