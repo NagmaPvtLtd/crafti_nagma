@@ -124,7 +124,7 @@ export default function LoginForm() {
                   inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="user@craftinagma.com"
                 />
               </Field>
 
