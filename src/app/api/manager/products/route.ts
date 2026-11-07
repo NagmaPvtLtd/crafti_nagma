@@ -1,3 +1,4 @@
+/*
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "../../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../../lib/Database/main.db";
@@ -6,9 +7,9 @@ import { auditLog } from "../../../../../services/AuditLog.service";
 import { randomUUID } from "crypto";
 import { productCreateSchema } from "../../../../../utils/zod/manager.product.zod";
 
-/* -------------------------------------------------------------------------- */
-/*  GET /api/manager/products                                                 */
-/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- *\/
+/*  GET /api/manager/products                                                 *\/
+/* -------------------------------------------------------------------------- *\/
 
 type ProductListRow = {
   id: string;
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   });
   if (!guard.ok) return guard.response;
 
-  /* ---- query params ---- */
+  /* ---- query params ---- *\/
   const sp = req.nextUrl.searchParams;
   const search = (sp.get("search") ?? "").trim();
   const status = sp.get("status") ?? ""; // "active" | "inactive" | ""
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
   const conn = await pool.getConnection();
 
   try {
-    /* ---- build WHERE clause safely ---- */
+    /* ---- build WHERE clause safely ---- *\/
     const where: string[] = [];
     const params: unknown[] = [];
 
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    /* ---- count ---- */
+    /* ---- count ---- *\/
     const [countRows] = await conn.query<{ total: number | string }[]>(
       `SELECT COUNT(*) AS total
          FROM products p
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
     );
     const total = Number(countRows[0]?.total ?? 0);
 
-    /* ---- list ---- */
+    /* ---- list ---- *\/
     const [rows] = await conn.query<ProductListRow[]>(
       `SELECT p.id, p.code, p.name, p.slug,
               p.brief_description, p.status,
@@ -143,9 +144,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  POST /api/manager/products                                                */
-/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- *\/
+/*  POST /api/manager/products                                                *\/
+/* -------------------------------------------------------------------------- *\/
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(["manager", "admin", "super_admin"], {
@@ -158,7 +159,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  /* ---- input ---- */
+  /* ---- input ---- *\/
   const json = await req.json().catch(() => null);
   const parsed = productCreateSchema.safeParse(json);
   if (!parsed.success) {
@@ -178,7 +179,7 @@ export async function POST(req: NextRequest) {
   try {
     await conn.beginTransaction();
 
-    /* ---- slug uniqueness pre-check ---- */
+    /* ---- slug uniqueness pre-check ---- *\/
     const [slugTaken] = await conn.query<{ id: string }[]>(
       `SELECT id FROM products WHERE slug = ? LIMIT 1`,
       [data.slug],
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /* ---- code uniqueness pre-check ---- */
+    /* ---- code uniqueness pre-check ---- *\/
     const [codeTaken] = await conn.query<{ id: string }[]>(
       `SELECT id FROM products WHERE code = ? LIMIT 1`,
       [data.code],
@@ -204,7 +205,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /* ---- category FK sanity ---- */
+    /* ---- category FK sanity ---- *\/
     if (data.categoryIds.length > 0) {
       const [catRows] = await conn.query<{ id: string }[]>(
         `SELECT id FROM categories WHERE id IN (?)`,
@@ -222,7 +223,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    /* ---- insert product ---- */
+    /* ---- insert product ---- *\/
     const productId = randomUUID().replace(/-/g, "").slice(0, 40);
     const now = getCurrentDateTime();
 
@@ -254,7 +255,7 @@ export async function POST(req: NextRequest) {
       ],
     );
 
-    /* ---- map categories ---- */
+    /* ---- map categories ---- *\/
     if (data.categoryIds.length > 0) {
       const values = data.categoryIds.map((cid) => [productId, cid]);
       await conn.query(
@@ -263,7 +264,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /* ---- optional first variant ---- */
+    /* ---- optional first variant ---- *\/
     if (data.firstVariant) {
       const fv = data.firstVariant;
       const variantId = randomUUID().replace(/-/g, "").slice(0, 40);
@@ -292,7 +293,7 @@ export async function POST(req: NextRequest) {
 
     await conn.commit();
 
-    /* ---- audit (never break response) ---- */
+    /* ---- audit (never break response) ---- *\/
     try {
       await auditLog.log(pool, {
         userId: managerId,
@@ -302,7 +303,7 @@ export async function POST(req: NextRequest) {
         description: `Product created. [id=${productId}, code=${data.code}, name=${data.name}]`,
       });
     } catch {
-      /* swallow */
+      /* swallow *\/
     }
 
     return NextResponse.json({ ok: true, id: productId });
@@ -313,4 +314,22 @@ export async function POST(req: NextRequest) {
   } finally {
     conn.release();
   }
+}
+*/
+
+import { NextResponse } from "next/server";
+
+function workInProgress() {
+  return NextResponse.json(
+    { error: "WORK IN PROGRESS" },
+    { status: 503 },
+  );
+}
+
+export async function GET() {
+  return workInProgress();
+}
+
+export async function POST() {
+  return workInProgress();
 }
