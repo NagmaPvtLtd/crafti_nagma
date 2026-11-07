@@ -1,10 +1,11 @@
+/*
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "../../../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../../../lib/Database/main.db";
 
-/* -------------------------------------------------------------------------- */
-/*  GET /api/manager/products/[id]                                            */
-/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- *\/
+/*  GET /api/manager/products/[id]                                            *\/
+/* -------------------------------------------------------------------------- *\/
 
 type ProductRow = {
   id: string;
@@ -43,7 +44,7 @@ export async function GET(
   const conn = await pool.getConnection();
 
   try {
-    /* ---- product ---- */
+    /* ---- product ---- *\/
     const [productRows] = await conn.query<ProductRow[]>(
       `SELECT id, code, name, slug,
               brief_description, description,
@@ -61,7 +62,7 @@ export async function GET(
     }
     const p = productRows[0];
 
-    /* ---- categories ---- */
+    /* ---- categories ---- *\/
     const [categoryRows] = await conn.query<
       { id: string; name: string; slug: string }[]
     >(
@@ -73,7 +74,7 @@ export async function GET(
       [id],
     );
 
-    /* ---- variants (with option value labels aggregated) ---- */
+    /* ---- variants (with option value labels aggregated) ---- *\/
     const [variantRows] = await conn.query<
       {
         id: string;
@@ -97,7 +98,7 @@ export async function GET(
       [id],
     );
 
-    /* ---- images ---- */
+    /* ---- images ---- *\/
     const [imageRows] = await conn.query<
       {
         id: string;
@@ -115,7 +116,7 @@ export async function GET(
       [id],
     );
 
-    /* ---- features / care / gifts ---- */
+    /* ---- features / care / gifts ---- *\/
     const [featureRows] = await conn.query<{ id: string; feature: string }[]>(
       `SELECT id, feature FROM product_features
         WHERE product_id = ? ORDER BY sort_order ASC`,
@@ -132,7 +133,7 @@ export async function GET(
       [id],
     );
 
-    /* ---- personalizations ---- */
+    /* ---- personalizations ---- *\/
     const [personalizationRows] = await conn.query<
       {
         id: string;
@@ -215,4 +216,18 @@ export async function GET(
   } finally {
     conn.release();
   }
+}
+*/
+
+import { NextResponse } from "next/server";
+
+function workInProgress() {
+  return NextResponse.json(
+    { error: "WORK IN PROGRESS" },
+    { status: 503 },
+  );
+}
+
+export async function GET() {
+  return workInProgress();
 }
