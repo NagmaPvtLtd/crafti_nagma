@@ -50,13 +50,43 @@ CREATE TABLE categories (
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(120) NOT NULL UNIQUE,
     parent_id CHAR(40) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE
     SET NULL
+);
+-- ===========================================================
+-- Global Options
+-- ===========================================================
+CREATE TABLE global_options (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_global_options_name (name),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+-- ===========================================================
+-- Global Option Values
+-- ===========================================================
+CREATE TABLE global_option_values (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    option_id CHAR(40) NOT NULL,
+    value VARCHAR(100) NOT NULL,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_global_option_value (option_id, value),
+    FOREIGN KEY (option_id) REFERENCES global_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
 );
 -- ===========================================================
 -- Products
@@ -97,14 +127,16 @@ CREATE TABLE product_categories (
 CREATE TABLE product_options (
     id CHAR(40) NOT NULL PRIMARY KEY,
     product_id CHAR(40) NOT NULL,
+    global_option_id CHAR(40) DEFAULT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (global_option_id) REFERENCES global_options(id) ON DELETE
+    SET NULL
 );
 -- ===========================================================
 -- Product Option Values
@@ -112,13 +144,15 @@ CREATE TABLE product_options (
 CREATE TABLE product_option_values (
     id CHAR(40) NOT NULL PRIMARY KEY,
     option_id CHAR(40) NOT NULL,
+    global_option_value_id CHAR(40) DEFAULT NULL,
     value VARCHAR(100) NOT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (option_id) REFERENCES product_options(id) ON DELETE CASCADE
+    FOREIGN KEY (option_id) REFERENCES product_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (global_option_value_id) REFERENCES global_option_values(id) ON DELETE
+    SET NULL
 );
 -- ===========================================================
 -- Product Variants
@@ -128,13 +162,16 @@ CREATE TABLE product_variants (
     product_id CHAR(40) NOT NULL,
     name VARCHAR(150) DEFAULT NULL,
     description VARCHAR(500) DEFAULT NULL,
+    brief_description VARCHAR(500) DEFAULT NULL,
     sku VARCHAR(100) NOT NULL UNIQUE,
     price DECIMAL(10, 2) NOT NULL,
     compare_at_price DECIMAL(10, 2) DEFAULT NULL,
     stock INT NOT NULL DEFAULT 0,
     weight DECIMAL(10, 2) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     status ENUM('active', 'inactive') DEFAULT 'active',
+    is_featured BOOLEAN DEFAULT FALSE,
+    main_showcase BOOLEAN DEFAULT FALSE,
+    orders_count INT NOT NULL DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -163,7 +200,6 @@ CREATE TABLE product_personalizations (
     placeholder VARCHAR(255) DEFAULT NULL,
     is_required BOOLEAN DEFAULT FALSE,
     max_length INT DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -205,7 +241,6 @@ CREATE TABLE product_gift_included (
     id CHAR(40) NOT NULL PRIMARY KEY,
     product_id CHAR(40) NOT NULL,
     item VARCHAR(255) NOT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,

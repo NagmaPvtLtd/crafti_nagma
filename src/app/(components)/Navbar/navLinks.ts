@@ -50,7 +50,7 @@ export const CUSTOMER_LINKS: NavLink[] = [
 export const MANAGER_LINKS: NavLink[] = [
   { href: "/admin/orders", label: "Enquiries / Orders", icon: Package },
   { href: "/admin/categories", label: "Manage Categories", icon: Tags },
-  { href: "/admin/products", label: "Manage Products", icon: Boxes },
+  { href: "/manager/product-studio", label: "Manage Products", icon: Boxes },
   { href: "/admin/store", label: "Store Dashboard", icon: LayoutDashboard },
   { href: "/admin/wishlist-trend", label: "Wishlist Trend", icon: TrendingUp },
 ];

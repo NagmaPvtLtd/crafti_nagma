@@ -15,11 +15,12 @@ import {
   Users,
 } from "lucide-react";
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
-import GoBack from "../../GoBack";
 import MetricChartCard from "../../MetricChartCard";
+import PageWrapper from "../../utils/PageWrapper";
+import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 
 /* ------------------------------------------------------------------ */
-/*  Types (mirror the API contract)                                    */
+/*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 const BASE = "/api/admin/dashboard";
@@ -58,7 +59,6 @@ type LowStockItem = {
 
 type TrendDatum = { label: string; count: number };
 
-/** Shared shape for both scopes — no `scope` field, no analytics. */
 type BasePayload = {
   generatedAt: string;
   range: RangeType;
@@ -67,9 +67,7 @@ type BasePayload = {
   lowStock: LowStockItem[];
 };
 
-type AdminPayload = BasePayload & {
-  scope: "admin";
-};
+type AdminPayload = BasePayload & { scope: "admin" };
 
 type SuperAdminPayload = BasePayload & {
   scope: "super_admin";
@@ -123,14 +121,14 @@ const count = (n: number) => n.toLocaleString("en-IN");
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 const ORDER_STATUS_STYLES: Record<string, string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  accepted: "border-blue-200 bg-blue-50 text-blue-700",
-  crafting_in_progress: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  slight_delay: "border-orange-200 bg-orange-50 text-orange-700",
-  almost_done: "border-cyan-200 bg-cyan-50 text-cyan-700",
-  shipped: "border-violet-200 bg-violet-50 text-violet-700",
-  delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  cancelled: "border-rose-200 bg-rose-50 text-rose-700",
+  pending: "border-amber-200/70 bg-amber-50 text-amber-700",
+  accepted: "border-blue-200/70 bg-blue-50 text-blue-700",
+  crafting_in_progress: "border-indigo-200/70 bg-indigo-50 text-indigo-700",
+  slight_delay: "border-orange-200/70 bg-orange-50 text-orange-700",
+  almost_done: "border-cyan-200/70 bg-cyan-50 text-cyan-700",
+  shipped: "border-violet-200/70 bg-violet-50 text-violet-700",
+  delivered: "border-emerald-200/70 bg-emerald-50 text-emerald-700",
+  cancelled: "border-rose-200/70 bg-rose-50 text-rose-700",
 };
 
 const RANGES: { value: RangeType; label: string }[] = [
@@ -141,7 +139,7 @@ const RANGES: { value: RangeType; label: string }[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function AdminDashboardClient() {
@@ -173,211 +171,224 @@ export default function AdminDashboardClient() {
     ahem();
   }, [load]);
 
-  // Aliased discriminant — TS 4.4+ narrows `data` inside `isSuper && ...`.
   const isSuper = data?.scope === "super_admin";
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      {/* ------------------------------------------------------------- */}
-      {/* Header                                                        */}
-      {/* ------------------------------------------------------------- */}
-      <div className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6">
-          <GoBack href="/" label="Home" />
+    <PageWrapper variant="content" position="fixed">
+      <div className="relative flex flex-col overflow-hidden text-stone-800">
+        {/* Decorative rose blobs — matches landing */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
+        />
 
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
+        {/* --------------------------------------------------------- */}
+        {/* Header                                                    */}
+        {/* --------------------------------------------------------- */}
+        <section className="relative">
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <SectionEyebrow>Admin</SectionEyebrow>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+                    Dashboard
+                  </h1>
+                  {isSuper && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-violet-200/70 bg-violet-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-700">
+                      Super Admin
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+                  {isSuper
+                    ? "Full analytical view — trends, breakdowns and operational health."
+                    : "Operational snapshot of orders, revenue and inventory."}
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold tracking-tight text-neutral-900 sm:text-2xl">
-                  Dashboard
-                </h1>
-                {isSuper && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
-                    Super Admin
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 max-w-2xl text-xs text-neutral-500 sm:text-sm">
-                {isSuper
-                  ? "Full analytical view — trends, breakdowns and operational health."
-                  : "Operational snapshot of orders, revenue and inventory."}
-              </p>
-            </div>
+                <div className="inline-flex items-center rounded-full border border-rose-200/70 bg-white/70 p-0.5 backdrop-blur-sm">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => setRange(r.value)}
+                      disabled={loading}
+                      className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        range === r.value
+                          ? "bg-rose-500 text-white shadow-sm shadow-rose-500/25"
+                          : "text-stone-600 hover:bg-rose-50 hover:text-rose-600"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
 
-            {/* Range + refresh */}
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center rounded-lg border border-neutral-200 bg-white p-0.5">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.value}
-                    onClick={() => setRange(r.value)}
-                    disabled={loading}
-                    className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      range === r.value
-                        ? "bg-neutral-900 text-white"
-                        : "text-neutral-600 hover:bg-neutral-100"
-                    }`}
+                <button
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+
+        {/* --------------------------------------------------------- */}
+        {/* Body                                                      */}
+        {/* --------------------------------------------------------- */}
+        <section className="relative">
+          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
+            {loading && !data && <DashboardSkeleton />}
+
+            {error && !loading && (
+              <ErrorState message={error} onRetry={() => void load()} />
+            )}
+
+            {data && !error && (
+              <div className="space-y-6 sm:space-y-8">
+                {/* KPI strip */}
+                <KpiStrip summary={data.summary} />
+
+                {/* Super-admin charts */}
+                {data.scope === "super_admin" && (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <ChartCard>
+                      <MetricChartCard
+                        title="Revenue"
+                        data={data.analytics.revenueTrend}
+                        range={range}
+                        color="#10b981"
+                        metricLabel="revenue"
+                      />
+                    </ChartCard>
+                    <ChartCard>
+                      <MetricChartCard
+                        title="Orders"
+                        data={data.analytics.ordersTrend}
+                        range={range}
+                        color="#0ea5e9"
+                        metricLabel="orders"
+                      />
+                    </ChartCard>
+                    <ChartCard>
+                      <MetricChartCard
+                        title="New customers"
+                        data={data.analytics.customersTrend}
+                        range={range}
+                        color="#8b5cf6"
+                        metricLabel="signups"
+                      />
+                    </ChartCard>
+                  </div>
+                )}
+
+                {/* Recent orders + low stock */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <SectionCard
+                    title="Recent orders"
+                    subtitle="Latest 8 orders across the store"
+                    icon={<ShoppingCart className="h-4 w-4" />}
                   >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+                    {data.recentOrders.length === 0 ? (
+                      <EmptyRow text="No orders yet" />
+                    ) : (
+                      <ul className="divide-y divide-stone-100">
+                        {data.recentOrders.map((o) => (
+                          <li
+                            key={o.id}
+                            className="flex items-center justify-between gap-3 py-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-semibold text-stone-800">
+                                {o.orderNumber}
+                              </p>
+                              <p className="truncate text-[11px] text-stone-500">
+                                {o.customerName}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${
+                                ORDER_STATUS_STYLES[o.orderStatus] ??
+                                "border-stone-200/70 bg-stone-50 text-stone-600"
+                              }`}
+                            >
+                              {o.orderStatus.replace(/_/g, " ")}
+                            </span>
+                            <span className="shrink-0 text-xs font-semibold tabular-nums text-stone-900">
+                              {inr(o.total)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </SectionCard>
 
-              <button
-                onClick={() => void load()}
-                disabled={loading}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+                  <SectionCard
+                    title="Low stock"
+                    subtitle="Variants with 5 or fewer units"
+                    icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
+                  >
+                    {data.lowStock.length === 0 ? (
+                      <EmptyRow text="Everything is well-stocked" />
+                    ) : (
+                      <ul className="divide-y divide-stone-100">
+                        {data.lowStock.map((v) => (
+                          <li
+                            key={v.id}
+                            className="flex items-center justify-between gap-3 py-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-semibold text-stone-800">
+                                {v.productName}
+                              </p>
+                              <p className="truncate text-[11px] text-stone-500">
+                                {v.variantName ?? "—"} · {v.sku}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                v.stock === 0
+                                  ? "border-rose-200/70 bg-rose-50 text-rose-700"
+                                  : "border-amber-200/70 bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {v.stock} left
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </SectionCard>
+                </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* Body                                                          */}
-      {/* ------------------------------------------------------------- */}
-      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
-        {loading && !data && <DashboardSkeleton />}
-
-        {error && !loading && (
-          <ErrorState message={error} onRetry={() => void load()} />
-        )}
-
-        {data && !error && (
-          <div className="space-y-6 sm:space-y-8">
-            {/* KPI strip ------------------------------------------------ */}
-            <KpiStrip summary={data.summary} />
-
-            {/* Super-admin charts --------------------------------------- */}
-            {data.scope === "super_admin" && (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <ChartCard>
-                  <MetricChartCard
-                    title="Revenue"
-                    data={data.analytics.revenueTrend}
-                    range={range}
-                    color="#10b981"
-                    metricLabel="revenue"
-                  />
-                </ChartCard>
-                <ChartCard>
-                  <MetricChartCard
-                    title="Orders"
-                    data={data.analytics.ordersTrend}
-                    range={range}
-                    color="#0ea5e9"
-                    metricLabel="orders"
-                  />
-                </ChartCard>
-                <ChartCard>
-                  <MetricChartCard
-                    title="New customers"
-                    data={data.analytics.customersTrend}
-                    range={range}
-                    color="#8b5cf6"
-                    metricLabel="signups"
-                  />
-                </ChartCard>
+                {/* Super-admin breakdowns */}
+                {data.scope === "super_admin" && (
+                  <SuperAdminBreakdowns data={data} />
+                )}
               </div>
             )}
-
-            {/* Recent orders + low stock ------------------------------- */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <SectionCard
-                title="Recent orders"
-                subtitle="Latest 8 orders across the store"
-                icon={<ShoppingCart className="h-4 w-4" />}
-              >
-                {data.recentOrders.length === 0 ? (
-                  <EmptyRow text="No orders yet" />
-                ) : (
-                  <ul className="divide-y divide-neutral-100">
-                    {data.recentOrders.map((o) => (
-                      <li
-                        key={o.id}
-                        className="flex items-center justify-between gap-3 py-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-neutral-800">
-                            {o.orderNumber}
-                          </p>
-                          <p className="truncate text-[11px] text-neutral-500">
-                            {o.customerName}
-                          </p>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${
-                            ORDER_STATUS_STYLES[o.orderStatus] ??
-                            "border-neutral-200 bg-neutral-50 text-neutral-600"
-                          }`}
-                        >
-                          {o.orderStatus.replace(/_/g, " ")}
-                        </span>
-                        <span className="shrink-0 text-xs font-semibold tabular-nums text-neutral-900">
-                          {inr(o.total)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </SectionCard>
-
-              <SectionCard
-                title="Low stock"
-                subtitle="Variants with 5 or fewer units"
-                icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
-              >
-                {data.lowStock.length === 0 ? (
-                  <EmptyRow text="Everything is well-stocked" />
-                ) : (
-                  <ul className="divide-y divide-neutral-100">
-                    {data.lowStock.map((v) => (
-                      <li
-                        key={v.id}
-                        className="flex items-center justify-between gap-3 py-2.5"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-neutral-800">
-                            {v.productName}
-                          </p>
-                          <p className="truncate text-[11px] text-neutral-500">
-                            {v.variantName ?? "—"} · {v.sku}
-                          </p>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${
-                            v.stock === 0
-                              ? "border-rose-200 bg-rose-50 text-rose-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {v.stock} left
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </SectionCard>
-            </div>
-
-            {/* Super-admin breakdowns ---------------------------------- */}
-            {data.scope === "super_admin" && (
-              <SuperAdminBreakdowns data={data} />
-            )}
           </div>
-        )}
+        </section>
       </div>
-    </div>
+    </PageWrapper>
   );
 }
 
 /* ================================================================== */
-/*  Super-admin-only block (own component → own narrowing)             */
+/*  Super-admin-only block                                             */
 /* ================================================================== */
 
 function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
@@ -447,7 +458,6 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
         </SectionCard>
       </div>
 
-      {/* Small metric panels ---------------------------------------- */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MiniStats
           title="Cart funnel"
@@ -555,7 +565,7 @@ function Kpi({
   tone: "neutral" | "emerald" | "sky" | "violet" | "amber";
 }) {
   const tones: Record<typeof tone, string> = {
-    neutral: "text-neutral-500",
+    neutral: "text-stone-500",
     emerald: "text-emerald-600",
     sky: "text-sky-600",
     violet: "text-violet-600",
@@ -563,18 +573,18 @@ function Kpi({
   };
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-3 sm:px-4 sm:py-3.5">
+    <div className="group rounded-2xl border border-white/60 bg-white/85 px-3 py-3 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:rounded-3xl sm:px-4 sm:py-3.5">
       <div className="flex items-center gap-1.5">
         <span className={tones[tone]}>{icon}</span>
-        <p className="truncate text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-rose-500/80">
           {label}
         </p>
       </div>
-      <p className="mt-1.5 truncate text-base font-semibold tabular-nums text-neutral-900 sm:text-lg">
+      <p className="mt-1.5 truncate text-base font-semibold tabular-nums text-stone-900 sm:text-lg">
         {value}
       </p>
       {hint && (
-        <p className="mt-0.5 truncate text-[10px] text-neutral-400">{hint}</p>
+        <p className="mt-0.5 truncate text-[10px] text-stone-400">{hint}</p>
       )}
     </div>
   );
@@ -582,7 +592,7 @@ function Kpi({
 
 function ChartCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
+    <div className="rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
       {children}
     </div>
   );
@@ -600,18 +610,16 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <header className="flex items-start gap-3 border-b border-neutral-100 px-4 py-3 sm:px-5">
+    <section className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm sm:rounded-3xl">
+      <header className="flex items-start gap-3 border-b border-stone-100 px-4 py-3.5 sm:px-5">
         {icon && (
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-rose-200/70 bg-rose-50 text-rose-500">
             {icon}
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-          {subtitle && (
-            <p className="text-[11px] text-neutral-500">{subtitle}</p>
-          )}
+          <h2 className="text-sm font-semibold text-stone-900">{title}</h2>
+          {subtitle && <p className="text-[11px] text-stone-500">{subtitle}</p>}
         </div>
       </header>
       <div className="px-4 py-3 sm:px-5 sm:py-4">{children}</div>
@@ -641,29 +649,29 @@ function BarList({
           <li key={`${it.label}-${i}`}>
             <div className="mb-1 flex items-baseline justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-xs font-medium capitalize text-neutral-800">
+                <p className="truncate text-xs font-medium capitalize text-stone-800">
                   {it.label}
                 </p>
                 {it.sub && (
-                  <p className="truncate font-mono text-[10px] text-neutral-400">
+                  <p className="truncate font-mono text-[10px] text-stone-400">
                     {it.sub}
                   </p>
                 )}
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-xs font-semibold tabular-nums text-neutral-900">
+                <p className="text-xs font-semibold tabular-nums text-stone-900">
                   {it.format(it.value)}
                 </p>
                 {it.trailing && (
-                  <p className="text-[10px] tabular-nums text-neutral-500">
+                  <p className="text-[10px] tabular-nums text-stone-500">
                     {it.trailing}
                   </p>
                 )}
               </div>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-rose-50">
               <div
-                className="h-full rounded-full bg-neutral-900/80 transition-all"
+                className="h-full rounded-full bg-rose-400/80 transition-all"
                 style={{ width: `${width}%` }}
               />
             </div>
@@ -684,20 +692,20 @@ function MiniStats({
   rows: [string, string][];
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+    <div className="rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl">
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-neutral-600">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-rose-200/70 bg-rose-50 text-rose-500">
           {icon}
         </span>
-        <h3 className="text-sm font-semibold text-neutral-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
       </div>
       <dl className="space-y-2">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-center justify-between gap-3">
-            <dt className="truncate text-[11px] uppercase tracking-wide text-neutral-500">
+            <dt className="truncate text-[11px] font-medium uppercase tracking-wider text-rose-500/80">
               {k}
             </dt>
-            <dd className="shrink-0 text-xs font-semibold tabular-nums text-neutral-900">
+            <dd className="shrink-0 text-xs font-semibold tabular-nums text-stone-900">
               {v}
             </dd>
           </div>
@@ -709,7 +717,7 @@ function MiniStats({
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2 py-6 text-xs text-neutral-500">
+    <div className="flex items-center gap-2 py-6 text-xs text-stone-500">
       <AlertCircle className="h-3.5 w-3.5" />
       {text}
     </div>
@@ -723,7 +731,7 @@ function DashboardSkeleton() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="h-20 animate-pulse rounded-xl border border-neutral-200 bg-white"
+            className="h-20 animate-pulse rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm sm:rounded-3xl"
           />
         ))}
       </div>
@@ -731,7 +739,7 @@ function DashboardSkeleton() {
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="h-56 animate-pulse rounded-xl border border-neutral-200 bg-white"
+            className="h-56 animate-pulse rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm sm:rounded-3xl"
           />
         ))}
       </div>
@@ -739,7 +747,7 @@ function DashboardSkeleton() {
         {Array.from({ length: 2 }).map((_, i) => (
           <div
             key={i}
-            className="h-56 animate-pulse rounded-xl border border-neutral-200 bg-white"
+            className="h-56 animate-pulse rounded-2xl border border-white/60 bg-white/70 backdrop-blur-sm sm:rounded-3xl"
           />
         ))}
       </div>
@@ -755,17 +763,17 @@ function ErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3.5 sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
       <div className="flex-1">
-        <p className="text-sm font-medium text-red-800">
+        <p className="text-sm font-semibold text-rose-800">
           Couldn&apos;t load dashboard
         </p>
-        <p className="mt-0.5 text-xs text-red-700">{message}</p>
+        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
       </div>
       <button
         onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
+        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
       >
         Retry
       </button>
