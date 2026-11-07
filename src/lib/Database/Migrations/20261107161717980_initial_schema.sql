@@ -9,9 +9,10 @@ CREATE TABLE users (
     full_name VARCHAR(255) DEFAULT NULL,
     -- Authentication
     email VARCHAR(255) NOT NULL UNIQUE,
-    phone VARCHAR(20) NOT NULL UNIQUE,
+    phone VARCHAR(20) NULL,
     password_hash VARCHAR(255) DEFAULT NULL,
     google_id VARCHAR(255) DEFAULT NULL UNIQUE,
+    google_profile_picture VARCHAR(500) DEFAULT NULL,
     email_verified BOOLEAN DEFAULT FALSE,
     phone_verified BOOLEAN DEFAULT FALSE,
     -- Shipping Address
@@ -49,13 +50,43 @@ CREATE TABLE categories (
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(120) NOT NULL UNIQUE,
     parent_id CHAR(40) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE
     SET NULL
+);
+-- ===========================================================
+-- Global Options
+-- ===========================================================
+CREATE TABLE global_options (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_global_options_name (name),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+-- ===========================================================
+-- Global Option Values
+-- ===========================================================
+CREATE TABLE global_option_values (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    option_id CHAR(40) NOT NULL,
+    value VARCHAR(100) NOT NULL,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_global_option_value (option_id, value),
+    FOREIGN KEY (option_id) REFERENCES global_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
 );
 -- ===========================================================
 -- Products
@@ -96,14 +127,16 @@ CREATE TABLE product_categories (
 CREATE TABLE product_options (
     id CHAR(40) NOT NULL PRIMARY KEY,
     product_id CHAR(40) NOT NULL,
+    global_option_id CHAR(40) DEFAULT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (global_option_id) REFERENCES global_options(id) ON DELETE
+    SET NULL
 );
 -- ===========================================================
 -- Product Option Values
@@ -111,13 +144,15 @@ CREATE TABLE product_options (
 CREATE TABLE product_option_values (
     id CHAR(40) NOT NULL PRIMARY KEY,
     option_id CHAR(40) NOT NULL,
+    global_option_value_id CHAR(40) DEFAULT NULL,
     value VARCHAR(100) NOT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
-    FOREIGN KEY (option_id) REFERENCES product_options(id) ON DELETE CASCADE
+    FOREIGN KEY (option_id) REFERENCES product_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (global_option_value_id) REFERENCES global_option_values(id) ON DELETE
+    SET NULL
 );
 -- ===========================================================
 -- Product Variants
@@ -127,13 +162,16 @@ CREATE TABLE product_variants (
     product_id CHAR(40) NOT NULL,
     name VARCHAR(150) DEFAULT NULL,
     description VARCHAR(500) DEFAULT NULL,
+    brief_description VARCHAR(500) DEFAULT NULL,
     sku VARCHAR(100) NOT NULL UNIQUE,
     price DECIMAL(10, 2) NOT NULL,
     compare_at_price DECIMAL(10, 2) DEFAULT NULL,
     stock INT NOT NULL DEFAULT 0,
     weight DECIMAL(10, 2) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     status ENUM('active', 'inactive') DEFAULT 'active',
+    is_featured BOOLEAN DEFAULT FALSE,
+    main_showcase BOOLEAN DEFAULT FALSE,
+    orders_count INT NOT NULL DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -162,7 +200,6 @@ CREATE TABLE product_personalizations (
     placeholder VARCHAR(255) DEFAULT NULL,
     is_required BOOLEAN DEFAULT FALSE,
     max_length INT DEFAULT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -204,7 +241,6 @@ CREATE TABLE product_gift_included (
     id CHAR(40) NOT NULL PRIMARY KEY,
     product_id CHAR(40) NOT NULL,
     item VARCHAR(255) NOT NULL,
-    sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -383,4 +419,65 @@ CREATE TABLE payments (
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+-- ===========================================================
+-- Audit Logs
+-- ===========================================================
+CREATE TABLE audit_logs (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    user_id CHAR(40) DEFAULT NULL,
+    -- who performed the action
+    action ENUM(
+        'CREATE',
+        'UPDATE',
+        'DELETE',
+        'LOGIN',
+        'LOGOUT',
+        'ROLE_CHANGED',
+        'STATUS_CHANGED',
+        'ORDER_CREATED',
+        'ORDER_STATUS_CHANGED',
+        'ORDER_CANCELLED',
+        'PAYMENT_CAPTURED',
+        'PAYMENT_FAILED',
+        'PAYMENT_REFUNDED',
+        'CART_CONVERTED',
+        'FILE_UPLOADED',
+        'FILE_DELETED'
+    ) NOT NULL,
+    entity_type ENUM(
+        'USER',
+        'CATEGORY',
+        'PRODUCT',
+        'VARIANT',
+        'OPTION',
+        'OPTION_VALUE',
+        'PERSONALIZATION',
+        'FEATURE',
+        'CARE_INSTRUCTION',
+        'GIFT_INCLUDED',
+        'IMAGEKIT_FILE',
+        'CART',
+        'CART_ITEM',
+        'ORDER',
+        'ORDER_ITEM',
+        'PAYMENT',
+        'SYSTEM'
+    ) NOT NULL,
+    entity_id CHAR(40) DEFAULT NULL,
+    -- the affected record, if any
+    description TEXT NOT NULL,
+    metadata JSON DEFAULT NULL,
+    -- optional before/after snapshot
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE
+    SET NULL
+);
+-- ===========================================================
+-- Settings Toggle
+-- ===========================================================
+CREATE TABLE setting_toggle (
+    field_name VARCHAR(100) NOT NULL PRIMARY KEY,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    save_in_redis BOOLEAN NOT NULL DEFAULT TRUE
 );
