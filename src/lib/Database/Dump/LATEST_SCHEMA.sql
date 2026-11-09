@@ -127,7 +127,7 @@ CREATE TABLE product_categories (
 CREATE TABLE product_options (
     id CHAR(40) NOT NULL PRIMARY KEY,
     product_id CHAR(40) NOT NULL,
-    global_option_id CHAR(40) DEFAULT NULL,
+    global_option_id CHAR(40) NOT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
     created_by CHAR(40) NOT NULL,
@@ -144,7 +144,7 @@ CREATE TABLE product_options (
 CREATE TABLE product_option_values (
     id CHAR(40) NOT NULL PRIMARY KEY,
     option_id CHAR(40) NOT NULL,
-    global_option_value_id CHAR(40) DEFAULT NULL,
+    global_option_value_id CHAR(40) NOT NULL,
     value VARCHAR(100) NOT NULL,
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
@@ -254,22 +254,13 @@ CREATE TABLE imagekit_files (
     id CHAR(40) NOT NULL PRIMARY KEY,
     file_id VARCHAR(255) NOT NULL UNIQUE,
     url VARCHAR(500) NOT NULL,
-    -- Polymorphic relationship fields
-    entity_type VARCHAR(50) NOT NULL,
-    -- e.g., 'users', 'categories', 'products', 'variants'
-    entity_id CHAR(40) NOT NULL,
-    -- Context/purpose of the file
-    file_purpose VARCHAR(50) DEFAULT 'general',
-    -- e.g., 'avatar', 'thumbnail', 'gallery', 'banner'
-    -- File metadata
+    file_purpose ENUM(
+        'product_variant_image',
+        'category_thumbnail',
+        'discount_picture'
+    ) DEFAULT NULL,
     file_name VARCHAR(255) DEFAULT NULL,
-    file_type VARCHAR(50) DEFAULT NULL,
-    file_size BIGINT DEFAULT NULL,
-    width INT DEFAULT NULL,
-    height INT DEFAULT NULL,
     alt_text VARCHAR(255) DEFAULT NULL,
-    tags JSON DEFAULT NULL,
-    -- Ordering (for multiple files on same entity)
     sort_order INT DEFAULT 0,
     created_by CHAR(40) NOT NULL,
     created_at DATETIME NOT NULL,
