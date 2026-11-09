@@ -193,7 +193,7 @@ export default function AdminDashboardClient() {
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <SectionEyebrow>Admin</SectionEyebrow>
+                <SectionEyebrow>SUPER ADMIN</SectionEyebrow>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
                     Dashboard
