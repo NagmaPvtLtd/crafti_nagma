@@ -15,7 +15,9 @@ export async function initServer() {
       console.log("[SERVER - CHECKING] Initializing database connection");
       await initializeDatabase();
       const isProduction: boolean = getProduction();
-      console.log(`[SERVER - READY] >_ Database initialized`);
+      console.log(
+        `[SERVER - READY] >_ Database initialized ${isProduction ? "in production mode" : "in development mode"}`,
+      );
       console.log(
         `[SERVER - ENV] ➤ Running in ${isProduction ? "production" : "development"} mode`,
       );

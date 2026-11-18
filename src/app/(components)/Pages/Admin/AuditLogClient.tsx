@@ -206,7 +206,7 @@ export default function AdminAuditLogsClient() {
         {/* --------------------------------------------------------- */}
         <section className="relative">
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <SectionEyebrow>Admin</SectionEyebrow>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
