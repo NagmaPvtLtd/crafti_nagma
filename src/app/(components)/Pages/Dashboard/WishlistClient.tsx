@@ -267,11 +267,11 @@ export default function WishlistClient() {
               </div>
 
               <Link
-                href="/shop"
+                href="/collections"
                 className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3.5 py-2 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50"
               >
                 <ShoppingBag className="h-3.5 w-3.5" />
-                Browse shop
+                Browse collections
               </Link>
             </div>
           </div>
@@ -551,11 +551,11 @@ function EmptyState({
         </button>
       ) : (
         <Link
-          href="/shop"
+          href="/collections"
           className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
         >
           <ShoppingBag className="h-3.5 w-3.5" />
-          Browse the shop
+          Browse the collections
         </Link>
       )}
     </div>

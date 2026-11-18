@@ -3,15 +3,7 @@
 import { useMemo } from "react";
 import { BarChart3, TrendingDown, TrendingUp } from "lucide-react";
 import TrendChart, { TrendPoint } from "./utils/TrendChart";
-
-type RangeType = "30d" | "90d" | "365d" | "lifetime";
-
-const RANGE_LABELS: Record<RangeType, string> = {
-  "30d": "30 days",
-  "90d": "90 days",
-  "365d": "1 year",
-  lifetime: "lifetime",
-};
+import { type RangeType, RANGE_LABELS } from "../../utils/AdminRange/adminRange.utils";
 
 const formatCount = (n: number) => n.toLocaleString("en-IN");
 

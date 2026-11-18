@@ -47,9 +47,9 @@ const LANDING_CONTENT = {
       icon: "heart" as const,
       title: "Catalogue is ready!",
       description:
-        "Browse our current collection — crochet plushies, keychains, hoops, and more.",
-      cta: "Shop collection",
-      href: "/products",
+        "Our current collection — crochet plushies, keychains, hoops, and more.",
+      cta: "View collections",
+      href: "/collections",
     },
     {
       icon: "message" as const,
@@ -65,7 +65,7 @@ const LANDING_CONTENT = {
       description:
         "Curated gift sets for birthdays, anniversaries, and baby showers — beautifully wrapped and ready to give.",
       cta: "Explore gifts",
-      href: "/products?category=gifts",
+      href: "/collections?category=Bouquets",
     },
   ] as const,
 
@@ -130,8 +130,8 @@ const LANDING_CONTENT = {
 
   finalCta: {
     heading: "Ready to bring handmade home?",
-    body: "Browse the collection or tell us your idea — either way, something special is about to begin.",
-    primaryCta: { label: "Shop the collection", href: "/products" },
+    body: "Explore the collection or tell us your idea — either way, something special is about to begin.",
+    primaryCta: { label: "View collections", href: "/products" },
     secondaryCta: { label: "Start a custom order", href: "/custom" },
     footnote: "Free shipping on special occassions! · Ships India-wide",
   },
@@ -215,10 +215,10 @@ export default function Landing() {
 
               <div className="mt-7 flex flex-col gap-2.5 sm:mt-9 sm:flex-row sm:justify-center md:justify-start">
                 <Link
-                  href="/products"
+                  href="/collections"
                   className="group inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-5 py-3.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-all hover:bg-rose-600 hover:shadow-md hover:shadow-rose-500/30 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-rose-500 active:scale-[0.98] sm:px-7"
                 >
-                  Shop the collection
+                  View collections
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
                 <Link

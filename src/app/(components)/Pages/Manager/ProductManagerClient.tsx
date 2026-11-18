@@ -6,9 +6,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowRight,
-  BadgeCheck,
   Boxes,
-  FileImage,
   FolderTree,
   Layers,
   ListChecks,
@@ -16,7 +14,6 @@ import {
   RefreshCw,
   Sparkles,
   Tag,
-  Wand2,
 } from "lucide-react";
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
@@ -26,7 +23,7 @@ import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-const BASE = "/api/manager/products/overview";
+const BASE = "/api/manager/product-studio/overview";
 
 type OverviewPayload = {
   ok: true;
@@ -40,6 +37,7 @@ type OverviewPayload = {
     };
     variants: { total: number; lowStock: number; outOfStock: number };
     categories: { total: number; root: number };
+    options?: { total: number };
     pendingPersonalizations?: number;
   };
   quickStats?: {
@@ -72,71 +70,40 @@ const MANAGE_ITEMS: MenuItem[] = [
     title: "Add a product",
     description:
       "Create a new product with its base info, categories, and showcase settings.",
-    href: "/manager/products/new",
+    href: "/manager/product-studio/products/new",
     icon: <Sparkles className="h-5 w-5" />,
   },
   {
     title: "All products",
     description:
       "Browse, search, and edit every product. Filter by status or category.",
-    href: "/manager/products/all",
+    href: "/manager/product-studio/products",
     icon: <Package className="h-5 w-5" />,
     badge: (d) =>
       `${d.counts.products.total} product${d.counts.products.total === 1 ? "" : "s"}`,
   },
-  {
-    title: "Variants & inventory",
-    description:
-      "Manage stock, pricing, SKUs, and per-variant options. Spot low-stock fast.",
-    href: "/manager/products/variants",
-    icon: <Layers className="h-5 w-5" />,
-    badge: (d) =>
-      d.counts.variants.lowStock > 0
-        ? `${d.counts.variants.lowStock} low stock`
-        : `${d.counts.variants.total} variants`,
-  },
-  {
-    title: "Options & values",
-    description:
-      "Colours, sizes, materials — define the choices customers pick from.",
-    href: "/manager/products/options",
-    icon: <ListChecks className="h-5 w-5" />,
-  },
-  {
-    title: "Personalization fields",
-    description:
-      "Add custom inputs — names, dates, notes — that shoppers fill at checkout.",
-    href: "/manager/products/personalizations",
-    icon: <Wand2 className="h-5 w-5" />,
-  },
 ];
 
-const ORGANISE_ITEMS: MenuItem[] = [
+const GLOBAL_ITEMS: MenuItem[] = [
   {
-    title: "Categories",
+    title: "Global Categories",
     description:
-      "Create, reorder, and nest categories. Root and child categories supported.",
-    href: "/manager/products/categories",
+      "Create categories & sub categories to assign to your products.",
+    href: "/manager/product-studio/categories",
     icon: <FolderTree className="h-5 w-5" />,
+    // Always the parent (main) categories — sub categories are counted inside them.
     badge: (d) =>
-      `${d.counts.categories.total} categor${d.counts.categories.total === 1 ? "y" : "ies"}`,
+      `${d.counts.categories.root} categor${d.counts.categories.root === 1 ? "y" : "ies"}`,
   },
   {
-    title: "Features & care",
+    title: "Global Options",
     description:
-      "Bullet features, care instructions, and gift inclusions per product.",
-    href: "/manager/products/details",
-    icon: <BadgeCheck className="h-5 w-5" />,
-  },
-  {
-    title: "Featured & showcase",
-    description:
-      "Curate what appears first — featured products and main showcase picks.",
-    href: "/manager/products/curation",
-    icon: <Tag className="h-5 w-5" />,
+      "Create all the pool of options you want to give your product to have.",
+    href: "/manager/product-studio/options",
+    icon: <ListChecks className="h-5 w-5" />,
     badge: (d) =>
-      d.counts.products.featured > 0
-        ? `${d.counts.products.featured} featured`
+      d.counts.options
+        ? `${d.counts.options.total} option${d.counts.options.total === 1 ? "" : "s"}`
         : null,
   },
 ];
@@ -238,8 +205,8 @@ export default function ProductManagerHubClient() {
                 <MenuSection
                   eyebrow="Shape the catalogue"
                   title="Organise & curate"
-                  subtitle="Categories, highlights, and the finer details."
-                  items={ORGANISE_ITEMS}
+                  subtitle="The shared pools every product draws from — categories and options."
+                  items={GLOBAL_ITEMS}
                   data={data}
                 />
 
@@ -347,6 +314,7 @@ function MenuSection({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => {
           const badge = it.badge?.(data);
+
           return (
             <Link
               key={it.title}
@@ -432,10 +400,10 @@ function RecentlyUpdated({
                   {p.status}
                 </span>
                 <Link
-                  href={`/manager/products/${p.id}`}
+                  href={`/manager/product-studio/products/${p.id}`}
                   className="shrink-0 rounded-full border border-rose-200/70 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
                 >
-                  Edit
+                  Open
                 </Link>
               </li>
             ))}

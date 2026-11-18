@@ -1,0 +1,259 @@
+import { z } from "zod";
+
+/* ------------------------------------------------------------------ */
+/*  Shared helpers                                                     */
+/* ------------------------------------------------------------------ */
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => v ?? "");
+
+const id = z.string().trim().min(10).max(40);
+const price = z.coerce.number().min(0).max(10_000_000);
+
+/* ------------------------------------------------------------------ */
+/*  Edit the base product                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Editing a base product never changes its `code` or `slug` — those stay
+ * stable so links and SKUs built from them keep working.
+ */
+export const productBaseUpdateSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(255),
+
+  briefDescription: optionalText(500),
+  description: optionalText(20000),
+
+  metaTitle: optionalText(255),
+  metaDescription: optionalText(500),
+
+  deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
+
+  isFeatured: z.boolean().default(false),
+  mainShowcase: z.boolean().default(false),
+
+  status: z.enum(["active", "inactive"]).default("active"),
+
+  /** When present the category set is replaced; omit to leave it untouched. */
+  categoryIds: z.array(id).optional(),
+});
+
+export type ProductBaseUpdateInput = z.infer<typeof productBaseUpdateSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Generate variants                                                  */
+/* ------------------------------------------------------------------ */
+
+export const generateVariantsSchema = z.object({
+  /**
+   * `all` builds the full cartesian product of the product's option values.
+   *
+   * TODO: `missing` (only combinations that do not exist yet) and `replace`
+   * (delete + rebuild) are not implemented. See the variants route.
+   */
+  mode: z.literal("all").default("all"),
+
+  startingPrice: price.default(100),
+  compareAtPrice: price.nullish(),
+  stock: z.coerce.number().int().min(0).max(100_000).default(0),
+});
+
+export type GenerateVariantsInput = z.infer<typeof generateVariantsSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Edit a variant                                                     */
+/* ------------------------------------------------------------------ */
+
+export const variantUpdateSchema = z.object({
+  name: optionalText(150),
+  briefDescription: optionalText(500),
+  description: optionalText(500),
+
+  price,
+  compareAtPrice: price.nullish(),
+  stock: z.coerce.number().int().min(0).max(100_000),
+  weight: z.coerce.number().min(0).max(100_000).nullish(),
+
+  status: z.enum(["active", "inactive"]).default("active"),
+  isFeatured: z.boolean().default(false),
+  mainShowcase: z.boolean().default(false),
+});
+
+export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Response types                                                     */
+/* ------------------------------------------------------------------ */
+
+export type ProductStatus = "active" | "inactive";
+
+export interface ProductListCounts {
+  total: number;
+  active: number;
+  inactive: number;
+  withoutVariants: number;
+}
+
+export interface ProductListItem {
+  id: string;
+  code: string;
+  name: string;
+  slug: string;
+  status: ProductStatus;
+  isFeatured: boolean;
+  mainShowcase: boolean;
+  variantCount: number;
+  totalStock: number;
+  minPrice: number | null;
+  maxPrice: number | null;
+  imageUrl: string | null;
+  updatedAt: string | null;
+}
+
+export interface ProductListResponse {
+  ok: true;
+  counts: ProductListCounts;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  products: ProductListItem[];
+}
+
+export interface ProductCategoryRef {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+}
+
+export interface ProductOptionValueRef {
+  id: string;
+  value: string;
+}
+
+export interface ProductOptionGroup {
+  id: string;
+  name: string;
+  description: string;
+  values: ProductOptionValueRef[];
+}
+
+export interface ProductMediaItem {
+  id: string;
+  url: string;
+  fileId: string;
+  altText: string;
+  sortOrder: number;
+  variantId: string | null;
+  createdAt: string;
+}
+
+export interface ProductVariantSummary {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  compareAtPrice: number | null;
+  stock: number;
+  status: ProductStatus;
+  optionValues: { option: string; value: string }[];
+  imageUrl: string | null;
+}
+
+export interface ProductDetailStats {
+  variantCount: number;
+  totalStock: number;
+  lowStock: number;
+  outOfStock: number;
+  minPrice: number | null;
+  maxPrice: number | null;
+  orders: number;
+  unitsSold: number;
+  revenue: number;
+  reviewCount: number;
+  averageRating: number | null;
+}
+
+export interface ProductReviewItem {
+  id: string;
+  reviewerName: string;
+  rating: number;
+  title: string;
+  comment: string;
+  isApproved: boolean;
+  createdAt: string;
+  variantId: string | null;
+}
+
+export interface ProductDetail {
+  id: string;
+  code: string;
+  name: string;
+  slug: string;
+  briefDescription: string;
+  description: string;
+  metaTitle: string;
+  metaDescription: string;
+  deliveryCharges: number;
+  isFeatured: boolean;
+  mainShowcase: boolean;
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ProductDetailResponse {
+  ok: true;
+  product: ProductDetail;
+  categories: ProductCategoryRef[];
+  options: ProductOptionGroup[];
+  variants: ProductVariantSummary[];
+  media: ProductMediaItem[];
+  stats: ProductDetailStats;
+  reviews: ProductReviewItem[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Variant detail                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface VariantDetail {
+  id: string;
+  productId: string;
+  productName: string;
+  productCode: string;
+  name: string;
+  briefDescription: string;
+  description: string;
+  sku: string;
+  price: number;
+  compareAtPrice: number | null;
+  stock: number;
+  weight: number | null;
+  status: ProductStatus;
+  isFeatured: boolean;
+  mainShowcase: boolean;
+  ordersCount: number;
+  orderStats: {
+    orders: number;
+    unitsSold: number;
+    revenue: number;
+  };
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface VariantDetailResponse {
+  ok: true;
+  variant: VariantDetail;
+  optionValues: { option: string; value: string }[];
+  media: ProductMediaItem[];
+}

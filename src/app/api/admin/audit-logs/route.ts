@@ -1,14 +1,16 @@
 // app/api/admin/audit-logs/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/Database/main.db";
 import { requireAdmin } from "../../../../utils/Auth/Auth.requireRole.util";
+import {
+  type RangeType,
+  parseRange,
+} from "../../../../utils/AdminRange/adminRange.utils";
 
 type DbPool = Awaited<ReturnType<typeof getPool>>;
 
-export type RangeType = "30d" | "90d" | "365d" | "lifetime";
-
-const ALLOWED_RANGES = ["30d", "90d", "365d", "lifetime"] as const;
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
@@ -30,10 +32,8 @@ const USER_NAME_EXPR =
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function parseRange(v: string | null): RangeType {
-  return v && (ALLOWED_RANGES as readonly string[]).includes(v)
-    ? (v as RangeType)
-    : "30d";
+function parseAuditRange(v: string | null): RangeType {
+  return parseRange(v, "30d");
 }
 
 function rangeStart(range: RangeType): Date | null {
@@ -46,6 +46,8 @@ function rangeStart(range: RangeType): Date | null {
     case "365d":
       return new Date(now.getTime() - 365 * 86_400_000);
     case "lifetime":
+      return null;
+    default:
       return null;
   }
 }
@@ -88,7 +90,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
 
-  const requestedRange = parseRange(url.searchParams.get("range"));
+  const requestedRange = parseAuditRange(url.searchParams.get("range"));
   // Admin is locked to the last 30 days regardless of what was asked.
   const range: RangeType = isSuperAdmin ? requestedRange : "30d";
 

@@ -86,7 +86,7 @@ export default function NavbarClient({ user }: Props) {
       e.preventDefault();
       const q = searchValue.trim();
       if (!q) return;
-      router.push(`/products?q=${encodeURIComponent(q)}`);
+      router.push(`/collections?q=${encodeURIComponent(q)}`);
       setSearchOpen(false);
       setSearchValue("");
     },
@@ -150,13 +150,13 @@ export default function NavbarClient({ user }: Props) {
             </IconButton>
 
             <RightLink
-              href="/products"
-              label="Browse"
-              active={pathname.startsWith("/products")}
+              href="/collections"
+              label="Collections"
+              active={pathname.startsWith("/collections")}
               className="hidden sm:flex"
             >
               <ShoppingBag size={16} />
-              <span>Browse</span>
+              <span>Collections</span>
             </RightLink>
 
             <RightLink

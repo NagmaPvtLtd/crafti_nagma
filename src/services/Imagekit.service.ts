@@ -8,6 +8,39 @@ import {
   UploadServerOptions,
   uploadServerOptionsSchema,
 } from "../utils/zod-schema/imagekit.schemas.zod";
+import {
+  base64ByteLength,
+  formatFileSize,
+  IMAGEKIT_DEFAULT_OUTPUT_FORMAT,
+  IMAGEKIT_MAX_FILE_BYTES,
+  IMAGEKIT_MAX_FILE_LABEL,
+  planImageConversion,
+} from "../utils/Imagekit/imagekit.util";
+
+/* -------------------------------------------------------------------------- */
+/*  Errors                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export type ImageKitUploadErrorCode = "empty_file" | "file_too_large";
+
+/**
+ * @brief Rejection from the upload guard, before anything reaches ImageKit.
+ *
+ * @description
+ * Carries an HTTP status so a route handler can answer directly:
+ *   413 → too large, 400 → empty/unusable payload.
+ */
+export class ImageKitUploadError extends Error {
+  readonly code: ImageKitUploadErrorCode;
+  readonly status: number;
+
+  constructor(code: ImageKitUploadErrorCode, message: string, status: number) {
+    super(message);
+    this.name = "ImageKitUploadError";
+    this.code = code;
+    this.status = status;
+  }
+}
 
 /**
  * @brief Centralized ImageKit operations.
@@ -15,8 +48,67 @@ import {
  * @description
  * All server-side ImageKit access goes through this class so the client,
  * auth, environment namespacing, and signing rules stay in one place.
+ *
+ * Every upload is guarded here: at most 15 MB per file, and raster images are
+ * re-encoded to WebP/AVIF on the way in via an ImageKit pre-transformation, so
+ * the file that gets stored — and billed — is the small one.
  */
 export class ImageKitService {
+  // ---------------------------------------------------------------------------
+  // Folders
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Root folder for the current environment.
+   *
+   *   production     → "<db-name>"         e.g. "crafti-nagma"
+   *   anything else  → "<db-name>-false"   e.g. "crafti-nagma-false"
+   *
+   * Callers never build this themselves — use `envFolder()` so the suffix can
+   * never be forgotten.
+   */
+  static environmentFolder(): string {
+    const dbName = getDBName();
+    return getProduction() ? dbName : `${dbName}-false`;
+  }
+
+  /**
+   * Build an ImageKit folder under this environment's root.
+   *
+   *   ImageKitService.envFolder("products", productId)
+   *     → "/crafti-nagma-false/products/<id>"   (non-production)
+   */
+  static envFolder(...segments: (string | null | undefined)[]): string {
+    const tail = segments
+      .flatMap((segment) => String(segment ?? "").split("/"))
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .join("/");
+
+    return tail ? `/${ImageKitService.environmentFolder()}/${tail}` : `/${ImageKitService.environmentFolder()}`;
+  }
+
+  /**
+   * Normalise a folder passed to `upload()`.
+   *
+   * Accepts a bare folder ("/products/abc"), one that already starts with the
+   * environment root, or a legacy one starting with the raw DB name — the
+   * result always sits under the correct environment folder.
+   */
+  private static resolveFolder(folder: string): string {
+    const root = ImageKitService.environmentFolder();
+    const dbName = getDBName();
+    const clean = folder.replace(/^\/+|\/+$/g, "");
+
+    if (clean === root || clean.startsWith(`${root}/`)) return `/${clean}`;
+    if (clean === dbName) return ImageKitService.envFolder();
+    if (clean.startsWith(`${dbName}/`)) {
+      return ImageKitService.envFolder(clean.slice(dbName.length + 1));
+    }
+
+    return ImageKitService.envFolder(clean);
+  }
+
   // ---------------------------------------------------------------------------
   // Signing / reading
   // ---------------------------------------------------------------------------
@@ -103,40 +195,77 @@ export class ImageKitService {
   /**
    * Uploads a Buffer or Base64 string to ImageKit from the server.
    *
-   * In non-production environments, redirects files from
-   * "/<dbName>/" to "/<dbName>-false/".
+   * The folder is always nested under the environment root
+   * (`<dbName>` in production, `<dbName>-false` otherwise) — see
+   * `environmentFolder()`. Pass a bare folder such as "/products/<id>".
+   *
+   * Before uploading:
+   *  - rejects an empty payload (400) or anything over 15 MB (413);
+   *  - plans the storage format — raster images become `.webp` (default) or
+   *    `.avif`, everything else (SVG, GIF, PDF, video…) is stored untouched;
+   *  - applies the conversion as an ImageKit pre-transformation, so ImageKit
+   *    stores the converted file instead of the original and the storage saving
+   *    is real, not just at delivery time.
    *
    * @param file - File contents as a Buffer or Base64 string.
    * @param options - Upload configuration (validated at runtime by Zod).
    * @returns The ImageKit upload response.
+   * @throws {ImageKitUploadError} when the payload is empty or over the limit.
    */
   static async upload(file: Buffer | string, options: UploadServerOptions) {
     const opts = uploadServerOptionsSchema.parse(options);
     const imagekit = imagekitClient();
-    const isProduction = getProduction();
 
-    let finalFolder = opts.folder;
+    /* ---- 1. validate the payload before anything leaves the server ---- */
+    const bytes =
+      typeof file === "string" ? base64ByteLength(file) : file.byteLength;
 
-    if (!isProduction) {
-      finalFolder = finalFolder.replace(
-        `/${getDBName()}/`,
-        `/${getDBName()}-false/`,
+    if (bytes <= 0) {
+      throw new ImageKitUploadError(
+        "empty_file",
+        `"${opts.fileName}" is empty — nothing to upload.`,
+        400,
       );
     }
 
-    console.log(
-      `[IMAGEKIT - UPLOAD] >_ ${opts.fileName} → ${finalFolder} (private: ${opts.isPrivateFile ?? false})`,
+    if (bytes > IMAGEKIT_MAX_FILE_BYTES) {
+      throw new ImageKitUploadError(
+        "file_too_large",
+        `"${opts.fileName}" is ${formatFileSize(bytes)} — a single file can be at most ${IMAGEKIT_MAX_FILE_LABEL}.`,
+        413,
+      );
+    }
+
+    /* ---- 2. decide the stored format ---- */
+    const plan = planImageConversion(
+      opts.fileName,
+      opts.convertTo ?? IMAGEKIT_DEFAULT_OUTPUT_FORMAT,
+      opts.quality,
     );
 
+    const finalFolder = ImageKitService.resolveFolder(opts.folder);
+
+    console.log(
+      `[IMAGEKIT - UPLOAD] >_ ${opts.fileName} → ${finalFolder} (private: ${
+        opts.isPrivateFile ?? false
+      }, size: ${formatFileSize(bytes)}, ${
+        plan.converted
+          ? `${plan.fromExtension || "image"} → ${plan.format} [${plan.pre}]`
+          : "stored as-is"
+      })`,
+    );
+
+    /* ---- 3. upload (converted, when there is a plan) ---- */
     const uploadFile =
-      typeof file === "string" ? file : await toFile(file, opts.fileName);
+      typeof file === "string" ? file : await toFile(file, plan.fileName);
 
     return imagekit.files.upload({
       file: uploadFile,
-      fileName: opts.fileName,
+      fileName: plan.fileName,
       folder: finalFolder,
       isPrivateFile: opts.isPrivateFile ?? false,
       useUniqueFileName: true,
+      ...(plan.pre ? { transformation: { pre: plan.pre } } : {}),
     });
   }
 

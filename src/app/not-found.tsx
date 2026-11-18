@@ -59,11 +59,11 @@ export default function NotFound() {
               </Link>
 
               <Link
-                href="/shop"
+                href="/collections"
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 py-2.5 text-sm font-medium text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Shop
+                Collections
               </Link>
             </div>
           </div>

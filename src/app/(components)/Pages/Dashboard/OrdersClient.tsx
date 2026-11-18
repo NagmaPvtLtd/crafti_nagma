@@ -152,7 +152,7 @@ function EmptyState() {
         onClick={() => {}}
         className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
       >
-        Browse products
+        Browse collections
       </button>
     </div>
   );
@@ -210,7 +210,7 @@ export default function OrdersPage() {
                 type="button"
                 className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
-                Browse products
+                Browse collections
               </button>
             </div>
           </div>

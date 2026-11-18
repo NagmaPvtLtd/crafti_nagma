@@ -15,6 +15,7 @@ import {
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { type RangeType, RANGES } from "../../../../utils/AdminRange/adminRange.utils";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -22,15 +23,6 @@ import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 
 const BASE = "/api/admin/audit-logs";
 const PAGE_LIMIT = 25;
-
-type RangeType = "30d" | "90d" | "365d" | "lifetime";
-
-const RANGES: { value: RangeType; label: string }[] = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "365d", label: "1y" },
-  { value: "lifetime", label: "All" },
-];
 
 const ACTION_STYLES: Record<string, string> = {
   CREATE: "border-emerald-200/70 bg-emerald-50 text-emerald-700",
@@ -222,7 +214,7 @@ export default function AdminAuditLogsClient() {
               <div className="flex items-center gap-2">
                 {isSuperAdmin && (
                   <div className="inline-flex items-center rounded-full border border-rose-200/70 bg-white/70 p-0.5 backdrop-blur-sm">
-                    {RANGES.map((r) => (
+                    {RANGES.map((r: typeof RANGES[number]) => (
                       <button
                         key={r.value}
                         onClick={() => {

@@ -18,14 +18,13 @@ import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.u
 import MetricChartCard from "../../MetricChartCard";
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { type RangeType, RANGES } from "../../../../utils/AdminRange/adminRange.utils";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 const BASE = "/api/admin/dashboard";
-
-type RangeType = "30d" | "90d" | "365d" | "lifetime";
 
 type Summary = {
   totalRevenue: number;
@@ -131,13 +130,6 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   cancelled: "border-rose-200/70 bg-rose-50 text-rose-700",
 };
 
-const RANGES: { value: RangeType; label: string }[] = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "365d", label: "1y" },
-  { value: "lifetime", label: "All" },
-];
-
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -213,7 +205,7 @@ export default function AdminDashboardClient() {
 
               <div className="flex items-center gap-2">
                 <div className="inline-flex items-center rounded-full border border-rose-200/70 bg-white/70 p-0.5 backdrop-blur-sm">
-                  {RANGES.map((r) => (
+                  {RANGES.map((r: typeof RANGES[number]) => (
                     <button
                       key={r.value}
                       onClick={() => setRange(r.value)}
