@@ -135,7 +135,7 @@ CREATE TABLE product_options (
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (global_option_id) REFERENCES global_options(id) ON DELETE
+    FOREIGN KEY (global_option_id) REFERENCES global_options(id) ON DELETE RESTRICT
     SET NULL
 );
 -- ===========================================================
@@ -151,8 +151,7 @@ CREATE TABLE product_option_values (
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (option_id) REFERENCES product_options(id) ON DELETE CASCADE,
-    FOREIGN KEY (global_option_value_id) REFERENCES global_option_values(id) ON DELETE
-    SET NULL
+    FOREIGN KEY (global_option_value_id) REFERENCES global_option_values(id) ON DELETE RESTRICT
 );
 -- ===========================================================
 -- Product Variants
