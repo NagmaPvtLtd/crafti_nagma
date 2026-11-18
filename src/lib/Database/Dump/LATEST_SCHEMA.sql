@@ -136,7 +136,6 @@ CREATE TABLE product_options (
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (global_option_id) REFERENCES global_options(id) ON DELETE RESTRICT
-    SET NULL
 );
 -- ===========================================================
 -- Product Option Values
