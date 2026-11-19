@@ -313,7 +313,7 @@ export default function ProductListClient() {
                     {data.products.map((product) => (
                       <li key={product.id}>
                         <Link
-                          href={`/manager/product-studio/products/${product.id}`}
+                          href={`/manager/product-studio/products/${product.code || product.id}`}
                           className="group flex items-center gap-3 rounded-2xl border border-white/60 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:gap-4 sm:rounded-3xl sm:p-4"
                         >
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-stone-100 sm:h-14 sm:w-14">

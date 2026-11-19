@@ -92,7 +92,7 @@ declare module "next-auth" {
 /* -------------------------------------------------------------------------- */
 
 const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 60 * 24 * 30 },
+  session: { strategy: "jwt", maxAge: 60 * 24 * 30 * 6 },
 
   providers: [
     Google({

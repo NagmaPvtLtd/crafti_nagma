@@ -12,6 +12,7 @@ import {
   FolderTree,
   Info,
   Loader2,
+  RefreshCw,
   Sparkles,
 } from "lucide-react";
 
@@ -53,6 +54,20 @@ type FormState = {
   status: "active" | "inactive";
 };
 
+type CreateProductResponse = {
+  ok: true;
+  message: string;
+  product: {
+    id: string;
+    code: string;
+    slug: string;
+    name: string;
+    status: "active" | "inactive";
+    categoryCount: number;
+    optionCount: number;
+  };
+};
+
 const EMPTY_FORM: FormState = {
   name: "",
   briefDescription: "",
@@ -86,6 +101,7 @@ export default function AddProductClient() {
   const [options, setOptions] = useState<GlobalOption[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
@@ -111,6 +127,22 @@ export default function AddProductClient() {
       options: optionRes.data.options,
     };
   }, []);
+
+  const reloadPools = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const data = await fetchPools();
+      setCategories(data.categories);
+      setOptions(data.options);
+      setLoadError(null);
+    } catch (err: unknown) {
+      setLoadError(
+        getAxiosErrorMessage(err, "Could not refresh the form data"),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPools]);
 
   useEffect(() => {
     let active = true;
@@ -250,9 +282,18 @@ export default function AddProductClient() {
     setErrors({});
 
     try {
-      await axios.post(CREATE_URL, parsed.data, { withCredentials: true });
+      const res = await axios.post<CreateProductResponse>(
+        CREATE_URL,
+        parsed.data,
+        { withCredentials: true },
+      );
+      const created = res.data.product;
       toast.success("Base product created");
-      router.push("/manager/product-studio");
+      router.push(
+        created?.code || created?.id
+          ? `/manager/product-studio/products/${created.code || created.id}`
+          : "/manager/product-studio/products",
+      );
     } catch (err) {
       const details = axios.isAxiosError(err)
         ? (err.response?.data?.details as Record<string, string[]> | undefined)
@@ -459,6 +500,13 @@ export default function AddProductClient() {
                   title="Categories"
                   hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
                   error={errors.categoryIds}
+                                    action={
+                    <RefreshButton
+                      onClick={reloadPools}
+                      busy={refreshing}
+                      disabled={loading || refreshing}
+                    />
+                  }
                 >
                   {roots.length === 0 ? (
                     <PoolHint
@@ -846,6 +894,7 @@ function SectionCard({
   title,
   hint,
   error,
+  action,
   children,
 }: {
   step: string;
@@ -853,21 +902,25 @@ function SectionCard({
   title: string;
   hint?: string;
   error?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
-      <header className="mb-4 flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-[11px] font-semibold text-stone-500">
-          {step}
-        </span>
-        <div className="min-w-0">
-          <SectionEyebrow>{eyebrow}</SectionEyebrow>
-          <h2 className="mt-1 flex flex-wrap items-center gap-1.5 text-base font-semibold text-stone-900">
-            {title}
-            {hint && <Hint text={hint} />}
-          </h2>
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-[11px] font-semibold text-stone-500">
+            {step}
+          </span>
+          <div className="min-w-0">
+            <SectionEyebrow>{eyebrow}</SectionEyebrow>
+            <h2 className="mt-1 flex flex-wrap items-center gap-1.5 text-base font-semibold text-stone-900">
+              {title}
+              {hint && <Hint text={hint} />}
+            </h2>
+          </div>
         </div>
+        {action && <div className="mt-3 shrink-0">{action}</div>}
       </header>
 
       {children}
@@ -1004,6 +1057,38 @@ function CategoryRow({
         </span>
       </label>
     </div>
+  );
+}
+
+/**
+ * Small chip-style refresh control for a section header — matches the
+ * muted, bordered chips used elsewhere in the studio.
+ */
+function RefreshButton({
+  onClick,
+  busy,
+  disabled,
+}: {
+  onClick: () => void;
+  busy: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title="Reload categories and options"
+      aria-label="Reload categories and options"
+      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium whitespace-nowrap text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <RefreshCw className="h-3 w-3" />
+      )}
+      Refresh
+    </button>
   );
 }
 

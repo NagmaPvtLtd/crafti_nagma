@@ -10,9 +10,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   Boxes,
-  Check,
   ChevronRight,
-  ImagePlus,
+  FolderTree,
   IndianRupee,
   Layers,
   Loader2,
@@ -31,10 +30,8 @@ import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import CustomLoader from "../../CustomLoader";
 import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
-import Textarea from "../../utils/Form/Textarea";
 import StudioModal from "./StudioModal";
 import PricingQuizButton from "./PricingQuizModal";
-import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
 import { suggestPrice } from "../../../../utils/Pricing/pricing.util";
 import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 import type {
@@ -46,27 +43,6 @@ import type {
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
-
-const CATEGORIES_URL = "/api/manager/product-studio/categories";
-
-type CategoryOption = {
-  id: string;
-  name: string;
-  parentId: string | null;
-};
-
-type EditForm = {
-  name: string;
-  briefDescription: string;
-  description: string;
-  metaTitle: string;
-  metaDescription: string;
-  deliveryCharges: string;
-  status: "active" | "inactive";
-  isFeatured: boolean;
-  mainShowcase: boolean;
-  categoryIds: string[];
-};
 
 const fmtDate = (iso: string | null) =>
   iso
@@ -86,11 +62,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [allCategories, setAllCategories] = useState<CategoryOption[]>([]);
-
-  const [editOpen, setEditOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [mediaOpen, setMediaOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,30 +86,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
     };
     ahem();
   }, [load]);
-
-  useEffect(() => {
-    let active = true;
-
-    axios
-      .get<{ categories: CategoryOption[] }>(CATEGORIES_URL, {
-        withCredentials: true,
-      })
-      .then((res) => {
-        if (active) setAllCategories(res.data.categories ?? []);
-      })
-      .catch(() => {
-        /* category editing is optional — the rest of the form still works */
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const baseImages = useMemo<ProductMediaItem[]>(
-    () => (data ? data.media.filter((item) => item.variantId === null) : []),
-    [data],
-  );
 
   const imagesByVariant = useMemo(() => {
     const map = new Map<string, ProductMediaItem[]>();
@@ -189,25 +137,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
                     <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
                       {data.product.name}
                     </h1>
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                        data.product.status === "active"
-                          ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-                          : "border-stone-200/70 bg-stone-50 text-stone-600"
-                      }`}
-                    >
-                      {data.product.status}
-                    </span>
-                    {data.product.isFeatured && (
-                      <span className="rounded-full border border-amber-200/70 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-700 uppercase">
-                        Featured
-                      </span>
-                    )}
-                    {data.product.mainShowcase && (
-                      <span className="rounded-full border border-violet-200/70 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-700 uppercase">
-                        Showcase
-                      </span>
-                    )}
                   </div>
                   <p className="mt-1 font-mono text-[11px] text-stone-400">
                     {data.product.code} · /{data.product.slug}
@@ -225,13 +154,13 @@ export default function ProductDetailClient({ productId }: { productId: string }
                     />
                     <span className="hidden sm:inline">Refresh</span>
                   </button>
-                  <button
-                    onClick={() => setEditOpen(true)}
+                  <Link
+                    href={`/manager/product-studio/products/${data.product.code || data.product.id}/edit`}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit product
-                  </button>
+                  </Link>
                   <button
                     onClick={() => setGenerateOpen(true)}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
@@ -278,42 +207,12 @@ export default function ProductDetailClient({ productId }: { productId: string }
               <div className="space-y-5 sm:space-y-6">
                 <StatsStrip stats={data.stats} />
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                  <section className="lg:col-span-5">
-                    <div className="h-full rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <div>
-                          <SectionEyebrow>Media</SectionEyebrow>
-                          <h2 className="mt-1 text-sm font-semibold text-stone-900">
-                            Base product photos
-                          </h2>
-                        </div>
-                        <button
-                          onClick={() => setMediaOpen(true)}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-                        >
-                          <ImagePlus className="h-3 w-3" />
-                          Manage
-                        </button>
-                      </div>
-
-                      <MediaGallery
-                        images={baseImages}
-                        alt={data.product.name}
-                        emptyLabel="No base images yet — add the shots every variant inherits."
-                      />
-                    </div>
-                  </section>
-
-                  <section className="lg:col-span-7">
-                    <BaseDetails data={data} />
-                  </section>
-                </div>
+                <BaseDetails data={data} />
 
                 <VariantsSection
                   variants={data.variants}
                   imagesByVariant={imagesByVariant}
-                  productId={productId}
+                  productId={data.product.id}
                   onGenerate={() => setGenerateOpen(true)}
                 />
 
@@ -329,20 +228,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
         {data && (
           <>
-            {/* Mounted only while open so the form starts from fresh props. */}
-            {editOpen && (
-              <EditProductModal
-                open
-                onClose={() => setEditOpen(false)}
-                product={data}
-                categories={allCategories}
-                onSaved={() => {
-                  setEditOpen(false);
-                  void load();
-                }}
-              />
-            )}
-
             {generateOpen && (
               <GenerateVariantsModal
                 open
@@ -355,15 +240,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 }}
               />
             )}
-
-            <ProductMediaManager
-              open={mediaOpen}
-              onClose={() => setMediaOpen(false)}
-              productId={productId}
-              images={baseImages}
-              onChange={() => void load()}
-              title="Base product images"
-            />
           </>
         )}
       </div>
@@ -457,6 +333,20 @@ function StatsStrip({ stats }: { stats: ProductDetailResponse["stats"] }) {
 function BaseDetails({ data }: { data: ProductDetailResponse }) {
   const { product } = data;
 
+  /* Group the assigned categories so sub categories hang under their parent
+     instead of sitting in one flat run of chips. A sub category that is
+     assigned without its parent still gets rendered on its own. */
+  const assignedIds = new Set(data.categories.map((category) => category.id));
+  const rootCategories = data.categories.filter(
+    (category) => category.parentId === null,
+  );
+  const orphans = data.categories.filter(
+    (category) =>
+      category.parentId !== null && !assignedIds.has(category.parentId),
+  );
+  const childrenOf = (parentId: string) =>
+    data.categories.filter((category) => category.parentId === parentId);
+
   return (
     <div className="h-full rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
       <SectionEyebrow>Base product</SectionEyebrow>
@@ -475,22 +365,98 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       )}
 
       <div className="mt-4">
-        <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-          Categories
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+            Categories
+          </p>
+          {data.categories.length > 0 && (
+            <span className="text-[10px] font-medium text-stone-400">
+              {data.categories.length} assigned
+            </span>
+          )}
+        </div>
+
         {data.categories.length === 0 ? (
           <p className="mt-1 text-xs text-stone-400">No categories assigned.</p>
         ) : (
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {data.categories.map((category) => (
-              <span
-                key={category.id}
-                className="rounded-full border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 text-[10px] font-medium text-rose-600"
-              >
-                {category.parentId ? "↳ " : ""}
-                {category.name}
-              </span>
-            ))}
+          <div className="mt-1.5 space-y-1.5">
+            {rootCategories.map((root) => {
+              const children = childrenOf(root.id);
+
+              return (
+                <div
+                  key={root.id}
+                  className="overflow-hidden rounded-xl border border-stone-200 bg-white"
+                >
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+                    <FolderTree className="h-3 w-3 shrink-0 text-rose-400" />
+                    <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-stone-800">
+                      {root.name}
+                    </span>
+                    {children.length > 0 && (
+                      <span className="shrink-0 text-[10px] font-medium text-stone-400">
+                        {children.length}
+                      </span>
+                    )}
+                    <span className="shrink-0 rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-stone-500 uppercase">
+                      Main
+                    </span>
+                  </div>
+
+                  {children.length > 0 && (
+                    <div className="border-t border-dashed border-stone-200 bg-stone-50/50 py-1 pr-2.5">
+                      {children.map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="relative flex items-center pl-6"
+                        >
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute top-0 bottom-0 left-3 border-l border-dashed border-stone-300"
+                          />
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute top-1/2 left-3 w-2 border-b border-dashed border-stone-300"
+                          />
+                          <span className="min-w-0 flex-1 truncate py-0.5 text-[11px] text-stone-600">
+                            {sub.name}
+                          </span>
+                          <span className="ml-2 shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-stone-400 uppercase ring-1 ring-stone-200">
+                            Sub
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {orphans.length > 0 && (
+              <div className="overflow-hidden rounded-xl border border-dashed border-stone-200 bg-white">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+                  <FolderTree className="h-3 w-3 shrink-0 text-stone-300" />
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-stone-500">
+                    Sub categories without their main
+                  </span>
+                </div>
+                <div className="border-t border-dashed border-stone-200 py-1 pr-2.5">
+                  {orphans.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="flex items-center gap-1.5 pl-6"
+                    >
+                      <span className="min-w-0 flex-1 truncate py-0.5 text-[11px] text-stone-600">
+                        {sub.name}
+                      </span>
+                      <span className="ml-2 shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-stone-400 uppercase ring-1 ring-stone-200">
+                        Sub
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -523,20 +489,70 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
         )}
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-xs">
-        <DetailRow label="Delivery" value={formatCurrency(product.deliveryCharges)} />
-        <DetailRow label="Status" value={product.status} capitalize />
-        <DetailRow
-          label="Featured"
-          value={product.isFeatured ? "Yes" : "No"}
-        />
-        <DetailRow
-          label="Showcase"
-          value={product.mainShowcase ? "Yes" : "No"}
-        />
-        <DetailRow label="Created" value={fmtDate(product.createdAt)} />
-        <DetailRow label="Updated" value={fmtDate(product.updatedAt)} />
-      </dl>
+      {data.features.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+            Features
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {data.features.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-1.5 text-[11px] leading-relaxed text-stone-600"
+              >
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-rose-400" />
+                {item.value}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.careInstructions.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+            Care instructions
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {data.careInstructions.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-1.5 text-[11px] leading-relaxed text-stone-600"
+              >
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-stone-300" />
+                {item.value}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-stone-100 pt-3 sm:grid-cols-2">
+        <dl className="space-y-2 text-xs">
+          <DetailRow
+            label="Delivery"
+            value={formatCurrency(product.deliveryCharges)}
+          />
+          <DetailRow
+            label="Processing"
+            value={product.processingTime || "—"}
+          />
+        </dl>
+
+        <dl className="space-y-2 text-xs">
+          <DetailRow label="Status" value={product.status} capitalize />
+          <DetailRow
+            label="Featured"
+            value={product.isFeatured ? "Yes" : "No"}
+          />
+          <DetailRow
+            label="Showcase"
+            value={product.mainShowcase ? "Yes" : "No"}
+          />
+          <DetailRow label="Created" value={fmtDate(product.createdAt)} />
+          <DetailRow label="Updated" value={fmtDate(product.updatedAt)} />
+        </dl>
+      </div>
 
       {(product.metaTitle || product.metaDescription) && (
         <div className="mt-3 border-t border-stone-100 pt-3">
@@ -798,249 +814,6 @@ function ReviewsSection({
         </ul>
       )}
     </section>
-  );
-}
-
-/* ================================================================== */
-/*  Edit base product                                                 */
-/* ================================================================== */
-
-function EditProductModal({
-  open,
-  onClose,
-  product,
-  categories,
-  onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  product: ProductDetailResponse;
-  categories: CategoryOption[];
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState<EditForm>(() => ({
-    name: product.product.name,
-    briefDescription: product.product.briefDescription,
-    description: product.product.description,
-    metaTitle: product.product.metaTitle,
-    metaDescription: product.product.metaDescription,
-    deliveryCharges: String(product.product.deliveryCharges),
-    status: product.product.status,
-    isFeatured: product.product.isFeatured,
-    mainShowcase: product.product.mainShowcase,
-    categoryIds: product.categories.map((category) => category.id),
-  }));
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const setField = <K extends keyof EditForm>(key: K, value: EditForm[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
-
-  const toggleCategory = (id: string) =>
-    setForm((prev) => ({
-      ...prev,
-      categoryIds: prev.categoryIds.includes(id)
-        ? prev.categoryIds.filter((categoryId) => categoryId !== id)
-        : [...prev.categoryIds, id],
-    }));
-
-  const parentCategories = categories.filter(
-    (category) => category.parentId === null,
-  );
-  const childCategories = categories.filter(
-    (category) => category.parentId !== null,
-  );
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    setFormError(null);
-    try {
-      await axios.put(
-        `/api/manager/product-studio/${product.product.id}`,
-        {
-          name: form.name,
-          briefDescription: form.briefDescription,
-          description: form.description,
-          metaTitle: form.metaTitle,
-          metaDescription: form.metaDescription,
-          deliveryCharges: Number(form.deliveryCharges || 0),
-          isFeatured: form.isFeatured,
-          mainShowcase: form.mainShowcase,
-          status: form.status,
-          categoryIds: form.categoryIds,
-        },
-        { withCredentials: true },
-      );
-      toast.success("Product updated");
-      onSaved();
-    } catch (err) {
-      setFormError(getAxiosErrorMessage(err, "Could not update the product"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <StudioModal
-      open={open}
-      onClose={onClose}
-      title="Edit base product"
-      subtitle="Code and slug stay stable — variants and links depend on them."
-      wide
-      footer={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving || !form.name.trim()}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Check className="h-3.5 w-3.5" />
-            )}
-            Save changes
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <Field label="Name" required>
-          <TextInput
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-            placeholder="Crochet Bouquet"
-          />
-        </Field>
-
-        <Field label="Short description">
-          <Textarea
-            value={form.briefDescription}
-            onChange={(e) => setField("briefDescription", e.target.value)}
-            rows={2}
-            maxLength={500}
-            className="min-h-16"
-          />
-        </Field>
-
-        <Field label="Description">
-          <Textarea
-            value={form.description}
-            onChange={(e) => setField("description", e.target.value)}
-            rows={5}
-          />
-        </Field>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Delivery charges (₹)">
-            <TextInput
-              type="number"
-              min={0}
-              value={form.deliveryCharges}
-              onChange={(e) => setField("deliveryCharges", e.target.value)}
-            />
-          </Field>
-
-          <Field label="Status">
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setField("status", e.target.value as "active" | "inactive")
-              }
-              className="w-full cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 transition-colors focus:border-rose-300 focus:ring-2 focus:ring-rose-100 focus:outline-none"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700">
-            <input
-              type="checkbox"
-              checked={form.isFeatured}
-              onChange={(e) => setField("isFeatured", e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
-            />
-            Featured on the landing page
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700">
-            <input
-              type="checkbox"
-              checked={form.mainShowcase}
-              onChange={(e) => setField("mainShowcase", e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
-            />
-            Main showcase for its category
-          </label>
-        </div>
-
-        <div>
-          <p className="mb-1 text-xs font-semibold tracking-wider text-stone-700 uppercase">
-            Categories
-          </p>
-          {categories.length === 0 ? (
-            <p className="text-[11px] text-stone-400">
-              Categories could not be loaded — the current set is kept.
-            </p>
-          ) : (
-            <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-stone-200 bg-white p-2">
-              {[...parentCategories, ...childCategories].map((category) => (
-                <label
-                  key={category.id}
-                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-rose-50/60 ${
-                    category.parentId ? "pl-5 text-stone-600" : "font-medium text-stone-800"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.categoryIds.includes(category.id)}
-                    onChange={() => toggleCategory(category.id)}
-                    className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
-                  />
-                  {category.parentId ? "↳ " : ""}
-                  {category.name}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Meta title">
-            <TextInput
-              value={form.metaTitle}
-              onChange={(e) => setField("metaTitle", e.target.value)}
-              maxLength={255}
-            />
-          </Field>
-          <Field label="Meta description">
-            <TextInput
-              value={form.metaDescription}
-              onChange={(e) => setField("metaDescription", e.target.value)}
-              maxLength={500}
-            />
-          </Field>
-        </div>
-
-        {formError && (
-          <p className="flex items-start gap-1.5 text-xs text-rose-600">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {formError}
-          </p>
-        )}
-      </div>
-    </StudioModal>
   );
 }
 

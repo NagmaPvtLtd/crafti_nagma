@@ -31,6 +31,7 @@ interface OptionCountRow extends RowDataPacket {
 
 interface RecentProductRow extends RowDataPacket {
   id: string;
+  code: string;
   name: string;
   slug: string;
   status: "active" | "inactive";
@@ -91,7 +92,7 @@ export async function GET() {
 
     /* ---- recently updated (for hub footer) ---- */
     const [recentRows] = await conn.query<RecentProductRow[]>(
-      `SELECT id, name, slug, status, updated_at
+      `SELECT id, code, name, slug, status, updated_at
          FROM products
         ORDER BY COALESCE(updated_at, created_at) DESC
         LIMIT 5`,
@@ -152,6 +153,7 @@ export async function GET() {
       },
       recentlyUpdated: recentRows.map((r) => ({
         id: r.id,
+        code: r.code,
         name: r.name,
         slug: r.slug,
         status: r.status,

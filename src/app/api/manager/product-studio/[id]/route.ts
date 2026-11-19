@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { auditLog } from "../../../../../services/AuditLog.service";
+import { generateULID } from "../../../../../utils/generateULID.util";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../../lib/Database/main.db";
@@ -23,6 +24,7 @@ interface ProductRow extends RowDataPacket {
   meta_title: string | null;
   meta_description: string | null;
   delivery_charges: number | string;
+  processing_time: string | null;
   is_featured: number | boolean;
   main_showcase: number | boolean;
   status: "active" | "inactive";
@@ -30,11 +32,21 @@ interface ProductRow extends RowDataPacket {
   updated_at: string | null;
 }
 
+interface IdRow extends RowDataPacket {
+  id: string;
+}
+
 interface CategoryRow extends RowDataPacket {
   id: string;
   name: string;
   slug: string;
   parent_id: string | null;
+}
+
+interface LineItemRow extends RowDataPacket {
+  id: string;
+  value: string;
+  sort_order: number | string;
 }
 
 interface OptionRow extends RowDataPacket {
@@ -139,20 +151,38 @@ export async function GET(
   });
   if (!guard.ok) return guard.response;
 
-  const { id } = await params;
-  if (!id || id.length < 10) {
-    return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
+  const { id: productRef } = await params;
+  if (!productRef || productRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
   }
 
   const pool = await getPool();
   const conn = await pool.getConnection();
 
   try {
+    /* The url may carry the readable code or the internal id. Resolve it to
+       the row id once, so every query below stays on the primary key. */
+    const [refRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM products WHERE id = ? OR code = ? LIMIT 1`,
+      [productRef, productRef],
+    );
+    const id = refRows[0]?.id;
+    if (!id) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 },
+      );
+    }
+
     const [productRows] = await conn.query<ProductRow[]>(
       `SELECT id, code, name, slug,
               brief_description, description,
               meta_title, meta_description,
-              delivery_charges, is_featured, main_showcase, status,
+              delivery_charges, processing_time,
+              is_featured, main_showcase, status,
               created_at, updated_at
          FROM products
         WHERE id = ?
@@ -163,6 +193,22 @@ export async function GET(
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    const [featureRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, feature AS value, sort_order
+         FROM product_features
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [id],
+    );
+
+    const [careRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, instruction AS value, sort_order
+         FROM product_care_instructions
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [id],
+    );
 
     const [categoryRows] = await conn.query<CategoryRow[]>(
       `SELECT c.id, c.name, c.slug, c.parent_id
@@ -310,12 +356,23 @@ export async function GET(
         metaTitle: product.meta_title ?? "",
         metaDescription: product.meta_description ?? "",
         deliveryCharges: Number(product.delivery_charges ?? 0),
+        processingTime: product.processing_time ?? "",
         isFeatured: Boolean(product.is_featured),
         mainShowcase: Boolean(product.main_showcase),
         status: product.status,
         createdAt: product.created_at,
         updatedAt: product.updated_at,
       },
+      features: featureRows.map((row) => ({
+        id: row.id,
+        value: row.value,
+        sortOrder: Number(row.sort_order ?? 0),
+      })),
+      careInstructions: careRows.map((row) => ({
+        id: row.id,
+        value: row.value,
+        sortOrder: Number(row.sort_order ?? 0),
+      })),
       categories: categoryRows.map((c) => ({
         id: c.id,
         name: c.name,
@@ -400,8 +457,8 @@ export async function GET(
 
 /* -------------------------------------------------------------------------- */
 /*  PUT /api/manager/product-studio/[id]                                      */
-/*  Edit the base product. `code` and `slug` stay stable; categories are      */
-/*  replaced only when `categoryIds` is sent.                                 */
+/*  Edit the base product. `slug` stays stable; `code` may be changed but      */
+/*  must be unique. Categories are replaced only when `categoryIds` is sent.   */
 /* -------------------------------------------------------------------------- */
 
 export async function PUT(
@@ -418,9 +475,12 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
-  if (!id || id.length < 10) {
-    return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
+  const { id: productRef } = await params;
+  if (!productRef || productRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
   }
 
   const json = await req.json().catch(() => null);
@@ -434,13 +494,18 @@ export async function PUT(
   const conn = await pool.getConnection();
 
   try {
+    /* Accept either the readable code or the internal id in the url. */
     const [existingRows] = await conn.query<ProductRow[]>(
-      `SELECT id, code, name, slug, status FROM products WHERE id = ? LIMIT 1`,
-      [id],
+      `SELECT id, code, name, slug, status
+         FROM products
+        WHERE id = ? OR code = ?
+        LIMIT 1`,
+      [productRef, productRef],
     );
     if (!existingRows[0]) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+    const id = existingRows[0].id;
 
     let categoryIds: string[] | null = null;
     if (data.categoryIds) {
@@ -461,17 +526,31 @@ export async function PUT(
       }
     }
 
+    if (data.code) {
+      const [taken] = await conn.query<IdRow[]>(
+        `SELECT id FROM products WHERE code = ? AND id <> ? LIMIT 1`,
+        [data.code, id],
+      );
+      if (taken.length > 0) {
+        return invalidInput({
+          code: ["Another product already uses this code"],
+        });
+      }
+    }
+
     const now = getCurrentDateTime();
     await conn.beginTransaction();
 
     await conn.query(
       `UPDATE products
-          SET name = ?,
+          SET code = COALESCE(?, code),
+              name = ?,
               brief_description = ?,
               description = ?,
               meta_title = ?,
               meta_description = ?,
               delivery_charges = ?,
+              processing_time = ?,
               is_featured = ?,
               main_showcase = ?,
               status = ?,
@@ -479,12 +558,14 @@ export async function PUT(
               updated_at = ?
         WHERE id = ?`,
       [
+        data.code ?? null,
         data.name,
         data.briefDescription || null,
         data.description || null,
         data.metaTitle || null,
         data.metaDescription || null,
         data.deliveryCharges,
+        data.processingTime || null,
         data.isFeatured ? 1 : 0,
         data.mainShowcase ? 1 : 0,
         data.status,
@@ -504,6 +585,53 @@ export async function PUT(
       );
     }
 
+    if (data.features) {
+      await conn.query(`DELETE FROM product_features WHERE product_id = ?`, [
+        id,
+      ]);
+      if (data.features.length > 0) {
+        await conn.query(
+          `INSERT INTO product_features
+             (id, product_id, feature, sort_order, created_by, created_at)
+           VALUES ?`,
+          [
+            data.features.map((feature, index) => [
+              generateULID("feat"),
+              id,
+              feature,
+              index,
+              managerId,
+              now,
+            ]),
+          ],
+        );
+      }
+    }
+
+    if (data.careInstructions) {
+      await conn.query(
+        `DELETE FROM product_care_instructions WHERE product_id = ?`,
+        [id],
+      );
+      if (data.careInstructions.length > 0) {
+        await conn.query(
+          `INSERT INTO product_care_instructions
+             (id, product_id, instruction, sort_order, created_by, created_at)
+           VALUES ?`,
+          [
+            data.careInstructions.map((instruction, index) => [
+              generateULID("care"),
+              id,
+              instruction,
+              index,
+              managerId,
+              now,
+            ]),
+          ],
+        );
+      }
+    }
+
     await conn.commit();
 
     try {
@@ -512,7 +640,7 @@ export async function PUT(
         action: "UPDATE",
         entityType: "PRODUCT",
         entityId: id,
-        description: `Base product updated. [id=${id}, name=${data.name}, status=${data.status}, categories=${categoryIds ? categoryIds.length : "unchanged"}]`,
+        description: `Base product updated. [id=${id}, code=${data.code ?? existingRows[0].code}, name=${data.name}, status=${data.status}, categories=${categoryIds ? categoryIds.length : "unchanged"}, features=${data.features ? data.features.length : "unchanged"}, care=${data.careInstructions ? data.careInstructions.length : "unchanged"}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -523,6 +651,7 @@ export async function PUT(
       message: "Product updated",
       product: {
         id,
+        code: data.code ?? existingRows[0].code,
         name: data.name,
         status: data.status,
         isFeatured: data.isFeatured,
@@ -533,7 +662,7 @@ export async function PUT(
     await conn.rollback().catch(() => {});
     if (isDuplicateEntry(err)) {
       return invalidInput({
-        name: ["A product with this name already exists — try another"],
+        code: ["Another product already uses this code"],
       });
     }
     console.error("[PRODUCT STUDIO - PRODUCT - PUT]", err);

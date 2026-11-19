@@ -20,11 +20,24 @@ const price = z.coerce.number().min(0).max(10_000_000);
 /* ------------------------------------------------------------------ */
 
 /**
- * Editing a base product never changes its `code` or `slug` — those stay
- * stable so links and SKUs built from them keep working.
+ * Editing a base product never changes its `slug` — that stays stable so links
+ * keep working. `code` may be edited, but the route refuses one that is
+ * already taken by another product.
  */
 export const productBaseUpdateSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(255),
+
+  /** Omit to leave the stored code untouched. */
+  code: z
+    .string()
+    .trim()
+    .min(2, "Code must be at least 2 characters")
+    .max(50, "Code must be at most 50 characters")
+    .regex(
+      /^[A-Z0-9-_]+$/,
+      "Use uppercase letters, digits, dash or underscore",
+    )
+    .optional(),
 
   briefDescription: optionalText(500),
   description: optionalText(20000),
@@ -33,6 +46,7 @@ export const productBaseUpdateSchema = z.object({
   metaDescription: optionalText(500),
 
   deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
+  processingTime: optionalText(100),
 
   isFeatured: z.boolean().default(false),
   mainShowcase: z.boolean().default(false),
@@ -41,6 +55,12 @@ export const productBaseUpdateSchema = z.object({
 
   /** When present the category set is replaced; omit to leave it untouched. */
   categoryIds: z.array(id).optional(),
+
+  /** Full replacement of the feature bullets; omit to leave them untouched. */
+  features: z.array(z.string().trim().min(1).max(255)).optional(),
+
+  /** Full replacement of the care instructions; omit to leave them untouched. */
+  careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
 });
 
 export type ProductBaseUpdateInput = z.infer<typeof productBaseUpdateSchema>;
@@ -193,6 +213,12 @@ export interface ProductReviewItem {
   variantId: string | null;
 }
 
+export interface ProductLineItem {
+  id: string;
+  value: string;
+  sortOrder: number;
+}
+
 export interface ProductDetail {
   id: string;
   code: string;
@@ -203,6 +229,7 @@ export interface ProductDetail {
   metaTitle: string;
   metaDescription: string;
   deliveryCharges: number;
+  processingTime: string;
   isFeatured: boolean;
   mainShowcase: boolean;
   status: ProductStatus;
@@ -213,6 +240,8 @@ export interface ProductDetail {
 export interface ProductDetailResponse {
   ok: true;
   product: ProductDetail;
+  features: ProductLineItem[];
+  careInstructions: ProductLineItem[];
   categories: ProductCategoryRef[];
   options: ProductOptionGroup[];
   variants: ProductVariantSummary[];

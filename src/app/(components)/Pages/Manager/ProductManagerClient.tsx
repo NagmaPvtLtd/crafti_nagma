@@ -46,6 +46,7 @@ type OverviewPayload = {
   };
   recentlyUpdated: {
     id: string;
+    code: string;
     name: string;
     slug: string;
     status: "active" | "inactive";
@@ -400,7 +401,7 @@ function RecentlyUpdated({
                   {p.status}
                 </span>
                 <Link
-                  href={`/manager/product-studio/products/${p.id}`}
+                  href={`/manager/product-studio/products/${p.code || p.id}`}
                   className="shrink-0 rounded-full border border-rose-200/70 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
                 >
                   Open
