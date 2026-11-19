@@ -16,7 +16,6 @@ type FieldProps = {
   required?: boolean;
   children: ReactElement<{
     id?: string;
-    invalid?: boolean;
     "aria-invalid"?: boolean;
     "aria-describedby"?: string;
   }>;
@@ -37,10 +36,13 @@ export default function Field({
   const hintId = `${id}-hint`;
   const describedBy = error ? errorId : hint ? hintId : undefined;
 
+  // Only DOM-safe props are injected here. A non-DOM `invalid` prop would be
+  // forwarded straight to the element by controls that do not consume it
+  // (e.g. a plain <select>), which React rejects. The shared input components
+  // read `aria-invalid` instead.
   const child = isValidElement(children)
     ? cloneElement(children, {
         id,
-        invalid: Boolean(error),
         "aria-invalid": Boolean(error),
         "aria-describedby": describedBy,
       })

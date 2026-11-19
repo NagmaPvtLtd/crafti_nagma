@@ -25,8 +25,13 @@ interface CategoryCountRow extends RowDataPacket {
   root: number | string;
 }
 
+interface OptionCountRow extends RowDataPacket {
+  total: number | string;
+}
+
 interface RecentProductRow extends RowDataPacket {
   id: string;
+  code: string;
   name: string;
   slug: string;
   status: "active" | "inactive";
@@ -40,12 +45,12 @@ interface TopProductRow extends RowDataPacket {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  GET /api/manager/products/overview                                        */
+/*  GET /api/manager/product-studio/overview                                        */
 /* -------------------------------------------------------------------------- */
 
 export async function GET() {
   const guard = await requireManager({
-    label: "GET /api/manager/products/overview",
+    label: "GET /api/manager/product-studio/overview",
   });
   if (!guard.ok) return guard.response;
 
@@ -80,9 +85,14 @@ export async function GET() {
        FROM categories`,
     );
 
+    /* ---- global option pool count ---- */
+    const [optionRows] = await conn.query<OptionCountRow[]>(
+      `SELECT COUNT(*) AS total FROM global_options`,
+    );
+
     /* ---- recently updated (for hub footer) ---- */
     const [recentRows] = await conn.query<RecentProductRow[]>(
-      `SELECT id, name, slug, status, updated_at
+      `SELECT id, code, name, slug, status, updated_at
          FROM products
         ORDER BY COALESCE(updated_at, created_at) DESC
         LIMIT 5`,
@@ -106,6 +116,7 @@ export async function GET() {
     const p = productRows[0] ?? ({} as Partial<ProductCountRow>);
     const v = variantRows[0] ?? ({} as Partial<VariantCountRow>);
     const c = categoryRows[0] ?? ({} as Partial<CategoryCountRow>);
+    const o = optionRows[0] ?? ({} as Partial<OptionCountRow>);
     const top = topRows[0] ?? null;
 
     return NextResponse.json({
@@ -127,6 +138,9 @@ export async function GET() {
           total: Number(c.total ?? 0),
           root: Number(c.root ?? 0),
         },
+        options: {
+          total: Number(o.total ?? 0),
+        },
       },
       quickStats: {
         topProduct: top
@@ -139,6 +153,7 @@ export async function GET() {
       },
       recentlyUpdated: recentRows.map((r) => ({
         id: r.id,
+        code: r.code,
         name: r.name,
         slug: r.slug,
         status: r.status,
@@ -146,7 +161,7 @@ export async function GET() {
       })),
     });
   } catch (err) {
-    console.error("[PRODUCTS - OVERVIEW - GET]", err);
+    console.error("[PRODUCT STUDIO - OVERVIEW - GET]", err);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   } finally {
     conn.release();

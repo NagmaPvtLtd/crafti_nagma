@@ -15,10 +15,10 @@ const FOOTER_CONTENT = {
   tagline: "Handmade with love, stitched with care.",
   columns: [
     {
-      title: "Shop",
+      title: "Collections",
       links: [
-        { label: "All products", href: "/products" },
-        { label: "Gift hampers", href: "/products?category=gifts" },
+        { label: "All collections", href: "/collections" },
+        { label: "Bouquets", href: "/collections?category=Bouquets" },
         { label: "Custom orders", href: "/custom" },
       ],
     },

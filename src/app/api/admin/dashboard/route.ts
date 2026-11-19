@@ -1,29 +1,20 @@
 // app/api/admin/dashboard/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/Database/main.db";
 import { requireAdmin } from "../../../../utils/Auth/Auth.requireRole.util";
+import {
+  type RangeType,
+  parseRange,
+} from "../../../../utils/AdminRange/adminRange.utils";
 
 type DbPool = Awaited<ReturnType<typeof getPool>>;
-
-export type RangeType = "30d" | "90d" | "365d" | "lifetime";
 type BucketType = "day" | "week" | "month";
 
 export interface TrendDatum {
   label: string;
   count: number;
-}
-
-const ALLOWED_RANGES = ["30d", "90d", "365d", "lifetime"] as const;
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function parseRange(v: string | null): RangeType {
-  return v && (ALLOWED_RANGES as readonly string[]).includes(v)
-    ? (v as RangeType)
-    : "90d";
 }
 
 function rangeWindow(range: RangeType): {
@@ -45,6 +36,9 @@ function rangeWindow(range: RangeType): {
       return { start, end, bucket: "month" };
     case "lifetime":
       return { start: null, end, bucket: "month" };
+    default:
+      // Should be unreachable — parseRange guarantees a valid RangeType.
+      throw new Error(`Unknown admin range: ${range}`);
   }
 }
 

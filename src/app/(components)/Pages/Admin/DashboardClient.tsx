@@ -18,14 +18,13 @@ import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.u
 import MetricChartCard from "../../MetricChartCard";
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { type RangeType, RANGES } from "../../../../utils/AdminRange/adminRange.utils";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 const BASE = "/api/admin/dashboard";
-
-type RangeType = "30d" | "90d" | "365d" | "lifetime";
 
 type Summary = {
   totalRevenue: number;
@@ -110,12 +109,7 @@ type DashboardPayload = AdminPayload | SuperAdminPayload;
 /*  Format helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 const count = (n: number) => n.toLocaleString("en-IN");
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -130,13 +124,6 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   delivered: "border-emerald-200/70 bg-emerald-50 text-emerald-700",
   cancelled: "border-rose-200/70 bg-rose-50 text-rose-700",
 };
-
-const RANGES: { value: RangeType; label: string }[] = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "365d", label: "1y" },
-  { value: "lifetime", label: "All" },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -213,7 +200,7 @@ export default function AdminDashboardClient() {
 
               <div className="flex items-center gap-2">
                 <div className="inline-flex items-center rounded-full border border-rose-200/70 bg-white/70 p-0.5 backdrop-blur-sm">
-                  {RANGES.map((r) => (
+                  {RANGES.map((r: typeof RANGES[number]) => (
                     <button
                       key={r.value}
                       onClick={() => setRange(r.value)}
@@ -328,7 +315,7 @@ export default function AdminDashboardClient() {
                               {o.orderStatus.replace(/_/g, " ")}
                             </span>
                             <span className="shrink-0 text-xs font-semibold tabular-nums text-stone-900">
-                              {inr(o.total)}
+                              {formatCurrency(o.total)}
                             </span>
                           </li>
                         ))}
@@ -419,7 +406,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.label,
               value: p.count,
               format: count,
-              trailing: inr(p.revenue),
+              trailing: formatCurrency(p.revenue),
             }))}
           />
         </SectionCard>
@@ -436,7 +423,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.name,
               sub: p.sku,
               value: p.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(p.units)} units`,
             }))}
           />
@@ -451,7 +438,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
             items={data.analytics.topCategories.map((c) => ({
               label: c.name,
               value: c.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(c.orders)} orders`,
             }))}
           />
@@ -517,7 +504,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <Kpi
         label="Revenue"
-        value={inr(summary.totalRevenue)}
+        value={formatCurrency(summary.totalRevenue)}
         icon={<IndianRupee className="h-3.5 w-3.5" />}
         tone="emerald"
       />
@@ -530,7 +517,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
       />
       <Kpi
         label="AOV"
-        value={inr(summary.averageOrderValue)}
+        value={formatCurrency(summary.averageOrderValue)}
         icon={<TrendingUp className="h-3.5 w-3.5" />}
         tone="violet"
       />
