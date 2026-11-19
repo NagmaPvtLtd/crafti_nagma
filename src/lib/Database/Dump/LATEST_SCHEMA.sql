@@ -274,7 +274,8 @@ CREATE TABLE imagekit_files (
     id CHAR(40) NOT NULL PRIMARY KEY,
     entity_type VARCHAR(50) NOT NULL DEFAULT 'product_variant',
     entity_id CHAR(40) NOT NULL DEFAULT '',
-    file_id VARCHAR(255) NOT NULL UNIQUE,
+    source_image_id CHAR(40) DEFAULT NULL,
+    file_id VARCHAR(255) DEFAULT NULL UNIQUE,
     url VARCHAR(500) NOT NULL,
     file_purpose ENUM(
         'product_variant_image',
@@ -287,6 +288,8 @@ CREATE TABLE imagekit_files (
     created_by CHAR(40) NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_imagekit_files_link (source_image_id, entity_id),
+    KEY idx_imagekit_files_source (source_image_id),
     CONSTRAINT chk_imagekit_files_entity_type CHECK (
         entity_type = 'product_variant'
         OR entity_type = 'product'
@@ -298,6 +301,12 @@ CREATE TABLE imagekit_files (
             AND entity_type = 'product_variant'
             AND entity_id <> ''
         )
+    ),
+    CONSTRAINT fk_imagekit_files_source FOREIGN KEY (source_image_id)
+    REFERENCES imagekit_files(id) ON DELETE CASCADE,
+    CONSTRAINT chk_imagekit_files_origin CHECK (
+        (source_image_id IS NULL AND file_id IS NOT NULL)
+        OR (source_image_id IS NOT NULL AND file_id IS NULL)
     ),
     FOREIGN KEY (created_by) REFERENCES users(id)
 );

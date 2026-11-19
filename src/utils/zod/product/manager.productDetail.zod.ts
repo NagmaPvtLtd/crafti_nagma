@@ -72,11 +72,13 @@ export type ProductBaseUpdateInput = z.infer<typeof productBaseUpdateSchema>;
 export const generateVariantsSchema = z.object({
   /**
    * `all` builds the full cartesian product of the product's option values.
-   *
-   * TODO: `missing` (only combinations that do not exist yet) and `replace`
-   * (delete + rebuild) are not implemented. See the variants route.
+   * `selected` builds only the combinations sent in `combinations`
+   * (each entry is one option-value id per option).
    */
-  mode: z.literal("all").default("all"),
+  mode: z.enum(["all", "selected"]).default("all"),
+
+  /** Used when mode is `selected`; one array of option-value ids per variant. */
+  combinations: z.array(z.array(id).min(1).max(20)).max(200).optional(),
 
   startingPrice: price.default(100),
   compareAtPrice: price.nullish(),
@@ -105,6 +107,17 @@ export const variantUpdateSchema = z.object({
 });
 
 export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Shallow image linking                                              */
+/* ------------------------------------------------------------------ */
+
+/** Attach photos that already exist on a sibling variant. */
+export const linkExistingImagesSchema = z.object({
+  imageIds: z.array(id).min(1, "Pick at least one photo").max(60),
+});
+
+export type LinkExistingImagesInput = z.infer<typeof linkExistingImagesSchema>;
 
 /* ------------------------------------------------------------------ */
 /*  Response types                                                     */
@@ -174,6 +187,34 @@ export interface ProductMediaItem {
   sortOrder: number;
   variantId: string | null;
   createdAt: string;
+  /** True when this row is a link to another variant's upload. */
+  isLinked: boolean;
+  /** `imagekit_files.id` of the original upload, when this row is a link. */
+  sourceImageId: string | null;
+  /** Variant that originally uploaded the file (links only). */
+  ownerVariantName: string | null;
+  ownerSku: string | null;
+  /** How many variants currently link the original. */
+  linkedVariantCount: number;
+}
+
+export interface AvailableImageItem {
+  id: string;
+  url: string;
+  altText: string;
+  alreadyLinked: boolean;
+}
+
+export interface AvailableImageGroup {
+  variantId: string;
+  variantName: string;
+  sku: string;
+  images: AvailableImageItem[];
+}
+
+export interface AvailableImagesResponse {
+  ok: true;
+  groups: AvailableImageGroup[];
 }
 
 export interface ProductVariantSummary {

@@ -25,8 +25,14 @@ interface SortOrderRow extends RowDataPacket {
 
 interface MediaLookupRow extends RowDataPacket {
   image_id: string;
-  file_id: string;
+  file_id: string | null;
   url: string;
+  entity_id: string;
+  source_image_id: string | null;
+}
+
+interface LinkCountRow extends RowDataPacket {
+  total: number | string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -57,40 +63,19 @@ export async function POST(req: NextRequest) {
   }
 
   const file = form.get("file");
-  const productId = String(form.get("productId") ?? "").trim();
-  const rawVariantId = String(form.get("variantId") ?? "").trim();
-  const variantId = rawVariantId || null;
+  const productRef = String(form.get("productId") ?? "").trim();
+  const variantRef = String(form.get("variantId") ?? "").trim();
   const altText = String(form.get("altText") ?? "").trim();
 
-  if (productId.length < 10 || productId.length > 40) {
-    return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
-  }
-  if (!variantId || variantId.length < 10 || variantId.length > 40) {
+  if (productRef.length < 2 || productRef.length > 50) {
     return NextResponse.json(
-      { error: "variantId is required — base products do not have images" },
+      { error: "Invalid product reference" },
       { status: 400 },
     );
   }
-
-  const folder = ImageKitService.envFolder(
-    "products",
-    productId,
-    "variants",
-    variantId,
-  );
-
-  const parsed = uploadImageParamsSchema.safeParse({
-    file,
-    folder,
-    fileNamePrefix: "product",
-    isPrivateFile: false,
-  });
-  if (!parsed.success) {
+  if (!variantRef || variantRef.length < 2 || variantRef.length > 100) {
     return NextResponse.json(
-      {
-        error: "Validation failed",
-        details: parsed.error.flatten().fieldErrors,
-      },
+      { error: "variantId is required — base products do not have images" },
       { status: 400 },
     );
   }
@@ -99,25 +84,52 @@ export async function POST(req: NextRequest) {
   const conn = await pool.getConnection();
 
   try {
+    /* Both the product code and the variant SKU are accepted, so the folder
+       and stored entity_id always use the canonical ids. */
     const [productRows] = await conn.query<IdRow[]>(
-      `SELECT id FROM products WHERE id = ? LIMIT 1`,
-      [productId],
+      `SELECT id FROM products WHERE id = ? OR code = ? LIMIT 1`,
+      [productRef, productRef],
     );
-    if (!productRows[0]) {
+    const productId = productRows[0]?.id;
+    if (!productId) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    if (variantId) {
-      const [variantRows] = await conn.query<IdRow[]>(
-        `SELECT id FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1`,
-        [variantId, productId],
+    const [variantRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM product_variants
+        WHERE product_id = ? AND (id = ? OR sku = ?)
+        LIMIT 1`,
+      [productId, variantRef, variantRef],
+    );
+    const variantId = variantRows[0]?.id;
+    if (!variantId) {
+      return NextResponse.json(
+        { error: "Variant not found for this product" },
+        { status: 404 },
       );
-      if (!variantRows[0]) {
-        return NextResponse.json(
-          { error: "Variant not found for this product" },
-          { status: 404 },
-        );
-      }
+    }
+
+    const folder = ImageKitService.envFolder(
+      "products",
+      productId,
+      "variants",
+      variantId,
+    );
+
+    const parsed = uploadImageParamsSchema.safeParse({
+      file,
+      folder,
+      fileNamePrefix: "product",
+      isPrivateFile: false,
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 },
+      );
     }
 
     const uploadedFile = parsed.data.file;
@@ -240,9 +252,12 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const [rows] = await conn.query<MediaLookupRow[]>(
-      `SELECT f.id AS image_id, f.file_id, f.url
+      `SELECT f.id AS image_id, f.file_id, f.url,
+              f.entity_id, f.source_image_id
          FROM imagekit_files f
-        WHERE f.id = ? AND f.file_purpose = 'product_variant_image'
+        WHERE f.id = ?
+          AND f.file_purpose = 'product_variant_image'
+          AND f.entity_type = 'product_variant'
         LIMIT 1`,
       [mediaId],
     );
@@ -251,11 +266,72 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    await ImageKitService.deleteFile(media.file_id);
+    /* A link row only references a sibling variant's upload. Removing it must
+       never touch the ImageKit file, which the original still owns. */
+    if (media.source_image_id) {
+      await conn.query(`DELETE FROM imagekit_files WHERE id = ?`, [
+        media.image_id,
+      ]);
 
-    await conn.query(`DELETE FROM imagekit_files WHERE id = ?`, [
-      media.image_id,
-    ]);
+      try {
+        await auditLog.log(pool, {
+          userId: managerId,
+          action: "UPDATE",
+          entityType: "IMAGEKIT_FILE",
+          entityId: media.image_id,
+          description: `Linked product image removed from a variant. [mediaId=${mediaId}, variantId=${media.entity_id}, sourceImageId=${media.source_image_id}]`,
+        });
+      } catch {
+        /* audit must never break the response */
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "Photo removed from this variant",
+        unlinked: true,
+        deletedId: mediaId,
+      });
+    }
+
+    const [linkRows] = await conn.query<LinkCountRow[]>(
+      `SELECT COUNT(*) AS total
+         FROM imagekit_files
+        WHERE source_image_id = ?`,
+      [media.image_id],
+    );
+    const linkedVariantCount = Number(linkRows[0]?.total ?? 0);
+
+    /* ImageKit first: if the file cannot be deleted we abort before touching
+       the database, so a failed delete never leaves an orphan file behind.
+       A 404 counts as success (already gone), which still lets every link be
+       cleaned up. Then links, then the original row. */
+    if (media.file_id) {
+      const removed = await ImageKitService.deleteFileStrict(media.file_id);
+      if (!removed) {
+        return NextResponse.json(
+          {
+            error:
+              "Could not delete the image file from ImageKit. Nothing was removed — try again.",
+          },
+          { status: 502 },
+        );
+      }
+    }
+
+    await conn.beginTransaction();
+    try {
+      await conn.query(
+        `DELETE FROM imagekit_files WHERE source_image_id = ?`,
+        [media.image_id],
+      );
+      await conn.query(`DELETE FROM imagekit_files WHERE id = ?`, [
+        media.image_id,
+      ]);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    }
 
     try {
       await auditLog.log(pool, {
@@ -263,7 +339,7 @@ export async function DELETE(req: NextRequest) {
         action: "FILE_DELETED",
         entityType: "IMAGEKIT_FILE",
         entityId: media.image_id,
-        description: `Product image deleted. [mediaId=${mediaId}, fileId=${media.file_id}]`,
+        description: `Product image deleted. [mediaId=${mediaId}, fileId=${media.file_id}, linkedVariants=${linkedVariantCount}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -271,8 +347,13 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: "Image deleted",
+      message:
+        linkedVariantCount > 0
+          ? `Image deleted and removed from ${linkedVariantCount} linked variant${linkedVariantCount === 1 ? "" : "s"}`
+          : "Image deleted",
       deletedId: mediaId,
+      linkedVariantCount,
+      linksRemoved: linkedVariantCount,
     });
   } catch (err) {
     console.error("[PRODUCT STUDIO - MEDIA - DELETE]", err);

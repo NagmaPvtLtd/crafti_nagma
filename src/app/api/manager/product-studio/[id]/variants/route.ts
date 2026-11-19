@@ -17,6 +17,8 @@ interface ProductRow extends RowDataPacket {
   id: string;
   code: string;
   name: string;
+  brief_description: string | null;
+  description: string | null;
   status: "active" | "inactive";
 }
 
@@ -35,8 +37,9 @@ interface IdRow extends RowDataPacket {
   id: string;
 }
 
-interface CountRow extends RowDataPacket {
-  total: number | string;
+interface ExistingValueRow extends RowDataPacket {
+  variant_id: string;
+  option_value_id: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -113,7 +116,8 @@ export async function POST(
 
   try {
     const [productRows] = await conn.query<ProductRow[]>(
-      `SELECT id, code, name, status FROM products WHERE id = ? LIMIT 1`,
+      `SELECT id, code, name, brief_description, description, status
+         FROM products WHERE id = ? LIMIT 1`,
       [id],
     );
     const product = productRows[0];
@@ -164,22 +168,26 @@ export async function POST(
       );
     }
 
-    const [existingRows] = await conn.query<CountRow[]>(
-      `SELECT COUNT(*) AS total FROM product_variants WHERE product_id = ?`,
+    /* ---- which combinations already exist? ---- */
+    const [existingRows] = await conn.query<ExistingValueRow[]>(
+      `SELECT vov.variant_id, vov.option_value_id
+         FROM variant_option_values vov
+         JOIN product_variants v ON v.id = vov.variant_id
+        WHERE v.product_id = ?`,
       [id],
     );
-    const existingCount = Number(existingRows[0]?.total ?? 0);
-
-    if (existingCount > 0) {
-      return NextResponse.json(
-        {
-          error: `${existingCount} variant${existingCount === 1 ? "" : "s"} already exist. Regenerating is not available yet — see the TODO in the variants route (active-order check + safe replacement).`,
-        },
-        { status: 409 },
-      );
+    const valuesByExisting = new Map<string, string[]>();
+    for (const row of existingRows) {
+      const list = valuesByExisting.get(row.variant_id) ?? [];
+      list.push(row.option_value_id);
+      valuesByExisting.set(row.variant_id, list);
     }
+    const existingSignatures = new Set(
+      [...valuesByExisting.values()].map((valueIds) =>
+        [...valueIds].sort().join("|"),
+      ),
+    );
 
-    /* ---- cartesian product of the option values ---- */
     type ComboPart = {
       optionId: string;
       optionName: string;
@@ -187,24 +195,99 @@ export async function POST(
       value: string;
     };
 
-    let combos: ComboPart[][] = [[]];
-    for (const option of optionRows) {
-      const values = valuesByOption.get(option.id) ?? [];
-      const next: ComboPart[][] = [];
-      for (const combo of combos) {
-        for (const value of values) {
-          next.push([
-            ...combo,
-            {
-              optionId: option.id,
-              optionName: option.name,
-              valueId: value.id,
-              value: value.value,
-            },
-          ]);
-        }
+    const valuesById = new Map(valueRows.map((row) => [row.id, row]));
+    const combos: ComboPart[][] = [];
+
+    if (data.mode === "selected") {
+      const selected = data.combinations ?? [];
+      if (selected.length === 0) {
+        return NextResponse.json(
+          { error: "Pick at least one combination to generate" },
+          { status: 400 },
+        );
       }
-      combos = next;
+
+      const seen = new Set<string>();
+      for (const valueIds of selected) {
+        if (valueIds.length !== optionRows.length) {
+          return NextResponse.json(
+            {
+              error:
+                "Every selected combination must pick exactly one value for each option",
+            },
+            { status: 400 },
+          );
+        }
+
+        const parts: ComboPart[] = [];
+        const chosenOptions = new Set<string>();
+        let valid = true;
+
+        for (const option of optionRows) {
+          const valueId = valueIds.find(
+            (candidate) => valuesById.get(candidate)?.option_id === option.id,
+          );
+          const value = valueId ? valuesById.get(valueId) : undefined;
+          if (!value || chosenOptions.has(option.id)) {
+            valid = false;
+            break;
+          }
+          chosenOptions.add(option.id);
+          parts.push({
+            optionId: option.id,
+            optionName: option.name,
+            valueId: value.id,
+            value: value.value,
+          });
+        }
+
+        if (!valid || chosenOptions.size !== optionRows.length) {
+          return NextResponse.json(
+            {
+              error:
+                "One of the selected combinations uses values that do not belong to this product",
+            },
+            { status: 400 },
+          );
+        }
+
+        const signature = parts
+          .map((part) => part.valueId)
+          .sort()
+          .join("|");
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        combos.push(parts);
+      }
+    } else {
+      /* ---- cartesian product of the option values ---- */
+      let cartesian: ComboPart[][] = [[]];
+      for (const option of optionRows) {
+        const values = valuesByOption.get(option.id) ?? [];
+        const next: ComboPart[][] = [];
+        for (const combo of cartesian) {
+          for (const value of values) {
+            next.push([
+              ...combo,
+              {
+                optionId: option.id,
+                optionName: option.name,
+                valueId: value.id,
+                value: value.value,
+              },
+            ]);
+          }
+        }
+        cartesian = next;
+      }
+      combos.push(...cartesian);
+    }
+
+    if (combos.length === 0) {
+      return NextResponse.json(
+        { error: "Pick at least one combination to generate" },
+        { status: 400 },
+      );
     }
 
     if (combos.length > 200) {
@@ -216,6 +299,28 @@ export async function POST(
       );
     }
 
+    /* Existing combinations are skipped, never rebuilt: this lets a manager
+       add just the missing pairs (e.g. Yellow / Small) without touching
+       variants that already have prices, stock or orders. */
+    const pending = combos.filter((combo) => {
+      const signature = combo
+        .map((part) => part.valueId)
+        .sort()
+        .join("|");
+      return !existingSignatures.has(signature);
+    });
+    const skippedCount = combos.length - pending.length;
+
+    if (pending.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        message: `All ${combos.length} selected combination${combos.length === 1 ? "" : "s"} already exist`,
+        createdCount: 0,
+        skippedCount,
+        variants: [],
+      });
+    }
+
     const price = data.startingPrice || suggestPrice();
     const now = getCurrentDateTime();
 
@@ -223,7 +328,7 @@ export async function POST(
 
     const created: { id: string; name: string; sku: string }[] = [];
 
-    for (const combo of combos) {
+    for (const combo of pending) {
       const suffix = combo.map((part) => skuToken(part.value)).join("-");
       const skuBase = `${product.code}-${suffix}`.slice(0, 84);
 
@@ -253,11 +358,13 @@ export async function POST(
             price, compare_at_price, stock, weight, status,
             is_featured, main_showcase, orders_count,
             created_by, updated_by, created_at, updated_at)
-         VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, NULL, ?, 0, 0, 0, ?, NULL, ?, NULL)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, ?, NULL, ?, NULL)`,
         [
           variantId,
           id,
           name,
+          product.description,
+          product.brief_description,
           sku,
           price,
           data.compareAtPrice ?? null,
@@ -293,7 +400,7 @@ export async function POST(
         action: "CREATE",
         entityType: "VARIANT",
         entityId: id,
-        description: `Generated ${created.length} variant${created.length === 1 ? "" : "s"}. [productId=${id}, price=${price}, stock=${data.stock}]`,
+        description: `Generated ${created.length} variant${created.length === 1 ? "" : "s"} (${skippedCount} already existed). [productId=${id}, price=${price}, stock=${data.stock}]`,
         metadata: { variants: created.map((v) => v.sku) },
       });
     } catch {
@@ -303,8 +410,13 @@ export async function POST(
     return NextResponse.json(
       {
         ok: true,
-        message: `${created.length} variant${created.length === 1 ? "" : "s"} generated`,
+        message:
+          `${created.length} variant${created.length === 1 ? "" : "s"} generated` +
+          (skippedCount > 0
+            ? ` · ${skippedCount} already existed`
+            : ""),
         createdCount: created.length,
+        skippedCount,
         variants: created,
       },
       { status: 201 },

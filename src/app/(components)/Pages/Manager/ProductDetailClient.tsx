@@ -7,9 +7,9 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowLeft,
   Boxes,
+  Check,
   ChevronRight,
   FolderTree,
   IndianRupee,
@@ -18,7 +18,6 @@ import {
   Package,
   Pencil,
   RefreshCw,
-  Sparkles,
   Star,
   TrendingUp,
   Wand2,
@@ -36,7 +35,6 @@ import { suggestPrice } from "../../../../utils/Pricing/pricing.util";
 import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 import type {
   ProductDetailResponse,
-  ProductMediaItem,
   ProductVariantSummary,
 } from "../../../../utils/zod/product/manager.productDetail.zod";
 
@@ -86,17 +84,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
     };
     ahem();
   }, [load]);
-
-  const imagesByVariant = useMemo(() => {
-    const map = new Map<string, ProductMediaItem[]>();
-    for (const item of data?.media ?? []) {
-      if (!item.variantId) continue;
-      const list = map.get(item.variantId) ?? [];
-      list.push(item);
-      map.set(item.variantId, list);
-    }
-    return map;
-  }, [data]);
 
   const comboCount = useMemo(() => {
     if (!data || data.options.length === 0) return 0;
@@ -211,7 +198,6 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
                 <VariantsSection
                   variants={data.variants}
-                  imagesByVariant={imagesByVariant}
                   productId={data.product.id}
                   onGenerate={() => setGenerateOpen(true)}
                 />
@@ -606,12 +592,10 @@ function DetailRow({
 
 function VariantsSection({
   variants,
-  imagesByVariant,
   productId,
   onGenerate,
 }: {
   variants: ProductVariantSummary[];
-  imagesByVariant: Map<string, ProductMediaItem[]>;
   productId: string;
   onGenerate: () => void;
 }) {
@@ -655,13 +639,13 @@ function VariantsSection({
           {variants.map((variant) => (
             <li key={variant.id}>
               <Link
-                href={`/manager/product-studio/products/${productId}/variants/${variant.id}`}
+                href={`/manager/product-studio/products/${productId}/variants/${variant.sku || variant.id}`}
                 className="group flex items-center gap-3 py-2.5"
               >
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
-                  {imagesByVariant.get(variant.id)?.[0] ? (
+                  {variant.imageUrl ? (
                     <img
-                      src={imagesByVariant.get(variant.id)![0].url}
+                      src={variant.imageUrl}
                       alt={variant.name || variant.sku}
                       className="h-full w-full object-cover"
                     />
@@ -821,6 +805,39 @@ function ReviewsSection({
 /*  Generate variants                                                 */
 /* ================================================================== */
 
+type GenerateCombo = {
+  key: string;
+  label: string;
+  valueIds: string[];
+};
+
+function buildGenerateCombos(product: ProductDetailResponse): GenerateCombo[] {
+  if (product.options.length === 0) return [];
+
+  let combos: { valueIds: string[]; labels: string[] }[] = [
+    { valueIds: [], labels: [] },
+  ];
+
+  for (const option of product.options) {
+    const next: { valueIds: string[]; labels: string[] }[] = [];
+    for (const combo of combos) {
+      for (const value of option.values) {
+        next.push({
+          valueIds: [...combo.valueIds, value.id],
+          labels: [...combo.labels, value.value],
+        });
+      }
+    }
+    combos = next;
+  }
+
+  return combos.map((combo) => ({
+    key: combo.valueIds.join("|"),
+    label: combo.labels.join(" / "),
+    valueIds: combo.valueIds,
+  }));
+}
+
 function GenerateVariantsModal({
   open,
   onClose,
@@ -834,24 +851,44 @@ function GenerateVariantsModal({
   comboCount: number;
   onGenerated: () => void;
 }) {
-  const [startingPrice, setStartingPrice] = useState(
-    String(suggestPrice()),
+  const combos = useMemo(() => buildGenerateCombos(product), [product]);
+  const [selected, setSelected] = useState<string[]>(() =>
+    combos.map((combo) => combo.key),
   );
+  const [startingPrice, setStartingPrice] = useState(String(suggestPrice()));
   const [stock, setStock] = useState("0");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const hasVariants = product.variants.length > 0;
+  const allSelected = combos.length > 0 && selected.length === combos.length;
+
+  function toggleCombo(key: string) {
+    setSelected((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? [] : combos.map((combo) => combo.key));
+  }
 
   async function generate() {
     if (saving) return;
+
+    const chosen = combos.filter((combo) => selected.includes(combo.key));
+    if (chosen.length === 0) {
+      setFormError("Tick at least one combination to generate.");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
       const res = await axios.post<{ message: string }>(
         `/api/manager/product-studio/${product.product.id}/variants`,
         {
-          mode: "all",
+          mode: "selected",
+          combinations: chosen.map((combo) => combo.valueIds),
           startingPrice: Number(startingPrice || 0),
           stock: Number(stock || 0),
         },
@@ -871,132 +908,95 @@ function GenerateVariantsModal({
       open={open}
       onClose={onClose}
       title="Generate variants"
-      subtitle="One variant per combination of this product's option values."
+      subtitle="Tick the combinations you need. Combinations that already exist are skipped, never rebuilt."
+      wide
       footer={
-        hasVariants ? (
+        <>
           <button
             type="button"
             onClick={onClose}
             className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
           >
-            Close
+            Cancel
           </button>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void generate()}
-              disabled={saving || comboCount === 0}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              Generate {comboCount} variant{comboCount === 1 ? "" : "s"}
-            </button>
-          </>
-        )
+          <button
+            type="button"
+            onClick={() => void generate()}
+            disabled={saving || selected.length === 0}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
+            Generate {selected.length} variant{selected.length === 1 ? "" : "s"}
+          </button>
+        </>
       }
     >
-      {hasVariants ? (
-        <div className="space-y-3">
-          <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200/70 bg-amber-50 px-3.5 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-amber-900">
-                {product.variants.length} variant
-                {product.variants.length === 1 ? "" : "s"} already exist
-              </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
-                How do you want to generate? Both paths are disabled for now.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="rounded-2xl border border-stone-200 bg-white px-3.5 py-3">
-              <p className="text-xs font-semibold text-stone-800">
-                Generate missing variants
-              </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-stone-500">
-                Only builds combinations that do not exist yet, leaving current
-                prices and stock untouched.
-              </p>
-              <button
-                type="button"
-                disabled
-                className="mt-2 inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[11px] font-semibold text-stone-400"
-              >
-                Coming soon
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-stone-200 bg-white px-3.5 py-3">
-              <p className="text-xs font-semibold text-stone-800">
-                Regenerate all variants
-              </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-stone-500">
-                Rebuilds every combination from scratch.
-              </p>
-              <button
-                type="button"
-                disabled
-                className="mt-2 inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[11px] font-semibold text-stone-400"
-              >
-                Coming soon
-              </button>
-            </div>
-          </div>
-
-          <p className="rounded-xl border border-dashed border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-            <strong>TODO:</strong> before regenerating, check for acting orders
-            (any order that is not delivered or cancelled) that use these
-            variants and refuse the operation. Then archive the old variants
-            instead of deleting them — <code className="font-mono">order_items</code>{" "}
-            references them. Missing-variant generation also needs the existing
-            combination signatures. See the TODO block in the variants API.
+      {product.options.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-rose-200/70 bg-rose-50/30 px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-stone-800">
+            No options yet
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-stone-500">
+            Add options and values to this product before generating variants.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="rounded-2xl border border-stone-200 bg-white px-3.5 py-3">
-            <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-              Combinations
-            </p>
-            {product.options.length === 0 ? (
-              <p className="mt-1 text-xs text-rose-600">
-                This product has no options yet — add options and values to it
-                before generating variants.
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                Combinations
               </p>
-            ) : (
-              <>
-                <div className="mt-1.5 space-y-1">
-                  {product.options.map((option) => (
-                    <p key={option.id} className="text-[11px] text-stone-600">
-                      <span className="font-semibold text-stone-800">
-                        {option.name}
+              <p className="text-[11px] text-stone-500">
+                {selected.length} of {comboCount} selected
+              </p>
+            </div>
+
+            <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-xs font-semibold text-stone-800">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+              />
+              All combinations
+            </label>
+
+            <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+              {combos.map((combo) => {
+                const checked = selected.includes(combo.key);
+                return (
+                  <li key={combo.key}>
+                    <label
+                      className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors ${
+                        checked
+                          ? "border-rose-300 bg-rose-50/60 text-stone-900"
+                          : "border-stone-200 bg-white text-stone-600 hover:border-rose-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCombo(combo.key)}
+                        className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {combo.label}
                       </span>
-                      {" · "}
-                      {option.values.map((value) => value.value).join(", ") ||
-                        "no values"}
-                    </p>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs font-semibold text-stone-900">
-                  {comboCount} variant{comboCount === 1 ? "" : "s"} will be
-                  created
-                </p>
-              </>
-            )}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
+              Combinations that already exist are skipped, so prices, stock and
+              orders on current variants stay untouched.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1027,8 +1027,10 @@ function GenerateVariantsModal({
           </div>
 
           <p className="text-[11px] leading-relaxed text-stone-500">
-            SKUs are built from <code className="font-mono">{product.product.code}</code>{" "}
-            plus the option values, and are guaranteed unique.
+            Each new variant copies the base product&apos;s short description and
+            description. SKUs are built from{" "}
+            <code className="font-mono">{product.product.code}</code> plus the
+            option values, and are guaranteed unique.
           </p>
 
           {formError && (

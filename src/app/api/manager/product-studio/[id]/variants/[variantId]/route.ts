@@ -9,10 +9,15 @@ import { requireManager } from "../../../../../../../utils/Auth/Auth.requireRole
 import { getPool } from "../../../../../../../lib/Database/main.db";
 import { getCurrentDateTime } from "../../../../../../../utils/ValueFetcher/getDateTime.util";
 import { auditLog } from "../../../../../../../services/AuditLog.service";
+import { ImageKitService } from "../../../../../../../services/Imagekit.service";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
 /* -------------------------------------------------------------------------- */
+
+interface IdRow extends RowDataPacket {
+  id: string;
+}
 
 interface VariantRow extends RowDataPacket {
   id: string;
@@ -42,11 +47,15 @@ interface OptionValueRow extends RowDataPacket {
 
 interface MediaRow extends RowDataPacket {
   id: string;
-  file_id: string;
+  file_id: string | null;
   url: string;
   alt_text: string | null;
   sort_order: number | string;
   created_at: string;
+  source_image_id: string | null;
+  owner_variant_name: string | null;
+  owner_sku: string | null;
+  linked_count: number | string;
 }
 
 interface OrderStatsRow extends RowDataPacket {
@@ -73,6 +82,31 @@ function isDuplicateEntry(err: unknown): boolean {
     "code" in err &&
     (err as { code?: string }).code === "ER_DUP_ENTRY"
   );
+}
+
+async function resolveProductId(
+  conn: PoolConnection,
+  productRef: string,
+): Promise<string | null> {
+  const [rows] = await conn.query<IdRow[]>(
+    `SELECT id FROM products WHERE id = ? OR code = ? LIMIT 1`,
+    [productRef, productRef],
+  );
+  return rows[0]?.id ?? null;
+}
+
+async function resolveVariantId(
+  conn: PoolConnection,
+  productId: string,
+  variantRef: string,
+): Promise<string | null> {
+  const [rows] = await conn.query<IdRow[]>(
+    `SELECT id FROM product_variants
+      WHERE product_id = ? AND (id = ? OR sku = ?)
+      LIMIT 1`,
+    [productId, variantRef, variantRef],
+  );
+  return rows[0]?.id ?? null;
 }
 
 async function loadVariant(
@@ -103,12 +137,19 @@ async function loadMedia(
 ): Promise<VariantDetailResponse["media"]> {
   const [rows] = await conn.query<MediaRow[]>(
     `SELECT f.id,
-              f.file_id,
+              COALESCE(src.file_id, f.file_id) AS file_id,
               f.url,
               f.alt_text,
               f.sort_order,
-              f.created_at
+              f.created_at,
+              f.source_image_id,
+              ov.name AS owner_variant_name,
+              ov.sku  AS owner_sku,
+              (SELECT COUNT(*) FROM imagekit_files l
+                WHERE l.source_image_id = f.source_image_id) AS linked_count
        FROM imagekit_files f
+       LEFT JOIN imagekit_files src ON src.id = f.source_image_id
+       LEFT JOIN product_variants ov ON ov.id = src.entity_id
       WHERE f.file_purpose = 'product_variant_image'
         AND f.entity_type = 'product_variant'
         AND f.entity_id = ?
@@ -119,11 +160,16 @@ async function loadMedia(
   return rows.map((m) => ({
     id: m.id,
     url: m.url,
-    fileId: m.file_id,
+    fileId: m.file_id ?? "",
     altText: m.alt_text ?? "",
     sortOrder: Number(m.sort_order ?? 0),
     variantId,
     createdAt: m.created_at ?? null,
+    isLinked: m.source_image_id !== null,
+    sourceImageId: m.source_image_id,
+    ownerVariantName: m.owner_variant_name,
+    ownerSku: m.owner_sku,
+    linkedVariantCount: Number(m.linked_count ?? 0),
   }));
 }
 
@@ -140,16 +186,34 @@ export async function GET(
   });
   if (!guard.ok) return guard.response;
 
-  const { id, variantId } = await params;
-  if (!id || id.length < 10 || !variantId || variantId.length < 10) {
-    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const { id: productRef, variantId: variantRef } = await params;
+  if (!productRef || productRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
+  }
+  if (!variantRef || variantRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid variant reference" },
+      { status: 400 },
+    );
   }
 
   const pool = await getPool();
   const conn = await pool.getConnection();
 
   try {
-    const variant = await loadVariant(conn, id, variantId);
+    const productId = await resolveProductId(conn, productRef);
+    if (!productId) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    const variantId = await resolveVariantId(conn, productId, variantRef);
+    if (!variantId) {
+      return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+    }
+
+    const variant = await loadVariant(conn, productId, variantId);
     if (!variant) {
       return NextResponse.json({ error: "Variant not found" }, { status: 404 });
     }
@@ -175,7 +239,7 @@ export async function GET(
       [variantId],
     );
 
-    const media = await loadMedia(conn, id, variantId);
+    const media = await loadMedia(conn, productId, variantId);
     const orderStats = orderStatsRows[0];
 
     const payload: VariantDetailResponse = {
@@ -246,9 +310,18 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, variantId } = await params;
-  if (!id || id.length < 10 || !variantId || variantId.length < 10) {
-    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const { id: productRef, variantId: variantRef } = await params;
+  if (!productRef || productRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
+  }
+  if (!variantRef || variantRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid variant reference" },
+      { status: 400 },
+    );
   }
 
   const json = await req.json().catch(() => null);
@@ -262,7 +335,16 @@ export async function PUT(
   const conn = await pool.getConnection();
 
   try {
-    const variant = await loadVariant(conn, id, variantId);
+    const productId = await resolveProductId(conn, productRef);
+    if (!productId) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    const variantId = await resolveVariantId(conn, productId, variantRef);
+    if (!variantId) {
+      return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+    }
+
+    const variant = await loadVariant(conn, productId, variantId);
     if (!variant) {
       return NextResponse.json({ error: "Variant not found" }, { status: 404 });
     }
@@ -298,13 +380,13 @@ export async function PUT(
         managerId,
         now,
         variantId,
-        id,
+        productId,
       ],
     );
 
     await conn.query(
       `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
-      [managerId, now, id],
+      [managerId, now, productId],
     );
 
     try {
@@ -338,6 +420,167 @@ export async function PUT(
     console.error("[PRODUCT STUDIO - VARIANT - PUT]", err);
     return NextResponse.json(
       { error: "Could not update the variant" },
+      { status: 500 },
+    );
+  } finally {
+    conn.release();
+  }
+}
+/* -------------------------------------------------------------------------- */
+/*  DELETE /api/manager/product-studio/[id]/variants/[variantId]              */
+/*  Removes a variant, its images and every link other variants made to them. */
+/*  Variants referenced by an order must be deactivated instead.              */
+/* -------------------------------------------------------------------------- */
+
+interface OrderCountRow extends RowDataPacket {
+  total: number | string;
+}
+
+interface OwnedFileRow extends RowDataPacket {
+  id: string;
+  file_id: string | null;
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; variantId: string }> },
+) {
+  const guard = await requireManager({
+    label: "DELETE /api/manager/product-studio/[id]/variants/[variantId]",
+  });
+  if (!guard.ok) return guard.response;
+
+  const managerId = guard.session.user.id;
+  if (!managerId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: productRef, variantId: variantRef } = await params;
+  if (!productRef || productRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
+  }
+  if (!variantRef || variantRef.length < 2) {
+    return NextResponse.json(
+      { error: "Invalid variant reference" },
+      { status: 400 },
+    );
+  }
+
+  const pool = await getPool();
+  const conn = await pool.getConnection();
+
+  try {
+    const productId = await resolveProductId(conn, productRef);
+    if (!productId) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    const variantId = await resolveVariantId(conn, productId, variantRef);
+    if (!variantId) {
+      return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+    }
+
+    const variant = await loadVariant(conn, productId, variantId);
+    if (!variant) {
+      return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+    }
+
+    const [orderRows] = await conn.query<OrderCountRow[]>(
+      `SELECT COUNT(*) AS total FROM order_items WHERE variant_id = ?`,
+      [variantId],
+    );
+    const orderCount = Number(orderRows[0]?.total ?? 0);
+    if (orderCount > 0) {
+      return NextResponse.json(
+        {
+          error: `This variant appears in ${orderCount} order${orderCount === 1 ? "" : "s"} and cannot be deleted. Mark it inactive instead.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const [fileRows] = await conn.query<OwnedFileRow[]>(
+      `SELECT id, file_id
+         FROM imagekit_files
+        WHERE entity_type = 'product_variant'
+          AND file_purpose = 'product_variant_image'
+          AND entity_id = ?
+          AND source_image_id IS NULL`,
+      [variantId],
+    );
+
+    /* 1. ImageKit first. If any file cannot be deleted, abort before touching
+       the database — a failed variant delete must never leave an orphan file
+       behind. A 404 counts as success (the file was already gone). */
+    for (const file of fileRows) {
+      if (!file.file_id) continue;
+      const removed = await ImageKitService.deleteFileStrict(file.file_id);
+      if (!removed) {
+        return NextResponse.json(
+          {
+            error:
+              "Could not delete this variant's image files from ImageKit. Nothing was removed — try again.",
+          },
+          { status: 502 },
+        );
+      }
+    }
+
+    /* 2. Then the database: links other variants made to this variant's
+       originals, this variant's own images (uploads + links), then the
+       variant row itself. */
+    const now = getCurrentDateTime();
+    const originalImageIds = fileRows.map((file) => file.id);
+
+    await conn.beginTransaction();
+    try {
+      if (originalImageIds.length > 0) {
+        await conn.query(
+          `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
+          [originalImageIds],
+        );
+      }
+      await conn.query(`DELETE FROM imagekit_files WHERE entity_id = ?`, [
+        variantId,
+      ]);
+      await conn.query(
+        `DELETE FROM product_variants WHERE id = ? AND product_id = ?`,
+        [variantId, productId],
+      );
+      await conn.query(
+        `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
+        [managerId, now, productId],
+      );
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    }
+
+    try {
+      await auditLog.log(pool, {
+        userId: managerId,
+        action: "DELETE",
+        entityType: "VARIANT",
+        entityId: variantId,
+        description: `Variant deleted. [id=${variantId}, sku=${variant.sku}, productId=${productId}, images=${fileRows.length}]`,
+      });
+    } catch {
+      /* audit must never break the response */
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: "Variant deleted",
+      deletedId: variantId,
+      deletedImages: fileRows.length,
+    });
+  } catch (err) {
+    console.error("[PRODUCT STUDIO - VARIANT - DELETE]", err);
+    return NextResponse.json(
+      { error: "Could not delete the variant" },
       { status: 500 },
     );
   } finally {

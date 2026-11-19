@@ -3,18 +3,21 @@
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
   ArrowLeft,
   Boxes,
   Check,
+  Images,
   ImagePlus,
   IndianRupee,
   Layers,
   Loader2,
   Package,
   RefreshCw,
+  Trash2,
   TrendingUp,
 } from "lucide-react";
 
@@ -27,6 +30,7 @@ import TextInput from "../../utils/Form/TextInput";
 import Textarea from "../../utils/Form/Textarea";
 import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
+import ExistingPhotosModal from "./ExistingPhotosModal";
 import type { VariantDetailResponse } from "../../../../utils/zod/product/manager.productDetail.zod";
 
 /* ------------------------------------------------------------------ */
@@ -60,6 +64,7 @@ export default function VariantDetailClient({
   variantId: string;
 }) {
   const [data, setData] = useState<VariantDetailResponse | null>(null);
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +72,8 @@ export default function VariantDetailClient({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [existingOpen, setExistingOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,6 +152,32 @@ export default function VariantDetailClient({
     }
   }
 
+  async function deleteVariant() {
+    if (deleting || !data) return;
+
+    const label = data.variant.sku || data.variant.name || "this variant";
+    const message =
+      `Delete ${label}?\n\n` +
+      "Its own photos are removed, and photos other variants linked to it will disappear for them too. This cannot be undone.";
+
+    if (!window.confirm(message)) return;
+
+    setDeleting(true);
+    try {
+      await axios.delete(
+        `/api/manager/product-studio/${productId}/variants/${variantId}`,
+        { withCredentials: true },
+      );
+      toast.success("Variant deleted");
+      router.push(
+        `/manager/product-studio/products/${data.variant.productCode || productId}`,
+      );
+    } catch (err) {
+      toast.error(getAxiosErrorMessage(err, "Could not delete the variant"));
+      setDeleting(false);
+    }
+  }
+
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="relative flex flex-col overflow-hidden text-stone-800">
@@ -161,7 +194,7 @@ export default function VariantDetailClient({
         <section className="relative">
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
             <Link
-              href={`/manager/product-studio/products/${productId}`}
+              href={`/manager/product-studio/products/${data?.variant.productCode || productId}`}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 transition-colors hover:text-rose-600"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -216,11 +249,29 @@ export default function VariantDetailClient({
                     <span className="hidden sm:inline">Refresh</span>
                   </button>
                   <button
+                    onClick={() => setExistingOpen(true)}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50"
+                  >
+                    <Images className="h-3.5 w-3.5" />
+                    Choose existing photos
+                  </button>
+                  <button
                     onClick={() => setMediaOpen(true)}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
                   >
                     <ImagePlus className="h-3.5 w-3.5" />
                     Manage images
+                  </button>                  <button
+                    onClick={() => void deleteVariant()}
+                    disabled={deleting}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    Delete
                   </button>
                 </div>
               </div>
@@ -307,14 +358,30 @@ export default function VariantDetailClient({
                           <h2 className="mt-1 text-sm font-semibold text-stone-900">
                             Variant photos
                           </h2>
+                          <p className="mt-0.5 text-[11px] text-stone-500">
+                            {data.media.length} photo
+                            {data.media.length === 1 ? "" : "s"}
+                            {data.media.some((image) => image.isLinked)
+                              ? ` · ${data.media.filter((image) => image.isLinked).length} linked`
+                              : ""}
+                          </p>
                         </div>
-                        <button
-                          onClick={() => setMediaOpen(true)}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-                        >
-                          <ImagePlus className="h-3 w-3" />
-                          Manage
-                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            onClick={() => setExistingOpen(true)}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-300 hover:bg-stone-50"
+                          >
+                            <Images className="h-3 w-3" />
+                            Choose existing
+                          </button>
+                          <button
+                            onClick={() => setMediaOpen(true)}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
+                          >
+                            <ImagePlus className="h-3 w-3" />
+                            Manage
+                          </button>
+                        </div>
                       </div>
 
                       <MediaGallery
@@ -521,6 +588,16 @@ export default function VariantDetailClient({
             images={data.media}
             onChange={() => void load()}
             title="Variant images"
+          />
+        )}
+
+        {data && (
+          <ExistingPhotosModal
+            open={existingOpen}
+            onClose={() => setExistingOpen(false)}
+            productId={data.variant.productId}
+            variantId={data.variant.id}
+            onLinked={() => void load()}
           />
         )}
       </div>

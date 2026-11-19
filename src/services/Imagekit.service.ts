@@ -53,6 +53,32 @@ export class ImageKitUploadError extends Error {
  * re-encoded to WebP/AVIF on the way in via an ImageKit pre-transformation, so
  * the file that gets stored — and billed — is the small one.
  */
+function isAlreadyDeleted(err: unknown): boolean {
+  if (typeof err === "string") {
+    return /404|not found|does not exist/i.test(err);
+  }
+  if (typeof err !== "object" || err === null) return false;
+
+  const candidate = err as {
+    status?: number;
+    statusCode?: number;
+    $metadata?: { httpStatusCode?: number };
+    response?: { status?: number };
+    message?: string;
+  };
+
+  const status =
+    candidate.status ??
+    candidate.statusCode ??
+    candidate.$metadata?.httpStatusCode ??
+    candidate.response?.status;
+
+  return (
+    status === 404 ||
+    /404|not found|does not exist/i.test(candidate.message ?? "")
+  );
+}
+
 export class ImageKitService {
   // ---------------------------------------------------------------------------
   // Folders
@@ -292,6 +318,38 @@ export class ImageKitService {
         `[IMAGEKIT - DELETE] ✕ Failed to delete file ${fileId} :`,
         err,
       );
+    }
+  }
+
+  /**
+   * Delete a file and report whether it is gone.
+   *
+   * @description
+   * Unlike `deleteFile`, this never hides a real failure: callers that must
+   * not leave an orphan ImageKit object (variant / product media deletion)
+   * use the boolean to abort before changing the database. A 404 means the
+   * file is already gone and counts as success.
+   */
+  static async deleteFileStrict(fileId: string): Promise<boolean> {
+    if (!fileId) return true;
+
+    try {
+      console.log(`[IMAGEKIT - DELETE STRICT] >_ File ${fileId}`);
+      const imagekit = imagekitClient();
+      await imagekit.files.delete(fileId);
+      return true;
+    } catch (err: unknown) {
+      if (isAlreadyDeleted(err)) {
+        console.log(
+          `[IMAGEKIT - DELETE STRICT] ➤ File ${fileId} was already deleted`,
+        );
+        return true;
+      }
+      console.error(
+        `[IMAGEKIT - DELETE STRICT] ✕ Failed to delete file ${fileId} :`,
+        err,
+      );
+      return false;
     }
   }
 

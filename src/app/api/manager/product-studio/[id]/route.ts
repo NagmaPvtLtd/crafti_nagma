@@ -69,6 +69,7 @@ interface VariantRow extends RowDataPacket {
   compare_at_price: number | string | null;
   stock: number | string;
   status: "active" | "inactive";
+  image_url: string | null;
 }
 
 interface VariantValueRow extends RowDataPacket {
@@ -110,11 +111,16 @@ interface ReviewRow extends RowDataPacket {
 
 interface MediaRow extends RowDataPacket {
   id: string;
+  file_id: string | null;
   url: string;
   alt_text: string | null;
   variant_id: string;
   sort_order: number | string;
   created_at: string;
+  source_image_id: string | null;
+  owner_variant_name: string | null;
+  owner_sku: string | null;
+  linked_count: number | string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -237,10 +243,18 @@ export async function GET(
     );
 
     const [variantRows] = await conn.query<VariantRow[]>(
-      `SELECT id, name, sku, price, compare_at_price, stock, status
-         FROM product_variants
-        WHERE product_id = ?
-        ORDER BY created_at ASC, id ASC`,
+      `SELECT v.id, v.name, v.sku, v.price, v.compare_at_price,
+              v.stock, v.status,
+              (SELECT f.url
+                 FROM imagekit_files f
+                WHERE f.file_purpose = 'product_variant_image'
+                  AND f.entity_type = 'product_variant'
+                  AND f.entity_id = v.id
+                ORDER BY f.sort_order ASC, f.created_at ASC
+                LIMIT 1) AS image_url
+         FROM product_variants v
+        WHERE v.product_id = ?
+        ORDER BY v.created_at ASC, v.id ASC`,
       [id],
     );
 
@@ -256,12 +270,20 @@ export async function GET(
 
     const [mediaRows] = await conn.query<MediaRow[]>(
       `SELECT f.id,
+              COALESCE(src.file_id, f.file_id) AS file_id,
               f.url,
               f.alt_text,
               f.entity_id AS variant_id,
               f.sort_order,
-              f.created_at
+              f.created_at,
+              f.source_image_id,
+              ov.name AS owner_variant_name,
+              ov.sku  AS owner_sku,
+              (SELECT COUNT(*) FROM imagekit_files l
+                WHERE l.source_image_id = f.source_image_id) AS linked_count
          FROM imagekit_files f
+         LEFT JOIN imagekit_files src ON src.id = f.source_image_id
+         LEFT JOIN product_variants ov ON ov.id = src.entity_id
          JOIN product_variants v ON v.id = f.entity_id
         WHERE f.file_purpose = 'product_variant_image'
           AND f.entity_type = 'product_variant'
@@ -333,13 +355,6 @@ export async function GET(
       valuesByVariant.set(row.variant_id, list);
     }
 
-    const firstImageByVariant = new Map<string, string>();
-    for (const row of mediaRows) {
-      if (!firstImageByVariant.has(row.variant_id)) {
-        firstImageByVariant.set(row.variant_id, row.url);
-      }
-    }
-
     const variantStats = variantStatsRows[0];
     const orderStats = orderStatsRows[0];
     const reviewStats = reviewStatsRows[0];
@@ -395,16 +410,21 @@ export async function GET(
         stock: Number(v.stock ?? 0),
         status: v.status,
         optionValues: valuesByVariant.get(v.id) ?? [],
-        imageUrl: firstImageByVariant.get(v.id) ?? null,
+        imageUrl: v.image_url ?? null,
       })),
       media: mediaRows.map((m) => ({
         id: m.id,
         url: m.url,
-        fileId: m.id,
+        fileId: m.file_id ?? "",
         altText: m.alt_text ?? "",
         sortOrder: Number(m.sort_order ?? 0),
         variantId: m.variant_id,
         createdAt: m.created_at,
+        isLinked: m.source_image_id !== null,
+        sourceImageId: m.source_image_id,
+        ownerVariantName: m.owner_variant_name,
+        ownerSku: m.owner_sku,
+        linkedVariantCount: Number(m.linked_count ?? 0),
       })),
       stats: {
         variantCount: Number(variantStats?.variant_count ?? 0),

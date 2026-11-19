@@ -154,17 +154,41 @@ export default function ProductMediaManager({
   }
 
   async function remove(media: ProductMediaItem) {
-    if (!window.confirm("Delete this image? This cannot be undone.")) return;
+    const message = media.isLinked
+      ? "Remove this linked photo from this variant? The original stays on the variant it was uploaded to."
+      : media.linkedVariantCount > 0
+        ? `Delete this image? It is shared with ${media.linkedVariantCount} other variant${media.linkedVariantCount === 1 ? "" : "s"} — they will lose it too. This cannot be undone.`
+        : "Delete this image? This cannot be undone.";
+
+    if (!window.confirm(message)) return;
 
     setDeletingId(media.id);
     try {
-      await axios.delete(`${MEDIA_URL}?id=${encodeURIComponent(media.id)}`, {
-        withCredentials: true,
-      });
-      toast.success("Image deleted");
+      if (media.isLinked) {
+        if (!variantId) {
+          throw new Error("Missing variant id");
+        }
+        await axios.delete(
+          `/api/manager/product-studio/${productId}/variants/${variantId}/linked-images?id=${encodeURIComponent(media.id)}`,
+          { withCredentials: true },
+        );
+        toast.success("Photo removed from this variant");
+      } else {
+        await axios.delete(`${MEDIA_URL}?id=${encodeURIComponent(media.id)}`, {
+          withCredentials: true,
+        });
+        toast.success("Image deleted");
+      }
       onChange();
     } catch (err) {
-      toast.error(getAxiosErrorMessage(err, "Could not delete the image"));
+      toast.error(
+        getAxiosErrorMessage(
+          err,
+          media.isLinked
+            ? "Could not remove the linked photo"
+            : "Could not delete the image",
+        ),
+      );
     } finally {
       setDeletingId(null);
     }
@@ -189,8 +213,11 @@ export default function ProductMediaManager({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-stone-500">
-          {images.length} image{images.length === 1 ? "" : "s"} · first image is
-          the cover
+          {images.length} image{images.length === 1 ? "" : "s"}
+          {images.some((image) => image.isLinked)
+            ? ` · ${images.filter((image) => image.isLinked).length} linked`
+            : ""}{" "}
+          · first image is the cover
         </p>
         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600">
           {uploading ? (
@@ -231,11 +258,21 @@ export default function ProductMediaManager({
                 alt={image.altText || title}
                 className="aspect-square w-full object-cover"
               />
+              {image.isLinked && (
+                <span className="absolute top-1.5 left-1.5 rounded-full bg-stone-900/75 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                  Linked
+                </span>
+              )}
+              {image.isLinked && image.ownerSku && (
+                <span className="absolute bottom-1.5 left-1.5 max-w-[80%] truncate rounded bg-white/90 px-1.5 py-0.5 font-mono text-[9px] text-stone-600">
+                  {image.ownerSku}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => void remove(image)}
                 disabled={deletingId === image.id}
-                aria-label="Delete image"
+                aria-label={image.isLinked ? "Remove linked photo" : "Delete image"}
                 className="absolute top-1.5 right-1.5 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-500 shadow-md transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingId === image.id ? (
