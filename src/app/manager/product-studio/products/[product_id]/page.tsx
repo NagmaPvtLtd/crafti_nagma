@@ -1,11 +1,10 @@
-import ProductDetailClient from "../../../../../app/(components)/Pages/Manager/ProductDetailClient";
+"use client";
 
-export default async function ProductOverviewPage({
-  params,
-}: {
-  params: Promise<{ product_id: string }>;
-}) {
-  const { product_id } = await params;
+import ProductDetailClient from "../../../../../app/(components)/Pages/Manager/ProductDetailClient";
+import { useParams } from "next/navigation";
+
+export default function ProductOverviewPage() {
+  const { product_id } = useParams<{ product_id: string }>();
 
   return <ProductDetailClient productId={product_id} />;
 }

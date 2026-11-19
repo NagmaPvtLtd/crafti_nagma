@@ -109,12 +109,7 @@ type DashboardPayload = AdminPayload | SuperAdminPayload;
 /*  Format helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 const count = (n: number) => n.toLocaleString("en-IN");
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -320,7 +315,7 @@ export default function AdminDashboardClient() {
                               {o.orderStatus.replace(/_/g, " ")}
                             </span>
                             <span className="shrink-0 text-xs font-semibold tabular-nums text-stone-900">
-                              {inr(o.total)}
+                              {formatCurrency(o.total)}
                             </span>
                           </li>
                         ))}
@@ -411,7 +406,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.label,
               value: p.count,
               format: count,
-              trailing: inr(p.revenue),
+              trailing: formatCurrency(p.revenue),
             }))}
           />
         </SectionCard>
@@ -428,7 +423,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.name,
               sub: p.sku,
               value: p.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(p.units)} units`,
             }))}
           />
@@ -443,7 +438,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
             items={data.analytics.topCategories.map((c) => ({
               label: c.name,
               value: c.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(c.orders)} orders`,
             }))}
           />
@@ -509,7 +504,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <Kpi
         label="Revenue"
-        value={inr(summary.totalRevenue)}
+        value={formatCurrency(summary.totalRevenue)}
         icon={<IndianRupee className="h-3.5 w-3.5" />}
         tone="emerald"
       />
@@ -522,7 +517,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
       />
       <Kpi
         label="AOV"
-        value={inr(summary.averageOrderValue)}
+        value={formatCurrency(summary.averageOrderValue)}
         icon={<TrendingUp className="h-3.5 w-3.5" />}
         tone="violet"
       />

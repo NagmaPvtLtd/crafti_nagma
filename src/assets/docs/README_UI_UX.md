@@ -16,4 +16,9 @@
 - `CustomLoader` with `fullScreen={false}` for in-page loads; no bespoke skeletons or spinners.
 - Data fetching: keep the request in a `useCallback` and set state in `.then/.catch/.finally` with an `active` flag — calling `setState` synchronously in an effect body trips `react-hooks/set-state-in-effect`.
 - Page shell: `PageWrapper` + `SectionDivider` / `SectionEyebrow` + `mx-auto max-w-7xl px-4 sm:px-6`, same rhythm as the landing page.
+- **All admin pages and the collections page must use `PageWrapper`** as their outermost wrapper. This includes:
+  - Admin pages: dashboard, audit-logs, settings (already use it)
+  - Collections page: both the main `Collections` component and any footer notes should be inside `PageWrapper`
+  - Dashboard pages: orders, profile, wishlist (already use it)
 - Page routes stay thin: a `page.tsx` that renders one client component; logic lives in the client file or the API.
+- Currency formatting: always use `formatCurrency()` from `src/utils/Formator/formatCurrency.util.ts` — never define a local `inr()` helper in individual files. The utility formats INR with `en-IN` locale and 0 decimal places.

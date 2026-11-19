@@ -3,7 +3,6 @@ import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../utils/Auth/Auth.requireRole.util";
 import { generateULID } from "../../../../utils/generateULID.util";
-import { ulid } from "ulid";
 import { getPool } from "../../../../lib/Database/main.db";
 import { getCurrentDateTime } from "../../../../utils/ValueFetcher/getDateTime.util";
 import { auditLog } from "../../../../services/AuditLog.service";
@@ -41,7 +40,7 @@ function codeBase(name: string): string {
 
 /** Internal, unique reference — the name plus 4 random characters. */
 function newCode(name: string): string {
-  const suffix = ulid().slice(0, 4).toUpperCase();
+  const suffix = generateULID().slice(0, 4).toUpperCase();
   return `${codeBase(name)}-${suffix}`;
 }
 

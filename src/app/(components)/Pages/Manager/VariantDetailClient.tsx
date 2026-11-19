@@ -33,12 +33,7 @@ import type { VariantDetailResponse } from "../../../../utils/zod/product/manage
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const inr = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 type FormState = {
   name: string;
@@ -267,10 +262,10 @@ export default function VariantDetailClient({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                   <StatCard
                     label="Price"
-                    value={inr(data.variant.price)}
+                    value={formatCurrency(data.variant.price)}
                     hint={
                       data.variant.compareAtPrice
-                        ? `was ${inr(data.variant.compareAtPrice)}`
+                        ? `was ${formatCurrency(data.variant.compareAtPrice)}`
                         : "Selling price"
                     }
                     icon={<IndianRupee className="h-3.5 w-3.5" />}
@@ -297,7 +292,7 @@ export default function VariantDetailClient({
                   />
                   <StatCard
                     label="Revenue"
-                    value={inr(data.variant.orderStats.revenue)}
+                    value={formatCurrency(data.variant.orderStats.revenue)}
                     hint="Order item totals"
                     icon={<IndianRupee className="h-3.5 w-3.5" />}
                   />

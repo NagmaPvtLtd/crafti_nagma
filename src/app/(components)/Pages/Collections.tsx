@@ -20,7 +20,6 @@ import {
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import { inputClass } from "../utils/Form/fieldStyles";
-
 /* ------------------------------------------------------------------ */
 /*  Sample data — not wired to the API yet                             */
 /* ------------------------------------------------------------------ */
@@ -110,7 +109,7 @@ const PRODUCTS: SampleProduct[] = [
     category: "Wall art",
     price: 1199,
     compareAt: 1399,
-    blurb: "Hand-embroidered wildflowers in a 8\" bamboo hoop.",
+    blurb: 'Hand-embroidered wildflowers in a 8" bamboo hoop.',
     rating: 4.9,
     reviews: 18,
     tone: TONE.lilac,
@@ -161,7 +160,7 @@ const ICONS = {
   home: Home,
 } as const;
 
-const inr = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -317,6 +316,22 @@ export default function Collections() {
             )}
           </div>
         </section>
+
+        {/* Footer note - now inside PageWrapper */}
+        <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm sm:rounded-3xl">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-rose-400" />
+              Made to order · ships India-wide
+            </span>
+            <Link
+              href="/"
+              className="font-semibold text-rose-600 transition-colors hover:text-rose-700"
+            >
+              Back to home
+            </Link>
+          </div>
+        </div>
       </div>
     </PageWrapper>
   );
@@ -336,7 +351,7 @@ function ProductCard({ product }: { product: SampleProduct }) {
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:rounded-3xl">
       {/* placeholder artwork — no images needed for the sample */}
       <div
-        className={`relative flex h-40 items-center justify-center bg-gradient-to-br ${product.tone}`}
+        className={`relative flex h-40 items-center justify-center bg-linear-to-br ${product.tone}`}
       >
         <Icon className="h-12 w-12 opacity-70 transition-transform duration-300 group-hover:scale-105" />
 
@@ -379,11 +394,11 @@ function ProductCard({ product }: { product: SampleProduct }) {
         <div className="mt-3 flex items-end justify-between gap-2 border-t border-stone-100 pt-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold tabular-nums text-stone-900">
-              {inr(product.price)}
+              {formatCurrency(product.price)}
             </p>
             {product.compareAt && (
               <p className="text-[10px] text-stone-400 line-through tabular-nums">
-                {inr(product.compareAt)}
+                {formatCurrency(product.compareAt)}
               </p>
             )}
           </div>
@@ -401,28 +416,5 @@ function ProductCard({ product }: { product: SampleProduct }) {
         </div>
       </div>
     </article>
-  );
-}
-
-/* ================================================================== */
-/*  Footer strip                                                       */
-/* ================================================================== */
-
-export function CollectionsFooterNote() {
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm sm:rounded-3xl">
-        <span className="flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-rose-400" />
-          Made to order · ships India-wide
-        </span>
-        <Link
-          href="/"
-          className="font-semibold text-rose-600 transition-colors hover:text-rose-700"
-        >
-          Back to home
-        </Link>
-      </div>
-    </div>
   );
 }

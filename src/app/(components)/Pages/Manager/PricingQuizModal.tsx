@@ -6,12 +6,7 @@ import { Sparkles, Wand2 } from "lucide-react";
 import StudioModal from "./StudioModal";
 import { QUIZ_SUGGESTED_PRICE } from "../../../../utils/Pricing/pricing.util";
 
-const inr = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 /**
  * Small "quiz" pill that sits above a price field. It opens a dialog that
@@ -64,7 +59,7 @@ export default function PricingQuizButton({
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Use {inr(QUIZ_SUGGESTED_PRICE)}
+              Use {formatCurrency(QUIZ_SUGGESTED_PRICE)}
             </button>
           </>
         }
@@ -74,7 +69,7 @@ export default function PricingQuizButton({
             Suggested price
           </p>
           <p className="mt-1 text-3xl font-semibold tabular-nums text-stone-900">
-            {inr(QUIZ_SUGGESTED_PRICE)}
+            {formatCurrency(QUIZ_SUGGESTED_PRICE)}
           </p>
           <p className="mt-1 text-[11px] text-stone-500">
             per variant, before delivery

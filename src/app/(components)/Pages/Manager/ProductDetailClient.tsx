@@ -36,6 +36,7 @@ import StudioModal from "./StudioModal";
 import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
 import { suggestPrice } from "../../../../utils/Pricing/pricing.util";
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 import type {
   ProductDetailResponse,
   ProductMediaItem,
@@ -66,13 +67,6 @@ type EditForm = {
   mainShowcase: boolean;
   categoryIds: string[];
 };
-
-const inr = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
 
 const fmtDate = (iso: string | null) =>
   iso
@@ -386,8 +380,8 @@ function StatsStrip({ stats }: { stats: ProductDetailResponse["stats"] }) {
     stats.minPrice === null
       ? "—"
       : stats.maxPrice !== null && stats.maxPrice !== stats.minPrice
-        ? `${inr(stats.minPrice)} – ${inr(stats.maxPrice)}`
-        : inr(stats.minPrice);
+        ? `${formatCurrency(stats.minPrice)} – ${formatCurrency(stats.maxPrice)}`
+        : formatCurrency(stats.minPrice);
 
   const items = [
     {
@@ -425,7 +419,7 @@ function StatsStrip({ stats }: { stats: ProductDetailResponse["stats"] }) {
     },
     {
       label: "Revenue",
-      value: inr(stats.revenue),
+      value: formatCurrency(stats.revenue),
       hint: "Order item totals",
       icon: <IndianRupee className="h-3.5 w-3.5" />,
     },
@@ -530,7 +524,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-xs">
-        <DetailRow label="Delivery" value={inr(product.deliveryCharges)} />
+        <DetailRow label="Delivery" value={formatCurrency(product.deliveryCharges)} />
         <DetailRow label="Status" value={product.status} capitalize />
         <DetailRow
           label="Featured"
@@ -683,7 +677,7 @@ function VariantsSection({
 
                 <div className="shrink-0 text-right">
                   <p className="text-xs font-semibold tabular-nums text-stone-900">
-                    {inr(variant.price)}
+                    {formatCurrency(variant.price)}
                   </p>
                   <p className="text-[10px] text-stone-500">
                     {variant.stock} in stock

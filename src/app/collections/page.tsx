@@ -1,12 +1,5 @@
-import Collections, {
-  CollectionsFooterNote,
-} from "../(components)/Pages/Collections";
+import Collections from "../(components)/Pages/Collections";
 
 export default function CollectionsPage() {
-  return (
-    <>
-      <Collections />
-      <CollectionsFooterNote />
-    </>
-  );
+  return <Collections />;
 }

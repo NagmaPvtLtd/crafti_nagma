@@ -161,12 +161,7 @@ const FILTERS = [
 
 type FilterKey = (typeof FILTERS)[number]["key"];
 
-const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 const countOf = (items: WishlistItem[], key: FilterKey) => {
   if (key === "in-stock") return items.filter((i) => i.inStock).length;
@@ -221,7 +216,7 @@ export default function WishlistClient() {
     },
     {
       label: "Wishlist value",
-      value: inr(totalValue),
+      value: formatCurrency(totalValue),
       hint: "At current prices",
       icon: <IndianRupee className="h-3.5 w-3.5" />,
     },
@@ -233,7 +228,7 @@ export default function WishlistClient() {
     },
     {
       label: "Best saving",
-      value: inr(bestSaving),
+      value: formatCurrency(bestSaving),
       hint: "On a single piece",
       icon: <Sparkles className="h-3.5 w-3.5" />,
     },
@@ -418,7 +413,7 @@ function WishlistCard({
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:rounded-3xl">
       {/* Artwork */}
       <div
-        className={`relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-linear-to-br ${item.accent}`}
+        className={`relative flex aspect-4/3 items-center justify-center overflow-hidden bg-linear-to-br ${item.accent}`}
       >
         <Icon
           aria-hidden
@@ -472,11 +467,11 @@ function WishlistCard({
 
         <div className="mt-3 flex items-baseline gap-2">
           <span className="text-base font-semibold tabular-nums text-stone-900">
-            {inr(item.price)}
+            {formatCurrency(item.price)}
           </span>
           {item.mrp > item.price && (
             <span className="text-xs text-stone-400 line-through tabular-nums">
-              {inr(item.mrp)}
+              {formatCurrency(item.mrp)}
             </span>
           )}
         </div>
@@ -561,4 +556,3 @@ function EmptyState({
     </div>
   );
 }
-

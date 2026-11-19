@@ -33,6 +33,12 @@ product draws from, and the base-product form that turns them into a product.
 - Schemas + response types: `src/utils/zod/product/manager.{category,option,product}.zod.ts`
 - Shared slug helper: `src/utils/Slug/slug.util.ts`
 
+## Params handling for dynamic routes
+
+- Dynamic route pages (`[product_id]/page.tsx`, `[product_id]/variants/[variant_id]/page.tsx`) use `useParams()` from `next/navigation` instead of awaiting the params Promise.
+- These pages must have the `"use client"` directive at the top since `useParams` is a client hook.
+- Example: `const { product_id } = useParams<{ product_id: string }>();`
+
 ## Data
 
 - `categories(id, name, slug UNIQUE, parent_id)`, `product_categories(product_id, category_id)`

@@ -28,6 +28,8 @@ import type { ProductListResponse } from "../../../../utils/zod/product/manager.
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
+
 const LIST_URL = "/api/manager/product-studio/products";
 const CATEGORIES_URL = "/api/manager/product-studio/categories";
 const PAGE_LIMIT = 20;
@@ -37,13 +39,6 @@ type CategoryOption = {
   name: string;
   parentId: string | null;
 };
-
-const inr = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -367,8 +362,8 @@ export default function ProductListClient() {
                                 ? "—"
                                 : product.maxPrice !== null &&
                                     product.maxPrice !== product.minPrice
-                                  ? `${inr(product.minPrice)} – ${inr(product.maxPrice)}`
-                                  : inr(product.minPrice)}
+                                  ? `${formatCurrency(product.minPrice)} – ${formatCurrency(product.maxPrice)}`
+                                  : formatCurrency(product.minPrice)}
                             </p>
                             <p className="text-[10px] text-stone-500">price</p>
                           </div>
