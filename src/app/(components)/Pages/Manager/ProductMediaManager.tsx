@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2 } from "lucide-react";
 
 import StudioModal from "./StudioModal";
+import ConfirmDialog from "../../utils/ConfirmDialog";
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import type { ProductMediaItem } from "../../../../utils/zod/product/manager.productDetail.zod";
 import axios from "axios";
@@ -127,6 +128,9 @@ export default function ProductMediaManager({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<ProductMediaItem | null>(
+    null,
+  );
 
   async function uploadFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -154,14 +158,6 @@ export default function ProductMediaManager({
   }
 
   async function remove(media: ProductMediaItem) {
-    const message = media.isLinked
-      ? "Remove this linked photo from this variant? The original stays on the variant it was uploaded to."
-      : media.linkedVariantCount > 0
-        ? `Delete this image? It is shared with ${media.linkedVariantCount} other variant${media.linkedVariantCount === 1 ? "" : "s"} — they will lose it too. This cannot be undone.`
-        : "Delete this image? This cannot be undone.";
-
-    if (!window.confirm(message)) return;
-
     setDeletingId(media.id);
     try {
       if (media.isLinked) {
@@ -195,7 +191,8 @@ export default function ProductMediaManager({
   }
 
   return (
-    <StudioModal
+    <>
+      <StudioModal
       open={open}
       onClose={onClose}
       title={title}
@@ -270,7 +267,7 @@ export default function ProductMediaManager({
               )}
               <button
                 type="button"
-                onClick={() => void remove(image)}
+                onClick={() => setPendingRemoval(image)}
                 disabled={deletingId === image.id}
                 aria-label={image.isLinked ? "Remove linked photo" : "Delete image"}
                 className="absolute top-1.5 right-1.5 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-500 shadow-md transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
@@ -285,6 +282,29 @@ export default function ProductMediaManager({
           ))}
         </ul>
       )}
-    </StudioModal>
+      </StudioModal>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title={pendingRemoval?.isLinked ? "Remove linked photo?" : "Delete photo?"}
+        description={
+          pendingRemoval?.isLinked
+            ? "This removes the photo from this variant only. The original upload stays on the variant it belongs to."
+            : pendingRemoval && pendingRemoval.linkedVariantCount > 0
+              ? `This photo is shared with ${pendingRemoval.linkedVariantCount} other variant${
+                  pendingRemoval.linkedVariantCount === 1 ? "" : "s"
+                }. Deleting it removes it from all of them.`
+              : "This permanently deletes the photo from ImageKit and cannot be undone."
+        }
+        confirmLabel={pendingRemoval?.isLinked ? "Remove" : "Delete"}
+        loading={pendingRemoval !== null && deletingId === pendingRemoval.id}
+        onConfirm={() => {
+          const media = pendingRemoval;
+          setPendingRemoval(null);
+          if (media) void remove(media);
+        }}
+        onClose={() => setPendingRemoval(null)}
+      />
+
+    </>
   );
 }

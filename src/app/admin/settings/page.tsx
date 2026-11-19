@@ -19,6 +19,7 @@ import {
 } from "../../../utils/zod/setting.validator.zod";
 import getAxiosErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../(components)/utils/PageWrapper";
+import ConfirmDialog from "../../(components)/utils/ConfirmDialog";
 import { SectionDivider, SectionEyebrow } from "../../(components)/utils/SectionDiv";
 
 const BASE = "/api/admin/settings";
@@ -29,6 +30,7 @@ export default function SettingsClient() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const [newName, setNewName] = useState<string>("");
   const [newActive, setNewActive] = useState<boolean>(true);
@@ -184,11 +186,6 @@ export default function SettingsClient() {
   /* ------------------------------------------------------------------ */
 
   async function handleDelete(fieldName: string) {
-    if (
-      !window.confirm(`Delete setting "${fieldName}"? This cannot be undone.`)
-    )
-      return;
-
     const previous = rows;
     markBusy(fieldName, true);
     setRows((prev) => prev.filter((r) => r.field_name !== fieldName));
@@ -437,7 +434,7 @@ export default function SettingsClient() {
                             )}
 
                             <button
-                              onClick={() => void handleDelete(row.field_name)}
+                              onClick={() => setPendingDelete(row.field_name)}
                               disabled={isBusy}
                               title="Delete toggle"
                               className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center text-stone-400 transition hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
@@ -555,7 +552,7 @@ export default function SettingsClient() {
                               <td className="px-5 py-4 text-right">
                                 <button
                                   onClick={() =>
-                                    void handleDelete(row.field_name)
+                                    setPendingDelete(row.field_name)
                                   }
                                   disabled={isBusy}
                                   title="Delete toggle"
@@ -575,6 +572,25 @@ export default function SettingsClient() {
             )}
           </div>
         </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete this toggle?"
+        description={
+          <>
+            <span className="font-mono">{pendingDelete}</span> will be removed
+            from the settings table. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete toggle"
+        loading={pendingDelete !== null && Boolean(busy[pendingDelete])}
+        onConfirm={() => {
+          const field = pendingDelete;
+          setPendingDelete(null);
+          if (field) void handleDelete(field);
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-3 bottom-4 z-50 flex justify-center sm:inset-x-auto sm:right-6 sm:justify-end">

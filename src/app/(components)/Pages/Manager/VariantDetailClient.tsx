@@ -31,6 +31,7 @@ import Textarea from "../../utils/Form/Textarea";
 import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
 import ExistingPhotosModal from "./ExistingPhotosModal";
+import ConfirmDialog from "../../utils/ConfirmDialog";
 import type { VariantDetailResponse } from "../../../../utils/zod/product/manager.productDetail.zod";
 
 /* ------------------------------------------------------------------ */
@@ -74,6 +75,7 @@ export default function VariantDetailClient({
   const [mediaOpen, setMediaOpen] = useState(false);
   const [existingOpen, setExistingOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,13 +156,6 @@ export default function VariantDetailClient({
 
   async function deleteVariant() {
     if (deleting || !data) return;
-
-    const label = data.variant.sku || data.variant.name || "this variant";
-    const message =
-      `Delete ${label}?\n\n` +
-      "Its own photos are removed, and photos other variants linked to it will disappear for them too. This cannot be undone.";
-
-    if (!window.confirm(message)) return;
 
     setDeleting(true);
     try {
@@ -262,7 +257,7 @@ export default function VariantDetailClient({
                     <ImagePlus className="h-3.5 w-3.5" />
                     Manage images
                   </button>                  <button
-                    onClick={() => void deleteVariant()}
+                    onClick={() => setConfirmOpen(true)}
                     disabled={deleting}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -600,6 +595,23 @@ export default function VariantDetailClient({
             onLinked={() => void load()}
           />
         )}
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Delete this variant?"
+          description={
+            <>
+              <span className="font-mono">
+                {data?.variant.sku || data?.variant.name}
+              </span>{" "}
+              will be removed with its own photos. Links other variants made to
+              those photos disappear too. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete variant"
+          loading={deleting}
+          onConfirm={() => void deleteVariant()}
+          onClose={() => setConfirmOpen(false)}
+        />
       </div>
     </PageWrapper>
   );
