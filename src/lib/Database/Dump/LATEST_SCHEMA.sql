@@ -3,11 +3,9 @@
 -- ===========================================================
 CREATE TABLE users (
     id CHAR(40) NOT NULL PRIMARY KEY,
-    -- Personal Information
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) DEFAULT NULL,
     full_name VARCHAR(255) DEFAULT NULL,
-    -- Authentication
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(20) NULL,
     password_hash VARCHAR(255) DEFAULT NULL,
@@ -15,7 +13,6 @@ CREATE TABLE users (
     google_profile_picture VARCHAR(500) DEFAULT NULL,
     email_verified BOOLEAN DEFAULT FALSE,
     phone_verified BOOLEAN DEFAULT FALSE,
-    -- Shipping Address
     address_line_1 VARCHAR(255) DEFAULT NULL,
     address_line_2 VARCHAR(255) DEFAULT NULL,
     landmark VARCHAR(255) DEFAULT NULL,
@@ -23,24 +20,15 @@ CREATE TABLE users (
     state VARCHAR(100) DEFAULT NULL,
     postal_code VARCHAR(10) DEFAULT NULL,
     country VARCHAR(100) DEFAULT 'India',
-    -- Optional Business Details
     company_name VARCHAR(255) DEFAULT NULL,
     gstin VARCHAR(20) DEFAULT NULL,
-    -- Account
-    role ENUM(
-        'super_admin',
-        'admin',
-        'manager',
-        'customer'
-    ) DEFAULT 'customer',
-    status ENUM(
-        'active',
-        'inactive',
-        'banned'
-    ) DEFAULT 'active',
+    role ENUM('super_admin', 'admin', 'manager', 'customer') DEFAULT 'customer',
+    status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     profile_completed BOOLEAN DEFAULT FALSE,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME DEFAULT NULL
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
 );
 -- ===========================================================
 -- Categories
@@ -302,11 +290,16 @@ CREATE TABLE imagekit_files (
             AND entity_id <> ''
         )
     ),
-    CONSTRAINT fk_imagekit_files_source FOREIGN KEY (source_image_id)
-    REFERENCES imagekit_files(id) ON DELETE CASCADE,
+    CONSTRAINT fk_imagekit_files_source FOREIGN KEY (source_image_id) REFERENCES imagekit_files(id) ON DELETE CASCADE,
     CONSTRAINT chk_imagekit_files_origin CHECK (
-        (source_image_id IS NULL AND file_id IS NOT NULL)
-        OR (source_image_id IS NOT NULL AND file_id IS NULL)
+        (
+            source_image_id IS NULL
+            AND file_id IS NOT NULL
+        )
+        OR (
+            source_image_id IS NOT NULL
+            AND file_id IS NULL
+        )
     ),
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
@@ -316,9 +309,7 @@ CREATE TABLE imagekit_files (
 CREATE TABLE carts (
     id CHAR(40) NOT NULL PRIMARY KEY,
     user_id CHAR(40) DEFAULT NULL,
-    -- NULL for guest carts
     session_id VARCHAR(255) DEFAULT NULL,
-    -- for guests before login
     status ENUM('active', 'converted', 'abandoned') DEFAULT 'active',
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
@@ -335,7 +326,6 @@ CREATE TABLE cart_items (
     variant_id CHAR(40) NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     personalization_data JSON DEFAULT NULL,
-    -- matches product_personalizations
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
@@ -348,10 +338,7 @@ CREATE TABLE cart_items (
 CREATE TABLE orders (
     id CHAR(40) NOT NULL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
-    -- human-readable, e.g. CRF-2026-0001
     user_id CHAR(40) DEFAULT NULL,
-    -- NULL if guest checkout allowed
-    -- Snapshot of shipping details (immutable after order placed)
     shipping_first_name VARCHAR(100) NOT NULL,
     shipping_last_name VARCHAR(100) DEFAULT NULL,
     shipping_phone VARCHAR(20) NOT NULL,
@@ -363,12 +350,10 @@ CREATE TABLE orders (
     shipping_state VARCHAR(100) NOT NULL,
     shipping_postal_code VARCHAR(10) NOT NULL,
     shipping_country VARCHAR(100) DEFAULT 'India',
-    -- Amounts (all snapshots at time of order)
     subtotal DECIMAL(10, 2) NOT NULL,
     delivery_charges DECIMAL(10, 2) DEFAULT 0,
     discount DECIMAL(10, 2) DEFAULT 0,
     total DECIMAL(10, 2) NOT NULL,
-    -- Order lifecycle (as per your workflow)
     order_status ENUM(
         'pending',
         'accepted',
@@ -379,12 +364,9 @@ CREATE TABLE orders (
         'delivered',
         'cancelled'
     ) DEFAULT 'pending',
-    -- Payment status (kept separate from order_status)
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
-    -- Optional admin/customer notes
     customer_note TEXT DEFAULT NULL,
     admin_note TEXT DEFAULT NULL,
-    -- Tracking (filled when shipped)
     tracking_number VARCHAR(100) DEFAULT NULL,
     tracking_url VARCHAR(500) DEFAULT NULL,
     shipped_at DATETIME DEFAULT NULL,
@@ -403,17 +385,12 @@ CREATE TABLE order_items (
     id CHAR(40) NOT NULL PRIMARY KEY,
     order_id CHAR(40) NOT NULL,
     variant_id CHAR(40) NOT NULL,
-    -- reference only, no cascade
-    -- Snapshots (so product edits/deletes never alter past orders)
     product_name VARCHAR(255) NOT NULL,
     variant_name VARCHAR(150) DEFAULT NULL,
     sku VARCHAR(100) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
-    -- price per unit at purchase time
     quantity INT NOT NULL DEFAULT 1,
     total DECIMAL(10, 2) NOT NULL,
-    -- price * quantity
-    -- Personalization captured at purchase
     personalization_data JSON DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
@@ -428,11 +405,8 @@ CREATE TABLE payments (
     order_id CHAR(40) NOT NULL,
     gateway VARCHAR(50) NOT NULL DEFAULT 'razorpay',
     gateway_order_id VARCHAR(255) DEFAULT NULL,
-    -- razorpay_order_id
     gateway_payment_id VARCHAR(255) DEFAULT NULL,
-    -- razorpay_payment_id
     gateway_signature VARCHAR(500) DEFAULT NULL,
-    -- razorpay_signature
     amount DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'INR',
     status ENUM(
@@ -443,10 +417,8 @@ CREATE TABLE payments (
         'refunded'
     ) DEFAULT 'created',
     method VARCHAR(50) DEFAULT NULL,
-    -- card, upi, netbanking, wallet
     failure_reason VARCHAR(500) DEFAULT NULL,
     raw_response JSON DEFAULT NULL,
-    -- full webhook/callback payload
     paid_at DATETIME DEFAULT NULL,
     refunded_at DATETIME DEFAULT NULL,
     refund_amount DECIMAL(10, 2) DEFAULT NULL,
@@ -460,7 +432,6 @@ CREATE TABLE payments (
 CREATE TABLE audit_logs (
     id CHAR(40) NOT NULL PRIMARY KEY,
     user_id CHAR(40) DEFAULT NULL,
-    -- who performed the action
     action ENUM(
         'CREATE',
         'UPDATE',
@@ -499,10 +470,8 @@ CREATE TABLE audit_logs (
         'SYSTEM'
     ) NOT NULL,
     entity_id CHAR(40) DEFAULT NULL,
-    -- the affected record, if any
     description TEXT NOT NULL,
     metadata JSON DEFAULT NULL,
-    -- optional before/after snapshot
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE
     SET NULL
