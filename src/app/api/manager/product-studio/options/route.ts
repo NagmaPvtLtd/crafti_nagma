@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
@@ -57,27 +58,41 @@ const OPTION_SELECT = `
            WHERE po.global_option_id = o.id)                  AS product_count
     FROM global_options o`;
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio/options                                   */
 /*  Every option with its values nested, plus totals for the stat strip.      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Lists every global option with its values nested, plus stat-strip totals.
+ *
+ * @async
+ * @function GET
+ * @description Reads `global_options` with per-option value and product counts behind the
+ *              manager guard, then loads all `global_option_values` and groups them by option.
+ *              Also returns the total option count, total value count and how many distinct
+ *              products use an option via `product_options`.
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - counts: `options`, `values` and `productsUsing`
+ *   - options: each with `id`, `name`, `description`, `valueCount`, `productCount`,
+ *              `values` (`id`, `value`), `createdAt` and `updatedAt`, ordered by name
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {500} `server_error` - Database failure while reading options or values
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Initialize the database pool and take a connection
+ *   3. Select options with `value_count` and `product_count` subqueries
+ *   4. Select all global option values ordered by creation
+ *   5. Count total options, total values and distinct products using options
+ *   6. Group values into a map keyed by `option_id`
+ *   7. Return 200 response with counts and options (values nested)
+ *   8. Release the connection in `finally`
+ */
 export async function GET() {
   const guard = await requireManager({
     label: "GET /api/manager/product-studio/options",
@@ -149,6 +164,42 @@ export async function GET() {
 /*  Create an option pool — Color, Size, Material…                            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Creates a global option pool such as Color, Size or Material.
+ *
+ * @async
+ * @function POST
+ * @description Validates with `optionCreateSchema`, stores the name in Pascal case, refuses a
+ *              name that already exists, inserts into `global_options` with an `opt` ULID id
+ *              and audits the creation. New options start with no values and no products.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} name - Option name (2-100 chars, stored in Pascal case)
+ * @body {string} [description] - Description (max 255 chars, stored as `NULL` when empty)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Option created"
+ *   - option: `id`, `name`, `description`, `valueCount: 0`, `productCount: 0`, `values: []`
+ *
+ * @throws {400} Validation failed - Schema errors or a duplicate name
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {500} `server_error` - Database failure while reading or inserting `global_options`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `optionCreateSchema`
+ *   3. Convert the name with `toPascalCase`
+ *   4. Initialize the database pool and take a connection
+ *   5. Check `global_options` for the same name and reject it as a field error
+ *   6. Generate the `opt` ULID and current timestamp
+ *   7. Insert into `global_options` (creator recorded, `updated_by` null)
+ *   8. Write a CREATE / OPTION audit entry, swallowing audit errors
+ *   9. Return 201 response with the new option
+ *   10. Map `ER_DUP_ENTRY` to a name field error, else 500
+ *   11. Release the connection in `finally`
+ */
 export async function POST(req: NextRequest) {
   const guard = await requireManager({
     label: "POST /api/manager/product-studio/options",
@@ -234,6 +285,42 @@ export async function POST(req: NextRequest) {
 /*  Rename an option or rewrite its description. Body must include its id.    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Renames a global option or rewrites its description.
+ *
+ * @async
+ * @function PUT
+ * @description Validates with `optionUpdateSchema` (the body carries the option `id`),
+ *              returns 404 when the option is missing, refuses a name already used by another
+ *              option, updates `global_options` and audits the change. Values are untouched.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} id - Option id (10-40 chars)
+ * @body {string} name - Option name (2-100 chars)
+ * @body {string} [description] - Description (max 255 chars, stored as `NULL` when empty)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Option updated"
+ *
+ * @throws {400} Validation failed - Schema errors or a duplicate name
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Option not found"
+ * @throws {500} `server_error` - Database failure while reading or updating `global_options`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `optionUpdateSchema`
+ *   3. Initialize the database pool and take a connection
+ *   4. Load the option through `OPTION_SELECT`, returning 404 when missing
+ *   5. Reject a name already used by a different option
+ *   6. Update `global_options` (name, description, `updated_by`, `updated_at`)
+ *   7. Write an UPDATE / OPTION audit entry, swallowing audit errors
+ *   8. Return 200 response with `{ ok: true, message: "Option updated" }`
+ *   9. Map `ER_DUP_ENTRY` to a name field error, else 500
+ *   10. Release the connection in `finally`
+ */
 export async function PUT(req: NextRequest) {
   const guard = await requireManager({
     label: "PUT /api/manager/product-studio/options",
@@ -309,6 +396,44 @@ export async function PUT(req: NextRequest) {
 /*  Blocked while a product still uses the option.                            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Deletes a global option once no product uses it.
+ *
+ * @async
+ * @function DELETE
+ * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
+ *              with `optionDeleteSchema`, refuses with 409 while `product_options` still
+ *              references the option, then deletes the row. The option's values are removed by
+ *              the `global_option_values` foreign-key cascade.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
+ * @query {string} id - Option id (10-40 chars); used when present, otherwise the body id wins
+ * @body {string} [id] - Option id, read only when the query string has none (10-40 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Option deleted"
+ *   - deletedId: the removed option id
+ *
+ * @throws {400} Validation failed - `id` is missing or not a valid option id
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Option not found"
+ * @throws {409} The option is still used by products
+ * @throws {500} `server_error` - Database failure while reading or deleting `global_options`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Read `id` from the query string, falling back to the parsed JSON body
+ *   3. Validate with `optionDeleteSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the option through `OPTION_SELECT`, returning 404 when missing
+ *   6. Return 409 with the using-product count while `product_options` still references it
+ *   7. Delete the row from `global_options` (values cascade)
+ *   8. Write a DELETE / OPTION audit entry with the value count, swallowing audit errors
+ *   9. Return 200 response with `ok`, `message` and `deletedId`
+ *   10. Release the connection in `finally`
+ */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
     label: "DELETE /api/manager/product-studio/options",

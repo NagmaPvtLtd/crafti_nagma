@@ -14,6 +14,7 @@ import {
 
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
+import ErrorState from "../../utils/ErrorState";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import { type RangeType, RANGES } from "../../../../utils/AdminRange/adminRange.utils";
 
@@ -182,22 +183,7 @@ export default function AdminAuditLogsClient() {
 
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        {/* Decorative rose blobs — matches landing */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* --------------------------------------------------------- */}
-        {/* Header + filters                                          */}
-        {/* --------------------------------------------------------- */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <SectionEyebrow>Admin</SectionEyebrow>
@@ -321,20 +307,13 @@ export default function AdminAuditLogsClient() {
                 </div>
               )}
             </div>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        {/* --------------------------------------------------------- */}
-        {/* Body                                                      */}
-        {/* --------------------------------------------------------- */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
             {loading && !data && <LogsSkeleton />}
 
             {error && !loading && (
-              <ErrorState message={error} onRetry={() => void load()} />
+              <ErrorState title="Couldn't load audit logs" message={error} onRetry={() => void load()} />
             )}
 
             {data && !error && (
@@ -381,8 +360,6 @@ export default function AdminAuditLogsClient() {
                 )}
               </div>
             )}
-          </div>
-        </section>
       </div>
     </PageWrapper>
   );
@@ -553,31 +530,6 @@ function EmptyState({ filtered }: { filtered: boolean }) {
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-rose-800">
-          Couldn&apos;t load audit logs
-        </p>
-        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}
 
 function LogsSkeleton() {
   return (

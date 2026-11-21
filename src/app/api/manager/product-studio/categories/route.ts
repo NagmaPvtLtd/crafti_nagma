@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
@@ -77,27 +78,40 @@ function mapCategory(row: CategoryRow) {
   };
 }
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio/categories                                */
 /*  Flat list (ordered by name) + totals for the hub / page stat strip.       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Lists every category as a flat array together with stat-strip totals.
+ *
+ * @async
+ * @function GET
+ * @description Reads `categories` with per-category product and subcategory counts behind the
+ *              manager guard, plus table-wide totals (all, root, sub) and the number of
+ *              `product_categories` assignments. No filtering or pagination is applied.
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - counts: `total`, `root`, `sub` and `productsAssigned`
+ *   - categories: each with `id`, `name`, `slug`, `parentId`, `productCount`,
+ *                 `subcategoryCount`, `createdAt` and `updatedAt`, ordered by name
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {500} `server_error` - Database failure while reading `categories`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Initialize the database pool and take a connection
+ *   3. Select categories with `product_count` and `subcategory_count` subqueries
+ *   4. Count total, root and sub categories
+ *   5. Count `product_categories` assignments
+ *   6. Normalize the MySQL aggregates with `Number`
+ *   7. Return 200 response with counts and mapped categories
+ *   8. Release the connection in `finally`
+ */
 export async function GET() {
   const guard = await requireManager({
     label: "GET /api/manager/product-studio/categories",
@@ -149,6 +163,50 @@ export async function GET() {
 /*  Create a category, or a sub category when parentId is provided.           */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Creates a category, or a sub category when `parentId` is given.
+ *
+ * @async
+ * @function POST
+ * @description Validates with `categoryCreateSchema`, stores the display name in Pascal case,
+ *              and enforces the two-level rule: a parent must exist and must itself be a root.
+ *              When a slug is supplied it must be free; otherwise a unique slug is built from
+ *              `slugify(name)` with the `category` fallback. The new row is inserted into
+ *              `categories` with a `cat` ULID id, then audited.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} name - Display name (2-100 chars, stored in Pascal case)
+ * @body {string} [slug] - Slug (max 120 chars, lowercase words separated by dashes);
+ *                         omitted or empty means "build a unique one from the name"
+ * @body {string|null} [parentId] - Parent category id (10-40 chars); empty or null means root
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Category created" or "Sub category created"
+ *   - category: the created category row, or `null`
+ *
+ * @throws {400} Validation failed - Schema errors, unknown parent, nested parent, taken slug
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {500} `server_error` - Database failure while reading or inserting `categories`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `categoryCreateSchema`
+ *   3. Convert the name with `toPascalCase`
+ *   4. Initialize the database pool and take a connection
+ *   5. When `parentId` is set, load the parent and reject a missing parent
+ *   6. Reject a parent that itself has a `parent_id` (two levels only)
+ *   7. When a slug is supplied, check `isSlugTaken` and reject a duplicate
+ *   8. Otherwise build a unique slug with `buildUniqueSlug` and the `category` fallback
+ *   9. Generate the `cat` ULID and current timestamp
+ *   10. Insert into `categories` (creator recorded, `updated_by` null)
+ *   11. Re-read the created row through `CATEGORY_SELECT`
+ *   12. Write a CREATE / CATEGORY audit entry, swallowing audit errors
+ *   13. Return 201 response with the created category
+ *   14. Map `ER_DUP_ENTRY` to a slug field error, else 500
+ *   15. Release the connection in `finally`
+ */
 export async function POST(req: NextRequest) {
   const guard = await requireManager({
     label: "POST /api/manager/product-studio/categories",
@@ -257,6 +315,52 @@ export async function POST(req: NextRequest) {
 /*  Rename / re-slug / move a category. Body must include its id.             */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Renames, re-slugs or moves a category.
+ *
+ * @async
+ * @function PUT
+ * @description Validates with `categoryUpdateSchema` (the body carries the category `id`). The
+ *              two-level rule is re-checked: a category cannot be its own parent, a category
+ *              that already has sub categories cannot be moved under another parent, and the
+ *              new parent must exist and be a root. A changed slug must be free; an omitted
+ *              slug rebuilds a unique one from the name, while an unchanged slug is kept.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} id - Category id (10-40 chars)
+ * @body {string} name - Display name (2-100 chars)
+ * @body {string} [slug] - Slug (max 120 chars, lowercase words separated by dashes);
+ *                         omitted or empty rebuilds a unique slug from the name
+ * @body {string|null} [parentId] - Parent category id (10-40 chars); empty or null means root
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Category updated"
+ *   - category: the updated category row, or `null`
+ *
+ * @throws {400} Validation failed - Schema errors, own-parent, nested parent, deeper nesting,
+ *               taken slug
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Category not found"
+ * @throws {500} `server_error` - Database failure while reading or updating `categories`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `categoryUpdateSchema`
+ *   3. Initialize the database pool and take a connection
+ *   4. Load the existing category through `CATEGORY_SELECT`, returning 404 when missing
+ *   5. Reject `parentId === id`
+ *   6. Reject a move while the category still has sub categories
+ *   7. Load the new parent and reject a missing parent or a non-root parent
+ *   8. Resolve the slug: changed and free, rebuilt when omitted, kept when unchanged
+ *   9. Update `categories` (name, slug, parent, `updated_by`, `updated_at`)
+ *   10. Re-read the updated row through `CATEGORY_SELECT`
+ *   11. Write an UPDATE / CATEGORY audit entry, swallowing audit errors
+ *   12. Return 200 response with the updated category
+ *   13. Map `ER_DUP_ENTRY` to a slug field error, else 500
+ *   14. Release the connection in `finally`
+ */
 export async function PUT(req: NextRequest) {
   const guard = await requireManager({
     label: "PUT /api/manager/product-studio/categories",
@@ -386,6 +490,44 @@ export async function PUT(req: NextRequest) {
 /*  Blocked while the category still has sub categories or products.          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Deletes a category once it no longer has sub categories or products.
+ *
+ * @async
+ * @function DELETE
+ * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
+ *              with `categoryDeleteSchema`, then refuses with 409 while the category still has
+ *              sub categories or `product_categories` assignments. Nothing is cascaded.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
+ * @query {string} id - Category id (10-40 chars); used when present, otherwise the body id wins
+ * @body {string} [id] - Category id, read only when the query string has none (10-40 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Category deleted"
+ *   - deletedId: the removed category id
+ *
+ * @throws {400} Validation failed - `id` is missing or not a valid category id
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Category not found"
+ * @throws {409} The category still has sub categories, or is assigned to products
+ * @throws {500} `server_error` - Database failure while reading or deleting `categories`
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Read `id` from the query string, falling back to the parsed JSON body
+ *   3. Validate with `categoryDeleteSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the category through `CATEGORY_SELECT`, returning 404 when missing
+ *   6. Return 409 with the sub category count when sub categories exist
+ *   7. Return 409 with the product count when products still reference it
+ *   8. Delete the row from `categories`
+ *   9. Write a DELETE / CATEGORY audit entry with name and slug, swallowing audit errors
+ *   10. Return 200 response with `ok`, `message` and `deletedId`
+ *   11. Release the connection in `finally`
+ */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
     label: "DELETE /api/manager/product-studio/categories",

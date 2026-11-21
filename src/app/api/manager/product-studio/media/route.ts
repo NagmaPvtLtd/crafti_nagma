@@ -43,6 +43,58 @@ interface LinkCountRow extends RowDataPacket {
 /*  /<db-name>[-false]/products/<productId>[/variants/<variantId>].            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Uploads a variant photo to ImageKit and records it in `imagekit_files`.
+ *
+ * @async
+ * @function POST
+ * @description Accepts multipart form data, resolves the product by id or code and the
+ *              variant by id or SKU, then uploads the file publicly into
+ *              `/<env>/products/<productId>/variants/<variantId>` through
+ *              `ImageKitService.upload`. The file is validated by `uploadImageParamsSchema`
+ *              (max 15 MB). The row is inserted into `imagekit_files` as
+ *              `product_variant_image` with the next `sort_order`, inside a transaction.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with multipart form data
+ * @formdata {File} file - Image file (max 15 MB)
+ * @formdata {string} productId - Product id or product code (2-50 chars)
+ * @formdata {string} variantId - Variant id or SKU (2-100 chars, required — base products
+ *                               have no images)
+ * @formdata {string} [altText] - Alt text stored on the row (empty means `NULL`)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Image uploaded"
+ *   - media: `id`, `url`, `fileId`, `altText`, `sortOrder`, `variantId` and `createdAt`
+ *
+ * @throws {400} Not multipart, invalid product reference, missing/invalid variant reference,
+ *               or the file fails `uploadImageParamsSchema`
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found" or "Variant not found for this product"
+ * @throws {500} Database failure, or "Could not upload the image" (an `ImageKitUploadError`
+ *               is re-thrown with its own ImageKit status and message)
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the form data, returning 400 when it is not multipart
+ *   3. Read `file`, `productId`, `variantId` and `altText`
+ *   4. Validate the product reference length (2-50) and the variant reference (2-100)
+ *   5. Initialize the database pool and take a connection
+ *   6. Resolve the product by `id` or `code`, returning 404 when missing
+ *   7. Resolve the variant by `id` or `sku` inside that product, returning 404 when missing
+ *   8. Build the ImageKit folder with `ImageKitService.envFolder`
+ *   9. Validate `uploadImageParamsSchema` (15 MB cap, public file)
+ *   10. Read the file into a buffer and upload it with `ImageKitService.upload`
+ *   11. Compute the next `sort_order` for the variant's images
+ *   12. Begin a transaction and insert into `imagekit_files` (`entity_type`
+ *       `product_variant`, purpose `product_variant_image`)
+ *   13. Commit the transaction
+ *   14. Write a FILE_UPLOADED / IMAGEKIT_FILE audit entry, swallowing audit errors
+ *   15. Return 201 response with the created media item
+ *   16. Roll back on error, re-throw `ImageKitUploadError` with its status, else 500
+ *   17. Release the connection in `finally`
+ */
 export async function POST(req: NextRequest) {
   const guard = await requireManager({
     label: "POST /api/manager/product-studio/media",
@@ -232,6 +284,53 @@ export async function POST(req: NextRequest) {
 /*  `imageIds` must list every photo of that variant in the new order.        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Moves a variant photo one position earlier or later.
+ *
+ * @async
+ * @function PUT
+ * @description Resolves the product and variant, reads the variant's own photo ids in their
+ *              current order (the server owns that list, so a stale client cannot send a
+ *              mismatched one), swaps the target photo with its neighbour, then rewrites every
+ *              `sort_order` in a transaction and touches `products.updated_at`. A photo already
+ *              at the requested edge returns 200 with the unchanged order.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} productId - Product id or product code (2-50 chars)
+ * @body {string} variantId - Variant id or SKU (2-100 chars)
+ * @body {string} imageId - `imagekit_files` id of the photo to move (10-40 chars)
+ * @body {string} direction - `earlier` or `later`
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Photo order updated", or "Photo is already at the edge"
+ *   - imageIds: the persisted photo order
+ *
+ * @throws {400} Invalid product, variant, image id, or `direction`
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found", "Variant not found for this product",
+ *               "Photo not found on this variant"
+ * @throws {500} "Could not update the photo order" - Database failure
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Read `productId`, `variantId`, `imageId` and `direction` from the JSON body
+ *   3. Validate each reference length and that `direction` is `earlier` or `later`
+ *   4. Initialize the database pool and take a connection
+ *   5. Resolve the product by `id` or `code`, returning 404 when missing
+ *   6. Resolve the variant by `id` or `sku` inside that product, returning 404 when missing
+ *   7. Select the variant's photo ids ordered by `sort_order`, `created_at` and `id`
+ *   8. Return 404 when the photo is not on this variant
+ *   9. Compute the neighbour index; return 200 with the unchanged order at an edge
+ *   10. Swap the two entries
+ *   11. Begin a transaction and rewrite `sort_order` for every photo from 0
+ *   12. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
+ *   13. Re-read the persisted order so the response cannot claim an unpersisted order
+ *   14. Write an UPDATE / VARIANT audit entry with the final ids, swallowing audit errors
+ *   15. Return 200 response with the final `imageIds`
+ *   16. Release the connection in `finally`
+ */
 export async function PUT(req: NextRequest) {
   const guard = await requireManager({
     label: "PUT /api/manager/product-studio/media",
@@ -412,6 +511,47 @@ export async function PUT(req: NextRequest) {
 /*  Removes the ImageKit file and its database rows.                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Deletes a variant photo, or unlinks it when the row is a link to a sibling's upload.
+ *
+ * @async
+ * @function DELETE
+ * @description Link rows are simply removed from `imagekit_files` and never touch the original
+ *              ImageKit file. For an original upload the ImageKit file is deleted first (a 404
+ *              counts as success); if that fails the request returns 502 and nothing is removed.
+ *              Then every link row that borrowed the file is deleted, followed by the original
+ *              row, inside a transaction.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} id - `imagekit_files.id` (10-40 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: deletion or unlink message with the affected link count
+ *   - deletedId: the removed row id
+ *   - unlinked: `true` for a link row
+ *   - linkedVariantCount, linksRemoved: how many link rows were removed
+ *
+ * @throws {400} "Invalid media id"
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Image not found" for this variant image purpose
+ * @throws {500} "Could not delete the image" - Database failure
+ * @throws {502} ImageKit deletion failed, so nothing was removed
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Read and length-check `?id=` (10-40)
+ *   3. Initialize the database pool and take a connection
+ *   4. Load the image row scoped to `product_variant_image` / `product_variant`
+ *   5. For a link row (`source_image_id` set) delete only that row, audit it and return 200
+ *   6. Count the link rows that reference the original
+ *   7. Delete the ImageKit file with `deleteFileStrict`, returning 502 on failure
+ *   8. Begin a transaction, delete the link rows then the original row, and commit
+ *   9. Write a FILE_DELETED / IMAGEKIT_FILE audit entry, swallowing audit errors
+ *   10. Return 200 response with the deleted id and link counts
+ *   11. Release the connection in `finally`
+ */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
     label: "DELETE /api/manager/product-studio/media",

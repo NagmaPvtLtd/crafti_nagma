@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toNumber } from "../../../../../utils/Formator/toNumber.util";
 import type { RowDataPacket } from "mysql2";
 
 import { getPool } from "../../../../../lib/Database/main.db";
@@ -106,11 +107,6 @@ interface CategoryLinkRow extends RowDataPacket {
 
 const ALL_SEGMENT = "all";
 
-function toNumber(value: number | string | null): number | null {
-  if (value === null || value === undefined) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  GET /api/public/collections/product?code=<code>&variant=<sku>             */
@@ -122,6 +118,54 @@ function toNumber(value: number | string | null): number | null {
 /*  triggers a fresh request for that SKU instead of shipping every variant.  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns one active storefront product with exactly one variant loaded in full.
+ *
+ * @async
+ * @function GET
+ * @description Public route with no auth check. The product is resolved by code, slug or id.
+ *              Only the variant named by `?variant=` (its SKU or id) is loaded in full; without
+ *              it the first active variant with stock is chosen, then any active variant, then
+ *              the first variant. `variants` ships the SKU skeleton (id, SKU, status and option
+ *              value ids) so changing an option chip can request that SKU instead. A variant with
+ *              no photos falls back to the product-level gallery.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} code - Product code, slug or id (required, max 120 chars)
+ * @query {string} [variant] - Variant SKU or id to load in full (max 120 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - product: `id`, `code`, `name`, `slug`, `briefDescription`, `description`, `processingTime`,
+ *              `deliveryCharges`, `isFeatured`, `images`, `options`, `reviews` (average, count),
+ *              `features`, `careInstructions`, `giftIncluded`, `category`, `subcategory`, `href`
+ *   - variant: the selected variant with copy, `price`, `compareAtPrice`, `stock`, `weight`,
+ *              `status`, `isFeatured`, `images` and `optionValueIds`, or `null`
+ *   - variants: the SKU skeleton of every variant (`id`, `sku`, `status`, `optionValueIds`)
+ *
+ * @throws {400} Missing `code`, or a `code` / `variant` reference longer than 120 chars
+ * @throws {404} "Product not found" - No active product matches the reference
+ * @throws {500} "Could not load this product" - Database failure
+ *
+ * @description Workflow:
+ *   1. Read `code` and `variant` from the query string and length-check both
+ *   2. Initialize the database pool and take a connection
+ *   3. Resolve the active product by code, slug or id, returning 404 when missing
+ *   4. Load the product-level images in sort order
+ *   5. Load the SKU skeleton of every variant (active first, then cheapest)
+ *   6. Load the product's options and option values
+ *   7. Load the variant/value links and group them by variant
+ *   8. Load features, care instructions and included gifts
+ *   9. Load approved review count and average
+ *   10. Load the product's category links with parent names
+ *   11. Build the options list, dropping options without values
+ *   12. Choose the variant: requested SKU/id, else first active in stock, else first active,
+ *       else the first variant
+ *   13. Load that variant in full plus its photos, falling back to the product gallery
+ *   14. Build the category and subcategory refs and the product `href`
+ *   15. Return 200 response with product, variant and variants
+ *   16. Release the connection in `finally`
+ */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const ref = (searchParams.get("code") ?? "").trim();

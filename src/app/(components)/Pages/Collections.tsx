@@ -75,19 +75,7 @@ export default function Collections() {
 
   return (
     <PageWrapper variant="hero" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* Header */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <SectionEyebrow>Collections · live catalogue</SectionEyebrow>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
               Everything on the shelf.
@@ -114,17 +102,15 @@ export default function Collections() {
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 py-6 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
         {loading ? (
-          <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">
+          <div className="pb-16">
             <CustomLoader fullScreen={false} label="Loading the catalogue…" />
           </div>
         ) : error ? (
-          <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">
+          <div className="pb-16">
             <div className="rounded-2xl border border-rose-200 bg-rose-50/70 px-5 py-6 text-sm text-rose-700">
               {error}
             </div>
@@ -133,7 +119,7 @@ export default function Collections() {
           <>
             {/* ---------------- Featured Products ---------------- */}
             <section className="relative">
-              <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-10">
+              <div className="pb-8 sm:pb-10">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
                   <div>
                     <SectionEyebrow>Featured Products</SectionEyebrow>
@@ -160,11 +146,11 @@ export default function Collections() {
               </div>
             </section>
 
-            <SectionDivider className="mx-auto max-w-7xl px-4 pb-8 sm:px-6" />
+            <SectionDivider className="my-6" size={11} />
 
             {/* ---------------- All Categories ---------------- */}
             <section className="relative">
-              <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-10">
+              <div className="pb-8 sm:pb-10">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
                   <div>
                     <SectionEyebrow>All Categories</SectionEyebrow>
@@ -228,11 +214,11 @@ export default function Collections() {
               </div>
             </section>
 
-            <SectionDivider className="mx-auto max-w-7xl px-4 pb-8 sm:px-6" />
+            <SectionDivider className="my-6" size={11} />
 
             {/* ---------------- Product links ---------------- */}
             <section className="relative" id="products">
-              <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
+              <div className="pb-12 sm:pb-16">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <SectionEyebrow>All Products</SectionEyebrow>
@@ -348,7 +334,7 @@ export default function Collections() {
           </>
         )}
 
-        <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6">
+        <div className="pb-10">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm sm:rounded-3xl">
             <span className="flex items-center gap-1.5">
               <Sparkles className="h-3 w-3 text-rose-400" />

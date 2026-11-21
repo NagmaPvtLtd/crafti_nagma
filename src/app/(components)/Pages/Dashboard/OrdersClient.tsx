@@ -181,19 +181,7 @@ const visible = MOCK_ORDERS.length > 0;
 export default function OrdersPage() {
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* Header */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <SectionEyebrow>Customer orders</SectionEyebrow>
@@ -213,14 +201,9 @@ export default function OrdersPage() {
                 Browse collections
               </button>
             </div>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        {/* Body */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
             <div className="space-y-8">
               {visible ? (
                 <>
@@ -250,8 +233,6 @@ export default function OrdersPage() {
                 <EmptyState />
               )}
             </div>
-          </div>
-        </section>
       </div>
     </PageWrapper>
   );

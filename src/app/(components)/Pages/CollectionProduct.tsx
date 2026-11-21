@@ -343,14 +343,7 @@ export default function CollectionProduct({ code }: { code: string }) {
 
   return (
     <PageWrapper variant="hero" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <nav className="flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
               <Link href="/" className="hover:text-rose-600">
                 Home
@@ -386,10 +379,8 @@ export default function CollectionProduct({ code }: { code: string }) {
                 {product?.name ?? code}
               </span>
             </nav>
-          </div>
-        </section>
+        <SectionDivider className="my-6" size={11} />
 
-        <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 sm:pb-16">
           {loading ? (
             <CustomLoader fullScreen={false} label="Loading the product…" />
           ) : error || !product ? (
@@ -811,7 +802,6 @@ export default function CollectionProduct({ code }: { code: string }) {
               </div>
             </>
           )}
-        </div>
 
         <PhotoViewer
           open={viewerOpen}

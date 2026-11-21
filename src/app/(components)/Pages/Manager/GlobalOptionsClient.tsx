@@ -20,6 +20,9 @@ import {
 
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
+import ErrorState from "../../utils/ErrorState";
+import { fieldErrors } from "../../utils/Form/formErrors";
+import { plural } from "../../../../utils/Formator/plural.util";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
@@ -47,18 +50,7 @@ type DeleteTarget =
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function fieldErrors(err: unknown): Record<string, string[]> {
-  if (axios.isAxiosError(err)) {
-    const details = err.response?.data?.details;
-    if (details && typeof details === "object") {
-      return details as Record<string, string[]>;
-    }
-  }
-  return {};
-}
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
 
 /* ------------------------------------------------------------------ */
 /*  Main                                                               */
@@ -196,19 +188,7 @@ export default function GlobalOptionsClient() {
 
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* Header */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <Link
               href="/manager/product-studio"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
@@ -250,14 +230,9 @@ export default function GlobalOptionsClient() {
                 </button>
               </div>
             </div>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        {/* Body */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
             {loading && !data && (
               <CustomLoader
                 fullScreen={false}
@@ -267,7 +242,7 @@ export default function GlobalOptionsClient() {
             )}
 
             {error && !loading && (
-              <ErrorState message={error} onRetry={() => void load()} />
+              <ErrorState title="Couldn't load options" message={error} onRetry={() => void load()} />
             )}
 
             {data && !error && (
@@ -315,8 +290,6 @@ export default function GlobalOptionsClient() {
                 )}
               </div>
             )}
-          </div>
-        </section>
       </div>
 
       {optionModal && (
@@ -959,28 +932,3 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-rose-800">
-          Couldn&apos;t load options
-        </p>
-        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}

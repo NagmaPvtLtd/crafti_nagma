@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../utils/Auth/Auth.requireRole.util";
@@ -34,27 +35,28 @@ interface ValueRow extends RowDataPacket {
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio                                            */
 /*  Product listing is not built yet — it stays a 503 until it is.            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Placeholder for the product-studio root listing.
+ *
+ * @async
+ * @function GET
+ * @description The listing is not built yet, so this handler always answers 503. It performs no
+ *              auth check and reads nothing; `/api/manager` is already gated by `src/proxy.ts`.
+ *              The real catalogue lives at `/api/manager/product-studio/products`.
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - error: "WORK IN PROGRESS"
+ *
+ * @throws {503} Always - the listing is not implemented
+ *
+ * @description Workflow:
+ *   1. Return 503 response with "WORK IN PROGRESS"
+ */
 export async function GET() {
   return NextResponse.json({ error: "WORK IN PROGRESS" }, { status: 503 });
 }
@@ -65,6 +67,69 @@ export async function GET() {
 /*  pool attached. A base product is never purchasable — variants are.        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Creates a base product with generated code and slug, its categories and its option pool.
+ *
+ * @async
+ * @function POST
+ * @description Validates with `baseProductCreateSchema`, which requires at least one category
+ *              and at least one option with at least one value. Duplicate categories, options
+ *              and values are merged before writing. Inside a transaction it verifies that every
+ *              category, option and option value still exists (and that each value belongs to its
+ *              option), builds a unique slug from the name and a product code from
+ *              `buildProductCode`, then inserts the `products` row, the `product_categories`
+ *              rows, and one `product_options` row plus `product_option_values` rows per option.
+ *              A base product is never purchasable — only its variants are.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} name - Product name (2-255 chars)
+ * @body {string} [briefDescription] - Short description (max 500 chars, default: "")
+ * @body {string} [description] - Full description (max 20000 chars, default: "")
+ * @body {string} [metaTitle] - Meta title (max 255 chars, default: "")
+ * @body {string} [metaDescription] - Meta description (max 500 chars, default: "")
+ * @body {number} [deliveryCharges] - Delivery charge 0-100000 (default: 0)
+ * @body {boolean} [isFeatured] - Featured flag (default: false)
+ * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
+ * @body {string} [status] - `active` or `inactive` (default: "active")
+ * @body {string[]} categoryIds - Category ids (10-40 chars each, at least one)
+ * @body {Object[]} options - Selected global options, at least one
+ * @body {string} options[].optionId - Global option id (10-40 chars)
+ * @body {string[]} options[].valueIds - Selected value ids for that option (at least one,
+ *                                      10-40 chars each)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Base product created"
+ *   - product: `id`, `code`, `slug`, `name`, `status`, `categoryCount`, `optionCount`
+ *
+ * @throws {400} Validation failed - Schema errors, missing categories/options/values, a value
+ *               that does not belong to its option
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {409} The generated product code is already taken, or the name clashes
+ * @throws {500} `server_error` - Database failure while validating or inserting
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `baseProductCreateSchema`
+ *   3. De-duplicate `categoryIds`
+ *   4. Merge repeated options and de-duplicate each option's `valueIds`
+ *   5. Initialize the database pool, take a connection and begin a transaction
+ *   6. Verify every category id still exists, else roll back with a field error
+ *   7. Verify every option id still exists, else roll back with a field error
+ *   8. Load every selected value and confirm each belongs to its option
+ *   9. Generate the `prod` ULID, current timestamp and a unique slug
+ *   10. Build the product code with `buildProductCode` and reject a taken code with 409
+ *   11. Insert the base row into `products` (counters start at 0)
+ *   12. Insert the `product_categories` rows
+ *   13. Per option: insert a `product_options` row (`po` ULID, name and description copied
+ *       from the global option) and its `product_option_values` rows (`pov` ULIDs)
+ *   14. Commit the transaction
+ *   15. Write a CREATE / PRODUCT audit entry, swallowing audit errors
+ *   16. Return 201 response with the product identity and counts
+ *   17. Roll back on error; map `ER_DUP_ENTRY` to a 409 name error, else 500
+ *   18. Release the connection in `finally`
+ */
 export async function POST(req: NextRequest) {
   const guard = await requireManager({
     label: "POST /api/manager/product-studio",

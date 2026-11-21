@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import PageWrapper from "../utils/PageWrapper";
-import { SectionDivider } from "../utils/SectionDiv";
+import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 
 type Props = {
   title: string;
@@ -65,18 +65,19 @@ export default function PolicyLayout({ title, lastUpdated, children }: Props) {
           </nav>
         </header>
 
-        <main className="relative z-10 mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-5">
-          <div className="mb-8 flex flex-col items-center gap-2 text-center">
-            <SectionDivider className="max-w-xs" />
-            <h1 className="text-2xl font-semibold leading-tight text-stone-900 sm:text-3xl">
-              {title}
-            </h1>
-            {lastUpdated && (
-              <p className="text-xs text-stone-500">
-                Last updated: {lastUpdated}
-              </p>
-            )}
-          </div>
+        <main className="relative z-10 mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
+          <SectionEyebrow>Policies</SectionEyebrow>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+            {title}
+          </h1>
+          {lastUpdated && (
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+              Last updated: {lastUpdated}
+            </p>
+          )}
+
+          <SectionDivider className="my-6" size={11} />
+
           <div className="space-y-6">{children}</div>
         </main>
       </div>

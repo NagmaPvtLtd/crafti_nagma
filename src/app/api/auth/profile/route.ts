@@ -8,6 +8,43 @@ import { ProfileResponse } from "../../../../types/User/ProfileClient.types";
 /*  GET /api/auth/profile                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns the signed-in customer's profile.
+ *
+ * @async
+ * @function GET
+ * @description Customer-only read of the caller's own `users` row, selected by the trusted
+ *              session id. `password_hash` is never returned; it is only used to derive the
+ *              `has_password` flag. Missing columns fall back to empty strings, and `country`
+ *              falls back to "India".
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - id: the user id
+ *   - first_name, last_name, full_name: name fields (empty string when null)
+ *   - email: the account email
+ *   - phone: phone number (empty string when null)
+ *   - email_verified, phone_verified: verification flags as booleans
+ *   - has_password: `true` when `password_hash` is set
+ *   - address_line_1, address_line_2, landmark, city, state, postal_code: address fields
+ *   - country: country (defaults to "India")
+ *   - company_name, gstin: business fields (empty string when null)
+ *   - image: `google_profile_picture` or `null`
+ *
+ * @throws {401} Unauthorized - No session, role below customer, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} `user_not_found` - The session id no longer exists in `users`
+ * @throws {500} `server_error` - Database failure while reading `users`
+ *
+ * @description Workflow:
+ *   1. Initialize the customer guard (session, active status, role rank)
+ *   2. Read the trusted user id from the session and return 401 when it is missing
+ *   3. Initialize the database pool and take a connection
+ *   4. Select the profile columns from `users` for that id
+ *   5. Return 404 when the row no longer exists
+ *   6. Map the row into `ProfileResponse` (nulls to empty strings, flags to booleans)
+ *   7. Return 200 response with the profile payload
+ *   8. Release the connection in `finally`
+ */
 export async function GET() {
   const guard = await requireRole(["customer"], {
     label: "GET /api/auth/profile",

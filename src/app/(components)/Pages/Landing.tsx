@@ -314,7 +314,7 @@ export default function Landing() {
         <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
 
         <section className="relative">
-          <div className="mx-auto w-full max-w-3xl px-4 py-12 text-center sm:px-6 sm:py-16 md:py-20">
+          <div className="mx-auto w-full max-w-7xl px-4 py-12 text-center sm:px-6 sm:py-16 md:py-20">
             <SectionEyebrow>{story.eyebrow}</SectionEyebrow>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-900 sm:mt-4 sm:text-3xl md:text-4xl">
               {story.heading}

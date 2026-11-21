@@ -75,6 +75,75 @@ interface ExistingValueRow extends RowDataPacket {
 /*  Build one variant per combination of the product's option values.         */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Generates one variant per combination of the product's option values.
+ *
+ * @async
+ * @function POST
+ * @description Reads the product's options and values, then either builds the full cartesian
+ *              product (`mode: "all"`) or uses the client's selection (`mode: "selected"`,
+ *              exactly one value per option). Combinations that already exist are skipped, never
+ *              rebuilt, so managers can add only the missing pairs. Each new variant gets an
+ *              `var` ULID id, a name of "<product> — <values>", a SKU from `buildVariantSku`
+ *              with a numeric suffix retry loop, the product's copy, and is inserted as
+ *              `inactive`. Capped at 200 new combinations per call.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string }>} context.params - Route parameters (`(await context.params).id`,
+ *                                                  min 10 chars, internal product id)
+ *
+ * @body {string} [mode] - `all` (default, full cartesian product) or `selected`
+ * @body {string[][]} [combinations] - Required for `selected`: up to 200 entries, each with 1-20
+ *                                     option-value ids, one per option
+ * @body {number} [startingPrice] - Price for the new variants, 0-10000000 (default: `suggestPrice()`)
+ * @body {number|null} [compareAtPrice] - Compare-at price, 0-10000000
+ * @body {number} [stock] - Initial stock, integer 0-100000 (default: 0)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: created count, noting how many already existed
+ *   - createdCount: number of variants inserted
+ *   - skippedCount: combinations that already existed
+ *   - variants: the created `{ id, name, sku }` rows
+ *
+ * @throws {400} Invalid product id, schema errors, no options, an option without values,
+ *               empty selection, a selection that does not match the options, more than 200
+ *               combinations
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found"
+ * @throws {500} "Could not generate the variants" - Database failure, or a SKU that could not be
+ *               made unique after 60 attempts
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Await `context.params` and reject a product id shorter than 10 chars
+ *   3. Parse the body (defaulting to `{}`) and validate it with `generateVariantsSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the product, returning 404 when missing
+ *   6. Load the product's options and option values in creation order
+ *   7. Reject a product with no options
+ *   8. Reject an option that has no values
+ *   9. Load the existing variant/value signatures so duplicates can be detected
+ *   10. For `selected`, validate each combination picks exactly one value per option and is
+ *       not duplicated inside the request
+ *   11. Otherwise build the cartesian product of every option's values
+ *   12. Reject an empty combination list or more than 200 combinations
+ *   13. Drop combinations whose sorted value-id signature already exists
+ *   14. Return 200 early when every selected combination already exists
+ *   15. Count the existing variants to continue the sequence
+ *   16. Begin a transaction
+ *   17. Per new combination: build the label, truncate the name to 150 chars, build the SKU via
+ *       `buildVariantSku`, retry with a `-N` suffix up to 60 times for uniqueness
+ *   18. Insert into `product_variants` as `inactive` (copy inherited from the base product)
+ *   19. Insert the `variant_option_values` rows for the combination
+ *   20. Touch `products.updated_at` and commit
+ *   21. Write a CREATE / VARIANT audit entry with the generated SKUs, swallowing audit errors
+ *   22. Return 201 response with created and skipped counts
+ *   23. Roll back on error and return 500
+ *   24. Release the connection in `finally`
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

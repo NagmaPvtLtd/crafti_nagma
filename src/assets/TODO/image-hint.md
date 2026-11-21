@@ -1,0 +1,1 @@
+when in the manage photos where we actually trigger the button to select a file and it goes into the backend. in that pop component , write a hint to upload the photo in 1:1 ratio for better user experience.

@@ -48,6 +48,44 @@ interface TopProductRow extends RowDataPacket {
 /*  GET /api/manager/product-studio/overview                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns the Product Studio hub numbers: product, variant, category and option counts plus
+ * recent activity.
+ *
+ * @async
+ * @function GET
+ * @description Read-only aggregate view behind the manager guard. Product totals split by
+ *              status and featured flag, variants split into low stock (1-5) and out of stock
+ *              (0), category totals with the root count, the global option pool size, the five
+ *              most recently updated products and the top product by units sold in the last 30
+ *              days (cancelled orders excluded).
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - scope: `manager`
+ *   - counts: `products` (`total`, `active`, `inactive`, `featured`), `variants` (`total`,
+ *             `lowStock`, `outOfStock`), `categories` (`total`, `root`), `options` (`total`)
+ *   - quickStats: `topProduct` (`id`, `name`, `units`) or `null`
+ *   - recentlyUpdated: up to 5 products with `id`, `code`, `name`, `slug`, `status`, `updatedAt`
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {500} `server_error` - Database failure while aggregating products, variants,
+ *               categories, options or order items
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Initialize the database pool and take a connection
+ *   3. Count products by status and featured flag
+ *   4. Count variants, low stock and out of stock
+ *   5. Count categories and root categories
+ *   6. Count global options
+ *   7. Select the 5 most recently updated products
+ *   8. Select the top product by units from the last 30 days, cancelled orders excluded
+ *   9. Normalize MySQL aggregates with `Number`
+ *   10. Return 200 response with counts, `quickStats` and `recentlyUpdated`
+ *   11. Release the connection in `finally`
+ */
 export async function GET() {
   const guard = await requireManager({
     label: "GET /api/manager/product-studio/overview",

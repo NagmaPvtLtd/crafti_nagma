@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 import { auditLog } from "../../../../../services/AuditLog.service";
 import { ImageKitService } from "../../../../../services/Imagekit.service";
@@ -137,27 +138,67 @@ interface MediaRow extends RowDataPacket {
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio/[id]                                      */
 /*  Everything the product overview page needs, in one round trip.            */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns everything the product overview page needs for one product in a single round trip.
+ *
+ * @async
+ * @function GET
+ * @description Resolves the URL reference (internal id or readable code) to the product row,
+ *              then reads the base copy, features, care instructions, categories, options with
+ *              values, variants with their option values and first photo, all media rows (links
+ *              resolve to their source file and owner variant), variant stock/price stats, order
+ *              stats (cancelled orders excluded) and the newest reviews.
+ *
+ * @param {NextRequest} _req - The incoming HTTP request (unused)
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string }>} context.params - Route parameters (`(await context.params).id`,
+ *                                                  product id or product code, min 2 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - product: base copy plus `deliveryCharges`, `processingTime`, `isFeatured`, `mainShowcase`,
+ *              `status`, `createdAt` and `updatedAt`
+ *   - features, careInstructions: `{ id, value, sortOrder }` rows in sort order
+ *   - categories: `{ id, name, slug, parentId }`, ordered by name
+ *   - options: `{ id, name, description, values }`
+ *   - variants: `{ id, name, sku, price, compareAtPrice, stock, status, optionValues, imageUrl }`
+ *   - media: `{ id, url, fileId, altText, sortOrder, variantId, createdAt, isLinked,
+ *              sourceImageId, ownerVariantName, ownerSku, linkedVariantCount }`
+ *   - stats: `variantCount`, `totalStock`, `lowStock`, `outOfStock`, `minPrice`, `maxPrice`,
+ *            `orders`, `unitsSold`, `revenue`, `reviewCount`, `averageRating`
+ *   - reviews: the newest 20 `{ id, reviewerName, rating, title, comment, isApproved,
+ *              createdAt, variantId }` rows
+ *
+ * @throws {400} "Invalid product reference" - Fewer than 2 characters in the segment
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {404} "Product not found" - Neither the id nor the code matches an active row
+ * @throws {500} "Could not load the product" - Database failure
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Await `context.params` and reject a reference shorter than 2 chars
+ *   3. Initialize the database pool and take a connection
+ *   4. Resolve the reference to `products.id` by id or code, returning 404 when missing
+ *   5. Load the base product row, returning 404 when missing
+ *   6. Load `product_features` and `product_care_instructions` in sort order
+ *   7. Load the product's categories
+ *   8. Load `product_options` and their `product_option_values`
+ *   9. Load `product_variants` with the first image per variant
+ *   10. Load `variant_option_values` joined to option and value names
+ *   11. Load media rows with owner variant and link count, filtered to this product
+ *   12. Load variant stats (count, stock, low stock, out of stock, price range)
+ *   13. Load order stats excluding cancelled orders
+ *   14. Load approved review stats and the newest 20 reviews
+ *   15. Group option values by option and variant values by variant
+ *   16. Map everything into `ProductDetailResponse` and return 200
+ *   17. Release the connection in `finally`
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -491,6 +532,82 @@ export async function GET(
 /*  must be unique. Categories are replaced only when `categoryIds` is sent.   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Edits a base product, replacing its category, feature and care lists only when sent.
+ *
+ * @async
+ * @function PUT
+ * @description Validates with `productBaseUpdateSchema` and resolves the URL reference to the
+ *              product. The slug is never touched so links stay stable; `code` may be changed but
+ *              must be free. Sending `categoryIds` replaces the whole set (at least one, all must
+ *              exist), `features` and `careInstructions` replace their lists entirely. Switching
+ *              `active` → `inactive` is refused with 409 when any variant appears in
+ *              `order_items`; otherwise every ImageKit file owned by the product's variants is
+ *              deleted first, then the link rows, media rows and variants are disabled inside a
+ *              transaction.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string }>} context.params - Route parameters (`(await context.params).id`,
+ *                                                  product id or product code, min 2 chars)
+ *
+ * @body {string} name - Product name (2-255 chars)
+ * @body {string} [code] - Product code (2-50 chars, uppercase letters, digits, dash, underscore);
+ *                         omitted leaves the stored code untouched
+ * @body {string} [briefDescription] - Short description (max 500 chars, default: "")
+ * @body {string} [description] - Full description (max 20000 chars, default: "")
+ * @body {string} [metaTitle] - Meta title (max 255 chars, default: "")
+ * @body {string} [metaDescription] - Meta description (max 500 chars, default: "")
+ * @body {number} [deliveryCharges] - Delivery charge 0-100000 (default: 0)
+ * @body {string} [processingTime] - Processing time text (max 100 chars, default: "")
+ * @body {boolean} [isFeatured] - Featured flag (default: false)
+ * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
+ * @body {string} [status] - `active` or `inactive` (default: "active")
+ * @body {string[]} [categoryIds] - Full replacement of the category set (10-40 chars each)
+ * @body {string[]} [features] - Full replacement of the feature bullets (1-255 chars each)
+ * @body {string[]} [careInstructions] - Full replacement of the care list (1-255 chars each)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Product updated"
+ *   - product: `id`, `code`, `name`, `status`, `isFeatured`, `mainShowcase`
+ *
+ * @throws {400} Validation failed - Schema errors, empty or unknown category ids, a code taken
+ *               by another product
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found"
+ * @throws {409} Disabling is refused while variants appear in order items
+ * @throws {500} "Could not update the product" - Database failure
+ * @throws {502} ImageKit could not delete a variant image, so nothing was changed
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Await `context.params` and reject a reference shorter than 2 chars
+ *   3. Parse the JSON body and validate it with `productBaseUpdateSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the product by id or code, returning 404 when missing
+ *   6. When `categoryIds` is sent: de-duplicate, reject an empty list, verify all exist
+ *   7. When `code` is sent: reject one already used by another product
+ *   8. Detect an active → inactive transition
+ *   9. When disabling: count `order_items` for its variants and return 409 when non-zero
+ *   10. When disabling: collect its variants and their original (non-link) image rows
+ *   11. Delete each ImageKit file first, returning 502 if any deletion fails
+ *   12. Begin a transaction
+ *   13. When disabling: delete link rows, count and delete the media rows, and set every
+ *       variant of the product to `inactive`
+ *   14. Update `products` (code via `COALESCE`, copy, delivery, processing time, flags, status,
+ *       `updated_by`, `updated_at`)
+ *   15. Replace `product_categories` when `categoryIds` was sent
+ *   16. Replace `product_features` (new `feat` ULIDs, index as sort order) when sent
+ *   17. Replace `product_care_instructions` (new `care` ULIDs) when sent
+ *   18. Commit the transaction
+ *   19. Write an UPDATE / PRODUCT audit entry noting replaced lists and any disabled variants,
+ *       swallowing audit errors
+ *   20. Return 200 response with the updated identity
+ *   21. Roll back on error; map `ER_DUP_ENTRY` to a code field error
+ *   22. Release the connection in `finally`
+ */
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

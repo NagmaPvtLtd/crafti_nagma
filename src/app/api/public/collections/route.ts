@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toNumber } from "../../../../utils/Formator/toNumber.util";
 import type { RowDataPacket } from "mysql2";
 
 import { getPool } from "../../../../lib/Database/main.db";
@@ -122,11 +123,6 @@ function subcategoryHref(rootSlug: string, subSlug: string): string {
   return `/collections/${rootSlug}/${subSlug}`;
 }
 
-function toNumber(value: number | string | null): number | null {
-  if (value === null || value === undefined) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  GET /api/public/collections                                              */
@@ -134,6 +130,51 @@ function toNumber(value: number | string | null): number | null {
 /*  active product. `?category=` / `?subcategory=` narrow to one scope.      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns the public storefront collections: featured picks, the category tree and every active
+ * product, optionally narrowed to one category or subcategory.
+ *
+ * @async
+ * @function GET
+ * @description Public route with no auth check. Every active product is read with its active
+ *              variant price range, total stock, compare-at price and a cover image (product
+ *              image first, then the variant image), plus its root category and subcategory
+ *              links. Each product gets a `/collections/<root>/<sub>/<code>` href, using `all` for
+ *              a missing segment. A `?subcategory=` narrows to that slug first, otherwise
+ *              `?category=` narrows to products whose root category matches; a scoped request
+ *              returns an empty `featured` list.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} [category] - Root category slug (lowercased); `all` or empty means no scoping
+ * @query {string} [subcategory] - Subcategory slug (lowercased); takes precedence over `category`
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - featured: up to 8 featured products (empty when scoped)
+ *   - categories: the category tree with `productCount`, `totalProductCount`, `subcategories`
+ *                 and `href`
+ *   - products: the scoped list with `id`, `code`, `name`, `slug`, `briefDescription`,
+ *               `isFeatured`, `imageUrl`, `priceFrom`, `priceTo`, `compareAtPrice`, `totalStock`,
+ *               `category`, `subcategory` and `href`
+ *   - totalProducts: number of active products before scoping
+ *   - scope: `{ type, name, slug, found }` for a scoped request, otherwise `null`
+ *
+ * @throws {500} "Could not load the collections" - Database failure
+ *
+ * @description Workflow:
+ *   1. Read and lowercase `category` and `subcategory` from the query string
+ *   2. Initialize the database pool and take a connection
+ *   3. Select every active product with price range, stock and cover image subqueries
+ *   4. Select categories with their active product counts
+ *   5. Select product-category links joined to category and parent names
+ *   6. Group the links by product
+ *   7. Map each product, preferring a subcategory link and falling back to a root link
+ *   8. Apply the scope: subcategory match first, otherwise category (root) match
+ *   9. Build `scope` with the matched name and a `found` flag
+ *   10. Build the category tree with per-root and total product counts
+ *   11. Return 200 response with featured, categories, products, total and scope
+ *   12. Release the connection in `finally`
+ */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const categorySlug = (searchParams.get("category") ?? "").trim().toLowerCase();

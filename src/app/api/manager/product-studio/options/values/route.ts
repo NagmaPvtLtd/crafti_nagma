@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../../utils/Auth/Auth.requireRole.util";
@@ -46,27 +47,49 @@ const VALUE_SELECT = `
     FROM global_option_values v
     JOIN global_options o ON o.id = v.option_id`;
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  POST /api/manager/product-studio/options/values                           */
 /*  Add a value to an option — Yellow, Red, Blue under Color.                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Adds a value to a global option (for example Yellow under Color).
+ *
+ * @async
+ * @function POST
+ * @description Validates with `optionValueCreateSchema`, stores the value in Pascal case,
+ *              confirms the parent option exists, refuses a duplicate value inside the same
+ *              option, inserts into `global_option_values` with an `optv` ULID id and audits
+ *              the creation.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} optionId - Parent option id (10-40 chars)
+ * @body {string} value - Value text (1-100 chars, stored in Pascal case)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Value added"
+ *   - value: `{ id, value }`
+ *
+ * @throws {400} Validation failed - Schema errors, unknown option, duplicate value
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {500} `server_error` - Database failure while reading or inserting option values
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `optionValueCreateSchema`
+ *   3. Convert the value with `toPascalCase`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the parent option and reject a missing one as a field error
+ *   6. Reject a value that already exists under that option
+ *   7. Generate the `optv` ULID and current timestamp
+ *   8. Insert into `global_option_values` (creator recorded, `updated_by` null)
+ *   9. Write a CREATE / OPTION_VALUE audit entry, swallowing audit errors
+ *   10. Return 201 response with the new value
+ *   11. Map `ER_DUP_ENTRY` to a value field error, else 500
+ *   12. Release the connection in `finally`
+ */
 export async function POST(req: NextRequest) {
   const guard = await requireManager({
     label: "POST /api/manager/product-studio/options/values",
@@ -151,6 +174,41 @@ export async function POST(req: NextRequest) {
 /*  Rename a value. Body: { id, value }.                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Renames a global option value.
+ *
+ * @async
+ * @function PUT
+ * @description Validates with `optionValueUpdateSchema`, returns 404 when the value is missing,
+ *              refuses a name that already exists inside the same option, updates the row and
+ *              audits the old-to-new change.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @body {string} id - Value id (10-40 chars)
+ * @body {string} value - New value text (1-100 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Value updated"
+ *
+ * @throws {400} Validation failed - Schema errors or a duplicate value in the same option
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Value not found"
+ * @throws {500} `server_error` - Database failure while reading or updating option values
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Parse the JSON body and validate it with `optionValueUpdateSchema`
+ *   3. Initialize the database pool and take a connection
+ *   4. Load the value through `VALUE_SELECT`, returning 404 when missing
+ *   5. Reject a value already used by a different row of the same option
+ *   6. Update `global_option_values` (value, `updated_by`, `updated_at`)
+ *   7. Write an UPDATE / OPTION_VALUE audit entry with the old and new value
+ *   8. Return 200 response with `{ ok: true, message: "Value updated" }`
+ *   9. Map `ER_DUP_ENTRY` to a value field error, else 500
+ *   10. Release the connection in `finally`
+ */
 export async function PUT(req: NextRequest) {
   const guard = await requireManager({
     label: "PUT /api/manager/product-studio/options/values",
@@ -227,6 +285,44 @@ export async function PUT(req: NextRequest) {
 /*  Blocked while a product variant still uses the value.                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Deletes a global option value once no product variant uses it.
+ *
+ * @async
+ * @function DELETE
+ * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
+ *              with `optionValueDeleteSchema`, refuses with 409 while
+ *              `product_option_values.global_option_value_id` still references the value, then
+ *              deletes the row and audits it.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
+ * @query {string} id - Value id (10-40 chars); used when present, otherwise the body id wins
+ * @body {string} [id] - Value id, read only when the query string has none (10-40 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Value deleted"
+ *   - deletedId: the removed value id
+ *
+ * @throws {400} Validation failed - `id` is missing or not a valid value id
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Value not found"
+ * @throws {409} The value is still used by product options
+ * @throws {500} `server_error` - Database failure while reading or deleting option values
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Read `id` from the query string, falling back to the parsed JSON body
+ *   3. Validate with `optionValueDeleteSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Load the value through `VALUE_SELECT`, returning 404 when missing
+ *   6. Count `product_option_values` rows using the value and return 409 when non-zero
+ *   7. Delete the row from `global_option_values`
+ *   8. Write a DELETE / OPTION_VALUE audit entry with the option name and value
+ *   9. Return 200 response with `ok`, `message` and `deletedId`
+ *   10. Release the connection in `finally`
+ */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
     label: "DELETE /api/manager/product-studio/options/values",

@@ -13,6 +13,7 @@ import Field from "../utils/Form/Field";
 import TextInput from "../utils/Form/TextInput";
 import PasswordInput from "../utils/Form/PasswordInput";
 import PageWrapper from "../utils/PageWrapper";
+import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -69,15 +70,22 @@ export default function LoginForm() {
 
   return (
     <PageWrapper variant="form">
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10 sm:py-14">
-        <div className="w-full max-w-md">
-          <div className="rounded-3xl bg-white/60 p-6 backdrop-blur-md shadow-sm shadow-stone-900/5 sm:p-8">
-            <h1 className="mt-5 text-xl font-semibold text-center text-stone-900">
-              Welcome back
-            </h1>
-            <p className="mt-1 text-sm text-center leading-relaxed text-stone-600">
-              Login to manage your account.
-            </p>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
+        <div className="min-w-0">
+          <SectionEyebrow>Account</SectionEyebrow>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+            Welcome back
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+            Login to manage your orders, wishlist and profile.
+          </p>
+        </div>
+
+        <SectionDivider className="my-6" size={11} />
+
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <div className="rounded-3xl bg-white/60 p-6 backdrop-blur-md shadow-sm shadow-stone-900/5 sm:p-8">
 
             {message && (
               <div
@@ -162,6 +170,7 @@ export default function LoginForm() {
               <span className="text-rose-600">New User?</span> Signup with
               Google today!
             </button>
+            </div>
           </div>
         </div>
       </div>

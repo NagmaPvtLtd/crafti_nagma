@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { invalidInput, isDuplicateEntry } from "../../../../../../../utils/Api/apiResponse.util";
+
+import { resolveProductId, resolveVariantId } from "../../../../../../../utils/ProductStudio/productStudio.lookup.util";
 import type { RowDataPacket } from "mysql2";
 import type { PoolConnection } from "mysql2/promise";
 import {
@@ -71,47 +74,20 @@ interface OrderStatsRow extends RowDataPacket {
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function invalidInput(details: Record<string, string[]>) {
-  return NextResponse.json(
-    { error: "Validation failed", details },
-    { status: 400 },
-  );
-}
-
-function isDuplicateEntry(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "ER_DUP_ENTRY"
-  );
-}
-
-async function resolveProductId(
-  conn: PoolConnection,
-  productRef: string,
-): Promise<string | null> {
-  const [rows] = await conn.query<IdRow[]>(
-    `SELECT id FROM products WHERE id = ? OR code = ? LIMIT 1`,
-    [productRef, productRef],
-  );
-  return rows[0]?.id ?? null;
-}
-
-async function resolveVariantId(
-  conn: PoolConnection,
-  productId: string,
-  variantRef: string,
-): Promise<string | null> {
-  const [rows] = await conn.query<IdRow[]>(
-    `SELECT id FROM product_variants
-      WHERE product_id = ? AND (id = ? OR sku = ?)
-      LIMIT 1`,
-    [productId, variantRef, variantRef],
-  );
-  return rows[0]?.id ?? null;
-}
-
+/**
+ * Loads one variant with its product context
+ *
+ * @async
+ * @function loadVariant
+ * @description Selects the variant joined to its product, scoped to both ids so a variant can
+ *              never be read through the wrong product.
+ *
+ * @param {PoolConnection} conn - Open database connection
+ * @param {string} productId - Resolved product id
+ * @param {string} variantId - Resolved variant id
+ *
+ * @returns {Promise<VariantRow | undefined>} The joined row, or `undefined` when not found
+ */
 async function loadVariant(
   conn: PoolConnection,
   productId: string,
@@ -135,6 +111,20 @@ async function loadVariant(
   return rows[0];
 }
 
+/**
+ * Loads a variant's photos with link metadata
+ *
+ * @async
+ * @function loadMedia
+ * @description Selects `imagekit_files` rows for the variant in display order, resolving a link
+ *              row to its source file id and to the variant that originally uploaded it.
+ *
+ * @param {PoolConnection} conn - Open database connection
+ * @param {string} productId - Resolved product id (kept for symmetry with the other loaders)
+ * @param {string} variantId - Resolved variant id
+ *
+ * @returns {Promise<VariantDetailResponse["media"]>} Media items with link metadata
+ */
 async function loadMedia(
   conn: PoolConnection,
   productId: string,
@@ -178,10 +168,122 @@ async function loadMedia(
   }));
 }
 
+interface VariantStatusRow extends RowDataPacket {
+  status: "active" | "inactive";
+}
+
+/**
+ * Variants can share photos through shallow links. Removing one variant's own
+ * uploads delinks every variant that borrowed them, so a sibling can suddenly
+ * be left with no photos at all — which the storefront cannot present. Those
+ * emptied variants are disabled here, in the same transaction.
+ *
+ * Consumes `originalImageIds` (deleting the link rows) and returns the ids of
+ * the variants that were hidden.
+ */
+async function unlinkAndHideEmptyVariants(
+  conn: PoolConnection,
+  originalImageIds: string[],
+  excludedVariantId: string,
+  managerId: string,
+  now: string,
+): Promise<string[]> {
+  if (originalImageIds.length === 0) return [];
+
+  /* Who is borrowing these photos right now? Collected before the links go. */
+  const [linkedRows] = await conn.query<IdRow[]>(
+    `SELECT DISTINCT entity_id AS id
+       FROM imagekit_files
+      WHERE source_image_id IN (?)
+        AND entity_type = 'product_variant'
+        AND file_purpose = 'product_variant_image'
+        AND entity_id <> ?`,
+    [originalImageIds, excludedVariantId],
+  );
+
+  await conn.query(
+    `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
+    [originalImageIds],
+  );
+
+  const hidden: string[] = [];
+  for (const linked of linkedRows) {
+    const [mediaRows] = await conn.query<OrderCountRow[]>(
+      `SELECT COUNT(*) AS total
+         FROM imagekit_files
+        WHERE entity_type = 'product_variant'
+          AND file_purpose = 'product_variant_image'
+          AND entity_id = ?`,
+      [linked.id],
+    );
+    if (Number(mediaRows[0]?.total ?? 0) > 0) continue;
+
+    const [statusRows] = await conn.query<VariantStatusRow[]>(
+      `SELECT status FROM product_variants WHERE id = ? LIMIT 1`,
+      [linked.id],
+    );
+    if (!statusRows[0] || statusRows[0].status === "inactive") continue;
+
+    await conn.query(
+      `UPDATE product_variants
+          SET status = 'inactive', updated_by = ?, updated_at = ?
+        WHERE id = ?`,
+      [managerId, now, linked.id],
+    );
+    hidden.push(linked.id);
+  }
+
+  return hidden;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio/[id]/variants/[variantId]                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Returns one purchasable variant with its option values, photos, order stats and base copy.
+ *
+ * @async
+ * @function GET
+ * @description Resolves the product (id or code) then the variant (id or SKU) inside it, and
+ *              returns the variant copy, price, stock, weight, badges, option-value pairs, media
+ *              rows and order stats (cancelled orders excluded). `baseProduct` carries the copy
+ *              the sync buttons pull from.
+ *
+ * @param {NextRequest} _req - The incoming HTTP request (unused)
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string, variantId: string }>} context.params - Route parameters
+ *        (`(await context.params).id` and `.variantId`, both min 2 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - variant: `id`, `productId`, `productName`, `productCode`, `name`, `briefDescription`,
+ *              `description`, `sku`, `price`, `compareAtPrice`, `stock`, `weight`, `status`,
+ *              `isFeatured`, `mainShowcase`, `ordersCount`, `orderStats`, `createdAt`, `updatedAt`
+ *   - optionValues: `{ option, value }` pairs
+ *   - media: media items with `isLinked`, `sourceImageId`, `ownerVariantName`, `ownerSku` and
+ *            `linkedVariantCount`
+ *   - baseProduct: `name`, `briefDescription`, `description`
+ *
+ * @throws {400} "Invalid product reference" or "Invalid variant reference"
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {404} "Product not found" or "Variant not found"
+ * @throws {500} "Could not load the variant" - Database failure
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Await `context.params` and validate both references (min 2 chars)
+ *   3. Initialize the database pool and take a connection
+ *   4. Resolve the product id with `resolveProductId`, returning 404 when missing
+ *   5. Resolve the variant id with `resolveVariantId`, returning 404 when missing
+ *   6. Load the variant with `loadVariant`, returning 404 when missing
+ *   7. Load the variant's option-value pairs ordered by option then value
+ *   8. Load order stats across non-cancelled orders
+ *   9. Load media with `loadMedia`
+ *   10. Map the row into `VariantDetailResponse` and return 200
+ *   11. Release the connection in `finally`
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; variantId: string }> },
@@ -306,6 +408,74 @@ export async function GET(
 /*  Edit the purchasable variant — price, stock, copy, badges.                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Edits a purchasable variant: copy, price, stock, weight, status and badges.
+ *
+ * @async
+ * @function PUT
+ * @description Validates with `variantUpdateSchema`. Activating an inactive variant is gated on
+ *              `VARIANT_ACTIVATION_RULES` (name ≥ 3, short description ≥ 10, description ≥ 20
+ *              characters) and on at least one photo, uploaded or linked. Disabling is refused
+ *              with 409 once the variant appears in `order_items`; otherwise its ImageKit files
+ *              are deleted first, borrowers of those files are unlinked, empty sibling variants
+ *              are disabled, and the variant's own media rows are removed in the transaction.
+ *
+ * @param {NextRequest} req - The incoming HTTP request with a JSON body
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string, variantId: string }>} context.params - Route parameters
+ *        (`(await context.params).id` and `.variantId`, both min 2 chars)
+ *
+ * @body {string} [name] - Variant name (max 150 chars, default: "")
+ * @body {string} [briefDescription] - Short description (max 500 chars, default: "")
+ * @body {string} [description] - Description (max 500 chars, default: "")
+ * @body {number} price - Price, 0-10000000
+ * @body {number|null} [compareAtPrice] - Compare-at price, 0-10000000
+ * @body {number} stock - Stock, integer 0-100000
+ * @body {number|null} [weight] - Weight, 0-100000
+ * @body {string} [status] - `active` or `inactive` (default: "active")
+ * @body {boolean} [isFeatured] - Featured flag (default: false)
+ * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Variant updated" or "Variant disabled"
+ *   - variant: `id`, `price`, `stock`, `status`
+ *   - removedImages: how many media rows were deleted while disabling
+ *   - autoDisabledVariantIds: sibling variants left without photos and hidden
+ *
+ * @throws {400} Schema errors, or the activation gate failing (with `details` per field)
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found" or "Variant not found"
+ * @throws {409} Disabling is refused while the variant appears in order items
+ * @throws {500} "Could not update the variant" - Database failure
+ * @throws {502} ImageKit could not delete the variant's files, so nothing was changed
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Await `context.params` and validate both references (min 2 chars)
+ *   3. Parse the JSON body and validate it with `variantUpdateSchema`
+ *   4. Initialize the database pool and take a connection
+ *   5. Resolve the product id and the variant id, returning 404 when either is missing
+ *   6. Load the variant with `loadVariant`, returning 404 when missing
+ *   7. Detect activation (inactive → active) and disabling (active → inactive)
+ *   8. On activation: collect the copy-length problems from `VARIANT_ACTIVATION_RULES`
+ *   9. On activation: require at least one media row, uploaded or linked
+ *   10. On activation: return 400 with the first problem and the full `details` map
+ *   11. On disabling: count `order_items` for the variant and return 409 when non-zero
+ *   12. On disabling: load its original (non-link) image rows and delete each ImageKit file,
+ *       returning 502 if any deletion fails
+ *   13. Begin a transaction
+ *   14. On disabling: unlink and hide emptied sibling variants, count and delete the media rows
+ *   15. Update `product_variants` (copy, price, compare-at, stock, weight, status, badges,
+ *       `updated_by`, `updated_at`)
+ *   16. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
+ *   17. Write an UPDATE / VARIANT audit entry with price, stock, status and media effects,
+ *       swallowing audit errors
+ *   18. Return 200 response with the new price, stock, status and media effects
+ *   19. Map `ER_DUP_ENTRY` to a field error; otherwise return 500
+ *   20. Release the connection in `finally`
+ */
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; variantId: string }> },
@@ -414,6 +584,7 @@ export async function PUT(
     /* ---- disabling frees the photos, and is refused once the variant sold ---- */
     let ownedFiles: OwnedFileRow[] = [];
     let removedImages = 0;
+    let autoDisabledVariantIds: string[] = [];
 
     if (disabling) {
       const [orderRows] = await conn.query<OrderCountRow[]>(
@@ -462,12 +633,13 @@ export async function PUT(
     try {
       if (disabling) {
         const originalImageIds = ownedFiles.map((file) => file.id);
-        if (originalImageIds.length > 0) {
-          await conn.query(
-            `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
-            [originalImageIds],
-          );
-        }
+        autoDisabledVariantIds = await unlinkAndHideEmptyVariants(
+          conn,
+          originalImageIds,
+          variantId,
+          managerId,
+          now,
+        );
 
         const [mediaCountRows] = await conn.query<OrderCountRow[]>(
           `SELECT COUNT(*) AS total
@@ -538,7 +710,7 @@ export async function PUT(
         action: "UPDATE",
         entityType: "VARIANT",
         entityId: variantId,
-        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, status=${data.status}${disabling ? `, removedImages=${removedImages}` : ""}]`,
+        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, status=${data.status}${disabling ? `, removedImages=${removedImages}` : ""}${autoDisabledVariantIds.length > 0 ? `, autoDisabled=${autoDisabledVariantIds.join("|")}` : ""}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -554,6 +726,7 @@ export async function PUT(
         status: data.status,
       },
       removedImages,
+      autoDisabledVariantIds,
     });
   } catch (err) {
     if (isDuplicateEntry(err)) {
@@ -585,6 +758,54 @@ interface OwnedFileRow extends RowDataPacket {
   file_id: string | null;
 }
 
+/**
+ * Deletes a variant together with its images and every link other variants made to them.
+ *
+ * @async
+ * @function DELETE
+ * @description Refuses with 409 while `order_items` references the variant (deactivate instead).
+ *              Owned ImageKit files are deleted before any database work, so a failed deletion
+ *              leaves nothing orphaned and returns 502. Inside a transaction it unlinks and hides
+ *              sibling variants left without photos, deletes the variant's media rows, deletes
+ *              the variant row and touches the product.
+ *
+ * @param {NextRequest} _req - The incoming HTTP request (unused)
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string, variantId: string }>} context.params - Route parameters
+ *        (`(await context.params).id` and `.variantId`, both min 2 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - message: "Variant deleted"
+ *   - deletedId: the removed variant id
+ *   - deletedImages: number of owned image rows deleted
+ *   - autoDisabledVariantIds: sibling variants left without photos and hidden
+ *
+ * @throws {400} "Invalid product reference" or "Invalid variant reference"
+ * @throws {401} Unauthorized - No session, role too low, or session without a user id
+ * @throws {403} Forbidden - Account not active or no role assigned
+ * @throws {404} "Product not found" or "Variant not found"
+ * @throws {409} The variant appears in order items and cannot be deleted
+ * @throws {500} "Could not delete the variant" - Database failure
+ * @throws {502} ImageKit could not delete the variant's files, so nothing was removed
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard and read the manager id, returning 401 when missing
+ *   2. Await `context.params` and validate both references (min 2 chars)
+ *   3. Initialize the database pool and take a connection
+ *   4. Resolve the product id and the variant id, returning 404 when either is missing
+ *   5. Load the variant with `loadVariant`, returning 404 when missing
+ *   6. Count `order_items` for the variant and return 409 when non-zero
+ *   7. Load the variant's original (non-link) image rows
+ *   8. Delete each ImageKit file first, returning 502 if any deletion fails
+ *   9. Begin a transaction
+ *   10. Unlink and hide sibling variants that the deleted photos left empty
+ *   11. Delete the variant's media rows, then the variant row itself
+ *   12. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
+ *   13. Write a DELETE / VARIANT audit entry with the SKU and image count, swallowing audit errors
+ *   14. Return 200 response with the deleted id, image count and auto-disabled variants
+ *   15. Release the connection in `finally`
+ */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; variantId: string }> },
@@ -679,13 +900,15 @@ export async function DELETE(
     const originalImageIds = fileRows.map((file) => file.id);
 
     await conn.beginTransaction();
+    let autoDisabledVariantIds: string[] = [];
     try {
-      if (originalImageIds.length > 0) {
-        await conn.query(
-          `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
-          [originalImageIds],
-        );
-      }
+      autoDisabledVariantIds = await unlinkAndHideEmptyVariants(
+        conn,
+        originalImageIds,
+        variantId,
+        managerId,
+        now,
+      );
       await conn.query(`DELETE FROM imagekit_files WHERE entity_id = ?`, [
         variantId,
       ]);
@@ -709,7 +932,7 @@ export async function DELETE(
         action: "DELETE",
         entityType: "VARIANT",
         entityId: variantId,
-        description: `Variant deleted. [id=${variantId}, sku=${variant.sku}, productId=${productId}, images=${fileRows.length}]`,
+        description: `Variant deleted. [id=${variantId}, sku=${variant.sku}, productId=${productId}, images=${fileRows.length}${autoDisabledVariantIds.length > 0 ? `, autoDisabled=${autoDisabledVariantIds.join("|")}` : ""}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -720,6 +943,7 @@ export async function DELETE(
       message: "Variant deleted",
       deletedId: variantId,
       deletedImages: fileRows.length,
+      autoDisabledVariantIds,
     });
   } catch (err) {
     console.error("[PRODUCT STUDIO - VARIANT - DELETE]", err);

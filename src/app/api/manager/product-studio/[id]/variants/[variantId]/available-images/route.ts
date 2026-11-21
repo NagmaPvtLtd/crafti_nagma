@@ -31,6 +31,44 @@ interface AvailableRow extends RowDataPacket {
 /*  Linked rows are never offered as a source, so linking stays one hop deep. */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Lists photos from the product's other variants that this variant can link to.
+ *
+ * @async
+ * @function GET
+ * @description Returns the original uploads owned by sibling variants of the same product,
+ *              grouped by variant, with a per-photo `alreadyLinked` flag. Only original rows (no
+ *              `source_image_id`, with a real ImageKit `file_id`) are offered, so a link can never
+ *              become somebody else's source and linking stays one hop deep.
+ *
+ * @param {NextRequest} _req - The incoming HTTP request (unused)
+ * @param {Object} context - Next.js route context
+ * @param {Promise<{ id: string, variantId: string }>} context.params - Route parameters
+ *        (`(await context.params).id` and `.variantId`, both min 2 chars)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - groups: per sibling variant `{ variantId, variantName, sku, images }`, each image with
+ *             `{ id, url, altText, alreadyLinked }`
+ *
+ * @throws {400} "Invalid product reference" or "Invalid variant reference"
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {404} "Product not found" or "Variant not found for this product"
+ * @throws {500} "Could not load the existing photos" - Database failure
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Await `context.params` and validate both references (min 2 chars)
+ *   3. Initialize the database pool and take a connection
+ *   4. Resolve the product by `id` or `code`, returning 404 when missing
+ *   5. Resolve the variant by `id` or `sku` inside that product, returning 404 when missing
+ *   6. Select original photos of every other variant of the product, with an EXISTS check
+ *      for an existing link to this variant
+ *   7. Group the rows by source variant, preserving variant and photo order
+ *   8. Return 200 response with the groups
+ *   9. Release the connection in `finally`
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; variantId: string }> },

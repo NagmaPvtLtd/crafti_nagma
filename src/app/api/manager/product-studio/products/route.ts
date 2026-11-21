@@ -56,6 +56,49 @@ const PRODUCT_SELECT = `
            WHERE v.product_id = p.id)                          AS max_price
     FROM products p`
 
+/**
+ * Returns a paginated, filterable product catalogue list for the "All products" page.
+ *
+ * @async
+ * @function GET
+ * @description Filters `products` by free text (name, code or slug), status and category, then
+ *              paginates newest-updated first with per-product variant count, total stock and
+ *              price range. Table-wide counts are returned alongside the page so the stat strip
+ *              stays accurate while filters are applied. `imageUrl` is always `null` in this
+ *              payload.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} [q] - Free text matched against `p.name`, `p.code` and `p.slug`
+ * @query {string} [status] - `active` or `inactive`; any other value is ignored
+ * @query {string} [categoryId] - Category id filter, applied through `product_categories` only
+ *                               when it is at least 10 characters long
+ * @query {number} [page] - Page number (default: 1)
+ * @query {number} [limit] - Page size (default: 20, max: 60)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - ok: `true`
+ *   - counts: `total`, `active`, `inactive`, `withoutVariants`
+ *   - pagination: `page`, `limit`, `total` and `totalPages`
+ *   - products: each with `id`, `code`, `name`, `slug`, `status`, `isFeatured`, `mainShowcase`,
+ *               `variantCount`, `totalStock`, `minPrice`, `maxPrice`, `imageUrl` and `updatedAt`
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below manager
+ * @throws {500} "Could not load the product list" - Database failure
+ *
+ * @description Workflow:
+ *   1. Initialize the manager guard (session, active status, role rank)
+ *   2. Read `q`, `status`, `categoryId`, `page` and `limit` from the query string
+ *   3. Clamp `page` to 1+ and `limit` to 1-60 (default 20)
+ *   4. Compute `offset` from page and limit
+ *   5. Build the `WHERE` list: LIKE across name/code/slug, exact status, category EXISTS
+ *   6. Initialize the database pool and take a connection
+ *   7. Select the page slice with variant count, total stock and price range subqueries
+ *   8. Count the filtered rows
+ *   9. Count table-wide totals including products without variants
+ *   10. Normalize the aggregates and return 200 with counts, pagination and products
+ *   11. Release the connection in `finally`
+ */
 export async function GET(req: NextRequest) {
   const guard = await requireManager({
     label: "GET /api/manager/product-studio/products",

@@ -18,6 +18,8 @@ import {
 
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
+import ErrorState from "../../utils/ErrorState";
+import { topLevelErrors } from "../../utils/Form/formErrors";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
@@ -81,14 +83,6 @@ const EMPTY_FORM: FormState = {
 };
 
 /** First issue per top-level field, e.g. `options.0.valueIds` → `options`. */
-function topLevelErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  const map: Record<string, string> = {};
-  for (const issue of issues) {
-    const key = String(issue.path[0] ?? "form");
-    if (!map[key]) map[key] = issue.message;
-  }
-  return map;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -332,18 +326,7 @@ export default function AddProductClient() {
 
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-x-clip text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        <section className="relative">
-          <div className="mx-auto w-full max-w-5xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <Link
               href="/manager/product-studio"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
@@ -359,13 +342,9 @@ export default function AddProductClient() {
               Set up the base product once — its categories, options and copy —
               and every variant you make from it inherits them.
             </p>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-5xl px-4 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        <section className="relative">
-          <div className="mx-auto w-full max-w-5xl px-4 pb-12 sm:px-6 sm:pb-16">
             {loading && !categories && (
               <CustomLoader
                 fullScreen={false}
@@ -376,6 +355,7 @@ export default function AddProductClient() {
 
             {loadError && !loading && (
               <ErrorState
+                title="Couldn't load the form"
                 message={loadError}
                 onRetry={() => window.location.reload()}
               />
@@ -783,8 +763,6 @@ export default function AddProductClient() {
                 </div>
               </form>
             )}
-          </div>
-        </section>
       </div>
     </PageWrapper>
   );
@@ -1166,28 +1144,3 @@ function CheckboxRow({
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-rose-800">
-          Couldn&apos;t load the form
-        </p>
-        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}

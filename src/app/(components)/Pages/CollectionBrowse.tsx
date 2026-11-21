@@ -73,14 +73,7 @@ export default function CollectionBrowse({
 
   return (
     <PageWrapper variant="hero" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <nav className="flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
               <Link href="/" className="hover:text-rose-600">
                 Home
@@ -115,13 +108,9 @@ export default function CollectionBrowse({
                 ? "That category does not exist in the catalogue."
                 : `Every product filed under ${title.toLowerCase()}.`}
             </p>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 py-6 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
             {rootCategory && (
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <Link
@@ -208,8 +197,6 @@ export default function CollectionBrowse({
                 </div>
               </>
             )}
-          </div>
-        </section>
       </div>
     </PageWrapper>
   );

@@ -9,8 +9,6 @@ import {
   parseRange,
 } from "../../../../utils/AdminRange/adminRange.utils";
 
-type DbPool = Awaited<ReturnType<typeof getPool>>;
-
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
@@ -81,6 +79,58 @@ function parseMetadata(v: unknown): Record<string, unknown> | null {
 /*  GET /api/admin/audit-logs                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Lists audit log entries with search, filters, pagination and filter facets.
+ *
+ * @async
+ * @function GET
+ * @description Reads `audit_logs` LEFT JOINed to `users` behind the admin guard, so admins
+ *              and super admins reach it. Super admins may pick any `range`; an admin is
+ *              locked to the last 30 days. A search string shaped like a 40-character audit
+ *              id becomes an exact `al.id` lookup that ignores the date window. Every
+ *              response also carries action and entity-type facet counts for the dropdowns.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} [search] - Free text matched against description, action, entity type,
+ *                            entity id, user id, email, full name, first and last name
+ * @query {string} [range] - `30d` (default), `90d`, `365d` or `lifetime`; admins always get `30d`
+ * @query {string} [action] - Exact `al.action` filter
+ * @query {string} [entity_type] - Exact `al.entity_type` filter
+ * @query {number} [page] - Page number (default: 1)
+ * @query {number} [limit] - Page size (default: 25, max: 100)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - scope: `super_admin` or `admin`
+ *   - generatedAt: ISO timestamp of the response
+ *   - range: the range actually applied
+ *   - requestedRange: the range asked for on the query string
+ *   - bypassedRange: `true` when a 40-char id lookup overrode the admin range lock
+ *   - query: the effective `search`, `action`, `entityType`, `page` and `limit`
+ *   - pagination: `page`, `limit`, `total` and `totalPages`
+ *   - logs: rows with `id`, `userId`, `userEmail`, `userName`, `action`, `entityType`,
+ *           `entityId`, `description`, `metadata` and `createdAt`
+ *   - facets: `actions` and `entityTypes`, each with a `count`
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below admin
+ * @throws {500} Database failure while counting or reading `audit_logs`
+ *
+ * @description Workflow:
+ *   1. Initialize the admin guard (session, active status, role rank)
+ *   2. Derive `isSuperAdmin` from the session role
+ *   3. Parse `range`, forcing `30d` for a non super admin
+ *   4. Parse `search`, `action`, `entity_type`, `page` and `limit` (clamped to 1-100)
+ *   5. Compute `offset` from page and limit
+ *   6. Test the trimmed search against the 40-char audit id pattern
+ *   7. Initialize the database pool
+ *   8. Build the `WHERE` list: exact id lookup, or range start plus a nine-column LIKE search
+ *   9. Append exact `action` and `entity_type` conditions
+ *   10. Count matching rows with `LEFT JOIN users`
+ *   11. Select the page slice with `USER_NAME_EXPR` as display name, newest first
+ *   12. Normalize `metadata` through `parseMetadata`
+ *   13. Load action and entity-type facet counts over the whole table
+ *   14. Return 200 response with scope, range, query, pagination, logs and facets
+ */
 export async function GET(req: NextRequest) {
   const guard = await requireAdmin({ label: "GET /api/admin/audit-logs" });
   if (!guard.ok) return guard.response;
