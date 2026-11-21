@@ -260,7 +260,7 @@ export default function ProductMediaManager({
       open={open}
       onClose={onClose}
       title={title}
-      subtitle="Uploaded to ImageKit as public media, under this environment's folder."
+      subtitle="Photos you upload here are public — shoppers will see them on the product page."
       wide
       footer={
         <button
@@ -298,6 +298,10 @@ export default function ProductMediaManager({
           />
         </label>
       </div>
+
+      <p className="mt-2 text-[11px] text-stone-500">
+        For the best look, upload photos in a 1:1 ratio (square).
+      </p>
 
       {images.length === 0 ? (
         <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 py-10 text-center">

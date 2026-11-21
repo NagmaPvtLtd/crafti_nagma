@@ -6,22 +6,50 @@
  *   product  → {PREFIX}-P{YY}00-{last 4 of product id}
  *   variant  → {PREFIX}-P{YY}{NN}-{last 4 of variant id}-{VALUE-VALUE}
  *
- * `PREFIX` is the first four letters/digits of the product name, `YY` is the
- * two-digit creation year, `00` marks the base product and `NN` counts the
- * variants of that product from 01.
+ * `PREFIX` is four random letters drawn (without repetition, skipping spaces)
+ * from anywhere in the product name, uppercased. When the name has fewer than
+ * four alphanumeric characters, the result is padded with `X`.
  *
- *   CHARGER COVER          → CHAR-P2600-JB29
- *   its Red / Large variant → CHAR-P2601-3S52-RED-LARGE
+ *   CHARGER COVER          → AGE-C2600-JB29   (random pick from CHARGERCOVER)
+ *   its Red / Large variant → AGE-C2601-3S52-RED-LARGE
  */
 
 const PREFIX_LENGTH = 4;
 const SKU_MAX_LENGTH = 100;
 
-/** "Charger Cover" → "CHAR". Always four characters, padded with X. */
+/**
+ * "Charger Cover" → e.g. "AGE".
+ *
+ * Randomly picks `PREFIX_LENGTH` distinct alphanumeric characters from the
+ * whole name (spaces and punctuation are ignored), uppercased. Repeats of the
+ * same letter are skipped so each picked position contributes a unique char.
+ * When fewer than `PREFIX_LENGTH` distinct letters exist, the result is padded
+ * with `X`.
+ */
 export function productCodePrefix(name: string): string {
   const letters = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const prefix = letters.slice(0, PREFIX_LENGTH) || "PRD";
-  return prefix.padEnd(PREFIX_LENGTH, "X");
+
+  if (letters.length === 0) {
+    return "PRD".padEnd(PREFIX_LENGTH, "X");
+  }
+
+  const picked: string[] = [];
+  const seen = new Set<string>();
+  const indices = Array.from({ length: letters.length }, (_, i) => i);
+
+  // Fisher-Yates shuffle, stopped early once we have enough distinct letters.
+  for (let i = indices.length - 1; i > 0 && picked.length < PREFIX_LENGTH; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+
+    const candidate = letters[indices[i]];
+    if (!seen.has(candidate)) {
+      seen.add(candidate);
+      picked.push(candidate);
+    }
+  }
+
+  return picked.join("").padEnd(PREFIX_LENGTH, "X");
 }
 
 /** 2026 → "26". */

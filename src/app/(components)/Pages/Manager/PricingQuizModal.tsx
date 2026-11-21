@@ -40,7 +40,7 @@ export default function PricingQuizButton({
         open={open}
         onClose={() => setOpen(false)}
         title="Pricing quiz"
-        subtitle="A few quick answers normally drive the suggestion — this is a placeholder for now."
+        subtitle="Answer a few quick questions and we will suggest a price for this variant."
         footer={
           <>
             <button
@@ -77,12 +77,9 @@ export default function PricingQuizButton({
         </div>
 
         <p className="mt-3 rounded-xl border border-dashed border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-          <strong>TODO:</strong> the quiz questions and the cost model are not
-          built yet, so every suggestion is the flat ₹100 placeholder. See{" "}
-          <code className="font-mono text-[10px]">
-            src/utils/Pricing/pricing.util.ts
-          </code>
-          .
+          <strong>Coming soon:</strong> the quiz will ask about your cost, time and
+          margin, then suggest a price. For now it suggests a starting point you
+          can change.
         </p>
       </StudioModal>
     </>

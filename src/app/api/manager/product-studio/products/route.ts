@@ -22,7 +22,8 @@ interface ProductRow extends RowDataPacket {
   total_stock: number | string;
   min_price: number | string | null;
   max_price: number | string | null;
-  imageUrl: string | null;
+  product_image: string | null;
+  variant_image: string | null;
 }
 
 interface TotalsRow extends RowDataPacket {
@@ -53,7 +54,19 @@ const PRODUCT_SELECT = `
          (SELECT MIN(v.price) FROM product_variants v
            WHERE v.product_id = p.id)                          AS min_price,
          (SELECT MAX(v.price) FROM product_variants v
-           WHERE v.product_id = p.id)                          AS max_price
+           WHERE v.product_id = p.id)                          AS max_price,
+         (SELECT f.url FROM imagekit_files f
+           WHERE f.entity_type = 'product' AND f.entity_id = p.id
+           ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC
+           LIMIT 1)                                             AS product_image,
+         (SELECT f.url FROM imagekit_files f
+            JOIN product_variants v ON v.id = f.entity_id
+           WHERE f.entity_type = 'product_variant'
+             AND f.file_purpose = 'product_variant_image'
+             AND v.product_id = p.id
+           ORDER BY v.status = 'active' DESC,
+                    f.sort_order ASC, f.created_at ASC, f.id ASC
+           LIMIT 1)                                             AS variant_image
     FROM products p`;
 
 /**
@@ -63,9 +76,11 @@ const PRODUCT_SELECT = `
  * @function GET
  * @description Filters `products` by free text (name, code or slug), status and category, then
  *              paginates newest-updated first with per-product variant count, total stock and
- *              price range. Table-wide counts are returned alongside the page so the stat strip
- *              stays accurate while filters are applied. `imageUrl` is always `null` in this
- *              payload.
+ *              price range. Each product also carries a cover `imageUrl`: the product-level
+ *              image first, then the first variant photo (active variants preferred, then by
+ *              sort order) — the same preference the storefront collections use. Table-wide
+ *              counts are returned alongside the page so the stat strip stays accurate while
+ *              filters are applied.
  *
  * @param {NextRequest} req - The incoming HTTP request
  * @query {string} [q] - Free text matched against `p.name`, `p.code` and `p.slug`
@@ -93,10 +108,12 @@ const PRODUCT_SELECT = `
  *   4. Compute `offset` from page and limit
  *   5. Build the `WHERE` list: LIKE across name/code/slug, exact status, category EXISTS
  *   6. Initialize the database pool and take a connection
- *   7. Select the page slice with variant count, total stock and price range subqueries
+ *   7. Select the page slice with variant count, total stock, price range and cover-image
+ *      subqueries (product image first, then first variant photo)
  *   8. Count the filtered rows
  *   9. Count table-wide totals including products without variants
- *   10. Normalize the aggregates and return 200 with counts, pagination and products
+ *   10. Normalize the aggregates and the cover image, and return 200 with counts, pagination
+ *       and products
  *   11. Release the connection in `finally`
  */
 export async function GET(req: NextRequest) {
@@ -200,7 +217,7 @@ export async function GET(req: NextRequest) {
         totalStock: Number(row.total_stock ?? 0),
         minPrice: row.min_price === null ? null : Number(row.min_price),
         maxPrice: row.max_price === null ? null : Number(row.max_price),
-        imageUrl: null,
+        imageUrl: row.product_image ?? row.variant_image ?? null,
         updatedAt: row.updated_at,
       })),
     };

@@ -100,7 +100,7 @@ export default function ExistingPhotosModal({
       open={open}
       onClose={onClose}
       title="Choose existing photos"
-      subtitle="Reuse a photo another variant already uploaded. Nothing is copied — only a link is added."
+      subtitle="Pick photos another variant already uploaded — they will show on this variant too."
       wide
       footer={
         <div className="flex items-center justify-end gap-2">

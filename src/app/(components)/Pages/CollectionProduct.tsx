@@ -20,7 +20,7 @@ import {
 import CustomLoader from "../CustomLoader";
 import PhotoViewer from "../utils/PhotoViewer";
 import PageWrapper from "../utils/PageWrapper";
-import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
+import { SectionDivider } from "../utils/SectionDiv";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type {
   CollectionOption,
@@ -34,13 +34,7 @@ import type {
 /*  Star row — Amazon-style rating under the title                            */
 /* -------------------------------------------------------------------------- */
 
-function ReviewStars({
-  average,
-  count,
-}: {
-  average: number;
-  count: number;
-}) {
+function ReviewStars({ average, count }: { average: number; count: number }) {
   const rounded = Math.round(average);
 
   return (
@@ -79,13 +73,7 @@ function ReviewStars({
 /*  Small detail card used for features, care and gift contents               */
 /* -------------------------------------------------------------------------- */
 
-function SpecRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function SpecRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-stone-100 py-1.5">
       <dt className="text-stone-500">{label}</dt>
@@ -269,8 +257,7 @@ export default function CollectionProduct({ code }: { code: string }) {
   const selectedValueLabels = options
     .map(
       (option) =>
-        option.values.find((value) => value.id === selection[option.id])
-          ?.value,
+        option.values.find((value) => value.id === selection[option.id])?.value,
     )
     .filter((value): value is string => Boolean(value));
 
@@ -344,464 +331,452 @@ export default function CollectionProduct({ code }: { code: string }) {
   return (
     <PageWrapper variant="hero" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <nav className="flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
-              <Link href="/" className="hover:text-rose-600">
-                Home
-              </Link>
+        <nav className="flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
+          <Link href="/" className="hover:text-rose-600">
+            Home
+          </Link>
+          <ChevronRight className="h-3 w-3 text-stone-300" />
+          <Link href="/collections" className="hover:text-rose-600">
+            Collections
+          </Link>
+          {product?.category && (
+            <>
               <ChevronRight className="h-3 w-3 text-stone-300" />
-              <Link href="/collections" className="hover:text-rose-600">
-                Collections
+              <Link
+                href={`/collections/${product.category.slug}`}
+                className="hover:text-rose-600"
+              >
+                {product.category.name}
               </Link>
-              {product?.category && (
-                <>
-                  <ChevronRight className="h-3 w-3 text-stone-300" />
-                  <Link
-                    href={`/collections/${product.category.slug}`}
-                    className="hover:text-rose-600"
-                  >
-                    {product.category.name}
-                  </Link>
-                </>
-              )}
-              {product?.subcategory && (
-                <>
-                  <ChevronRight className="h-3 w-3 text-stone-300" />
-                  <Link
-                    href={`/collections/${product.category?.slug ?? "all"}/${product.subcategory.slug}`}
-                    className="hover:text-rose-600"
-                  >
-                    {product.subcategory.name}
-                  </Link>
-                </>
-              )}
+            </>
+          )}
+          {product?.subcategory && (
+            <>
               <ChevronRight className="h-3 w-3 text-stone-300" />
-              <span className="font-semibold text-stone-700">
-                {product?.name ?? code}
-              </span>
-            </nav>
+              <Link
+                href={`/collections/${product.category?.slug ?? "all"}/${product.subcategory.slug}`}
+                className="hover:text-rose-600"
+              >
+                {product.subcategory.name}
+              </Link>
+            </>
+          )}
+          <ChevronRight className="h-3 w-3 text-stone-300" />
+          <span className="font-semibold text-stone-700">
+            {product?.name ?? code}
+          </span>
+        </nav>
         <SectionDivider className="my-6" size={11} />
 
-          {loading ? (
-            <CustomLoader fullScreen={false} label="Loading the product…" />
-          ) : error || !product ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-200 bg-white/70 px-6 py-14 text-center backdrop-blur-sm sm:rounded-3xl">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <h1 className="mt-3 text-base font-semibold text-stone-900">
-                Product unavailable
-              </h1>
-              <p className="mt-1 max-w-sm text-sm text-stone-600">{error}</p>
-              <Link
-                href="/collections"
-                className="mt-4 inline-flex items-center gap-1 rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Back to collections
-              </Link>
+        {loading ? (
+          <CustomLoader fullScreen={false} label="Loading the product…" />
+        ) : error || !product ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-200 bg-white/70 px-6 py-14 text-center backdrop-blur-sm sm:rounded-3xl">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500">
+              <AlertCircle className="h-5 w-5" />
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* ---------------- Gallery — selected variant's photos ---------------- */}
-                <div>
-                  <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-linear-to-br from-rose-100 via-rose-50 to-amber-50 sm:rounded-3xl">
-                    {activeImage ? (
+            <h1 className="mt-3 text-base font-semibold text-stone-900">
+              Product unavailable
+            </h1>
+            <p className="mt-1 max-w-sm text-sm text-stone-600">{error}</p>
+            <Link
+              href="/collections"
+              className="mt-4 inline-flex items-center gap-1 rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Back to collections
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* ---------------- Gallery — selected variant's photos ---------------- */}
+              <div>
+                <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-linear-to-br from-rose-100 via-rose-50 to-amber-50 sm:rounded-3xl">
+                  {activeImage ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewerOpen(true)}
+                      aria-label="View photo full screen"
+                      className="h-full w-full cursor-zoom-in"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={activeImage.url}
+                        alt={activeImage.altText ?? product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ) : (
+                    <Flower2 className="h-14 w-14 text-rose-300" />
+                  )}
+
+                  {discount !== null && (
+                    <span className="absolute top-3 left-3 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {discount}% off
+                    </span>
+                  )}
+
+                  {activeImage && (
+                    <button
+                      type="button"
+                      onClick={() => setViewerOpen(true)}
+                      aria-label="View photo full screen"
+                      className="absolute top-3 right-3 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+
+                  {gallery.length > 1 && (
+                    <>
                       <button
                         type="button"
-                        onClick={() => setViewerOpen(true)}
-                        aria-label="View photo full screen"
-                        className="h-full w-full cursor-zoom-in"
+                        aria-label="Previous image"
+                        onClick={() =>
+                          setImageIndex(
+                            (index) =>
+                              (index - 1 + gallery.length) % gallery.length,
+                          )
+                        }
+                        className="absolute top-1/2 left-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Next image"
+                        onClick={() =>
+                          setImageIndex((index) => (index + 1) % gallery.length)
+                        }
+                        className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <span className="absolute right-2 bottom-2 rounded-full bg-stone-900/70 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {imageIndex + 1} / {gallery.length}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {gallery.length > 1 && (
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {gallery.map((image, index) => (
+                      <button
+                        key={image.id}
+                        type="button"
+                        onClick={() => setImageIndex(index)}
+                        aria-label={`Show photo ${index + 1}`}
+                        className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
+                          index === imageIndex
+                            ? "border-rose-400"
+                            : "border-transparent hover:border-rose-200"
+                        }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={activeImage.url}
-                          alt={activeImage.altText ?? product.name}
+                          src={image.url}
+                          alt={image.altText ?? product.name}
+                          loading="lazy"
                           className="h-full w-full object-cover"
                         />
                       </button>
-                    ) : (
-                      <Flower2 className="h-14 w-14 text-rose-300" />
-                    )}
-
-                    {discount !== null && (
-                      <span className="absolute top-3 left-3 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
-                        {discount}% off
-                      </span>
-                    )}
-
-                    {activeImage && (
-                      <button
-                        type="button"
-                        onClick={() => setViewerOpen(true)}
-                        aria-label="View photo full screen"
-                        className="absolute top-3 right-3 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-
-                    {gallery.length > 1 && (
-                      <>
-                        <button
-                          type="button"
-                          aria-label="Previous image"
-                          onClick={() =>
-                            setImageIndex(
-                              (index) =>
-                                (index - 1 + gallery.length) % gallery.length,
-                            )
-                          }
-                          className="absolute top-1/2 left-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Next image"
-                          onClick={() =>
-                            setImageIndex((index) => (index + 1) % gallery.length)
-                          }
-                          className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                        <span className="absolute right-2 bottom-2 rounded-full bg-stone-900/70 px-2 py-0.5 text-[10px] font-semibold text-white">
-                          {imageIndex + 1} / {gallery.length}
-                        </span>
-                      </>
-                    )}
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  {gallery.length > 1 && (
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                      {gallery.map((image, index) => (
-                        <button
-                          key={image.id}
-                          type="button"
-                          onClick={() => setImageIndex(index)}
-                          aria-label={`Show photo ${index + 1}`}
-                          className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
-                            index === imageIndex
-                              ? "border-rose-400"
-                              : "border-transparent hover:border-rose-200"
-                          }`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={image.url}
-                            alt={image.altText ?? product.name}
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
+              {/* ---------------- Details ---------------- */}
+              <div
+                aria-busy={switching}
+                className={`rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm transition-opacity sm:rounded-3xl ${
+                  switching ? "opacity-70" : ""
+                }`}
+              >
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                  {product.name}
+                </h1>
+
+                <ReviewStars
+                  average={product.reviews.average}
+                  count={product.reviews.count}
+                />
+
+                {product.isFeatured && (
+                  <span className="mt-2 inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                    Featured
+                  </span>
+                )}
+
+                {brief && (
+                  <p className="mt-3 text-sm leading-relaxed text-stone-600">
+                    {brief}
+                  </p>
+                )}
+
+                {/* Price */}
+                <div className="mt-4 flex flex-wrap items-end gap-2">
+                  <p className="text-3xl font-semibold tabular-nums text-emerald-700">
+                    {price === null
+                      ? "Price on request"
+                      : formatCurrency(price)}
+                  </p>
+                  {compareAt !== null && compareAt > (price ?? 0) && (
+                    <p className="text-sm text-stone-400 line-through tabular-nums">
+                      {formatCurrency(compareAt)}
+                    </p>
+                  )}
+                  {discount !== null && (
+                    <span className="text-[11px] font-semibold text-emerald-600">
+                      Save {discount}%
+                    </span>
                   )}
                 </div>
 
-                {/* ---------------- Details ---------------- */}
-                <div
-                  aria-busy={switching}
-                  className={`rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm transition-opacity sm:rounded-3xl ${
-                    switching ? "opacity-70" : ""
-                  }`}
-                >
-                  <SectionEyebrow>
-                    {product.subcategory
-                      ? `${product.category?.name ?? ""} · ${product.subcategory.name}`
-                      : (product.category?.name ?? "Uncategorised")}
-                  </SectionEyebrow>
-
-                  <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                    {product.name}
-                  </h1>
-
-                  <ReviewStars
-                    average={product.reviews.average}
-                    count={product.reviews.count}
-                  />
-
-                  {product.isFeatured && (
-                    <span className="mt-2 inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
-                      Featured
-                    </span>
-                  )}
-
-                  {brief && (
-                    <p className="mt-3 text-sm leading-relaxed text-stone-600">
-                      {brief}
-                    </p>
-                  )}
-
-                  {/* Price */}
-                  <div className="mt-4 flex flex-wrap items-end gap-2">
-                    <p className="text-2xl font-semibold tabular-nums text-stone-900">
-                      {price === null ? "Price on request" : formatCurrency(price)}
-                    </p>
-                    {compareAt !== null && compareAt > (price ?? 0) && (
-                      <p className="text-xs text-stone-400 line-through tabular-nums">
-                        {formatCurrency(compareAt)}
-                      </p>
-                    )}
-                    {discount !== null && (
-                      <span className="text-[11px] font-semibold text-emerald-600">
-                        Save {discount}%
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Availability */}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                    <span
-                      className={`rounded-full px-2 py-0.5 font-semibold ${
-                        variant &&
-                        !soldOut &&
-                        variant.status === "active"
-                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border border-stone-200 bg-stone-100 text-stone-500"
-                      }`}
-                    >
-                      {!variant
+                {/* Availability */}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-semibold ${
+                      variant && !soldOut && variant.status === "active"
+                        ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border border-stone-200 bg-stone-100 text-stone-500"
+                    }`}
+                  >
+                    {!variant
+                      ? "Currently unavailable"
+                      : variant.status === "inactive"
                         ? "Currently unavailable"
-                        : variant.status === "inactive"
-                          ? "Currently unavailable"
-                          : soldOut
-                            ? "Out of stock"
-                            : stockLabel(stock)}
+                        : soldOut
+                          ? "Out of stock"
+                          : stockLabel(stock)}
+                  </span>
+                  {variant?.isFeatured && (
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
+                      Bestseller
                     </span>
-                    {variant?.isFeatured && (
-                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
-                        Bestseller
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Options — pick values, the chosen variant is fetched by SKU */}
-                  {options.length > 0 && (
-                    <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
-                      {options.map((option) => {
-                        const selectedValueId = selection[option.id];
-                        const selectedValue = option.values.find(
-                          (value) => value.id === selectedValueId,
-                        );
-
-                        return (
-                          <div key={option.id}>
-                            <p className="text-[11px] text-stone-500">
-                              <span className="font-semibold tracking-wide text-stone-700 uppercase">
-                                {option.name}
-                              </span>
-                              {selectedValue && (
-                                <span className="ml-2 font-semibold text-stone-900">
-                                  {selectedValue.value}
-                                </span>
-                              )}
-                            </p>
-
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              {option.values.map((value) => {
-                                const active = value.id === selectedValueId;
-                                const available = isValueAvailable(
-                                  option.id,
-                                  value.id,
-                                );
-
-                                return (
-                                  <button
-                                    key={value.id}
-                                    type="button"
-                                    onClick={() =>
-                                      chooseValue(option.id, value.id)
-                                    }
-                                    disabled={!available || switching}
-                                    aria-pressed={active}
-                                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
-                                      active
-                                        ? "border-rose-400 bg-rose-50 text-rose-700 ring-1 ring-rose-200"
-                                        : available
-                                          ? "cursor-pointer border-stone-200 bg-white text-stone-600 hover:border-rose-300 hover:text-stone-900"
-                                          : "cursor-not-allowed border-stone-100 bg-stone-50 text-stone-300 line-through"
-                                    }`}
-                                  >
-                                    {value.value}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
                   )}
+                </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-2 text-[11px] text-stone-600 sm:grid-cols-2">
-                    {product.processingTime && (
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2">
-                        <Sparkles className="h-3.5 w-3.5 text-rose-400" />
-                        {product.processingTime}
-                      </span>
-                    )}
-                    {variant?.name && (
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2">
+                {/* Options — pick values, the chosen variant is fetched by SKU */}
+                {options.length > 0 && (
+                  <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                    {options.map((option) => {
+                      const selectedValueId = selection[option.id];
+
+                      return (
+                        <div key={option.id}>
+                          <p className="text-[11px] text-stone-500">
+                            <span className="font-semibold tracking-wide text-stone-700 capitalize">
+                              Choose {option.name}:
+                            </span>
+                          </p>
+
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {option.values.map((value) => {
+                              const active = value.id === selectedValueId;
+                              const available = isValueAvailable(
+                                option.id,
+                                value.id,
+                              );
+
+                              return (
+                                <button
+                                  key={value.id}
+                                  type="button"
+                                  onClick={() =>
+                                    chooseValue(option.id, value.id)
+                                  }
+                                  disabled={!available || switching}
+                                  aria-pressed={active}
+                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                    active
+                                      ? "border-rose-200 bg-rose-50 text-rose-600 "
+                                      : available
+                                        ? "cursor-pointer border-stone-200 bg-white text-stone-600 hover:border-rose-100 hover:text-stone-900"
+                                        : "cursor-not-allowed border-stone-100 bg-stone-50 text-stone-300 line-through"
+                                  }`}
+                                >
+                                  {value.value}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  {variant?.name && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                        You are currently viewing:
+                      </p>
+                      <span className="inline-flex items-center gap-1.5 rounded-xl w-full border border-stone-100 bg-stone-50 px-3 py-2 text-[11px] text-stone-600">
                         <Package className="h-3.5 w-3.5 text-rose-400" />
                         {variant.name}
                       </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {(description || variant) && (
-                <>
-                  <SectionDivider className="mx-auto max-w-7xl py-8" />
-                  <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                        Product Description
-                      </h2>
-                      {variant?.description?.trim() &&
-                        selectedValueLabels.length > 0 && (
-                          <span className="text-[11px] font-medium text-stone-500">
-                            {selectedValueLabels.join(" / ")}
-                          </span>
-                        )}
                     </div>
-                    {description && (
-                      <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-stone-600">
-                        {description}
-                      </p>
-                    )}
-
-                    {/* Quiet identifier for people who come looking for it. */}
-                    {variant && (
-                      <p className="mt-4 border-t border-stone-100 pt-3 text-[10px] text-stone-400">
-                        Product ID:{" "}
-                        <span className="font-medium text-stone-500">
-                          {variant.sku}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* ---------------- Features / care / gift / specs ---------------- */}
-              {(product.features.length > 0 ||
-                product.careInstructions.length > 0 ||
-                product.giftIncluded.length > 0) && (
-                <>
-                  <SectionDivider className="mx-auto max-w-7xl py-8" />
-                  <div className="space-y-3">
-                    <DetailList
-                      title="Product Features"
-                      items={product.features.map((feature) => feature.text)}
-                    />
-                    <DetailList
-                      title="Product Care Instructions"
-                      items={product.careInstructions.map((care) => care.text)}
-                    />
-                    <DetailList
-                      title="Gift Includes"
-                      items={product.giftIncluded.map((gift) => gift.text)}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* ---------------- Specifications ---------------- */}
-              <div className="mt-3 rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
-                <h2 className="text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
-                  Specifications
-                </h2>
-
-                <dl className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-2">
-                  {options.length > 0 && (
-                    <SpecRow
-                      label={options.map((option) => option.name).join(" / ")}
-                      value={selectedValueLabels.join(" / ") || "—"}
-                    />
                   )}
-                  <SpecRow label="Category" value={product.category?.name ?? "—"} />
-                  <SpecRow
-                    label="Subcategory"
-                    value={product.subcategory?.name ?? "—"}
-                  />
-                  <SpecRow
-                    label="Weight"
-                    value={
-                      variant?.weight !== null && variant?.weight !== undefined
-                        ? `${variant.weight} g`
-                        : "—"
-                    }
-                  />
-                  <SpecRow
-                    label="Processing time"
-                    value={product.processingTime ?? "—"}
-                  />
-                </dl>
+                </div>
               </div>
+            </div>
 
-              {/* ---------------------------------------------------------------- */}
-              {/* TODO(reviews): replace this placeholder with the real reviews      */}
-              {/* module — paginated approved reviews from `product_reviews`, a      */}
-              {/* rating breakdown, helpful votes and a submit form. The summary     */}
-              {/* above already comes from the live review average.                  */}
-              {/* ---------------------------------------------------------------- */}
-              <SectionDivider className="mx-auto max-w-7xl py-8" />
-
-              <section
-                id="reviews"
-                className="rounded-2xl border border-dashed border-rose-200 bg-white/70 p-5 backdrop-blur-sm sm:rounded-3xl"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-semibold tracking-widest text-rose-500/80 uppercase">
-                      Product Reviews
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold text-stone-900">
-                      What people are saying
+            {(description || variant) && (
+              <>
+                <SectionDivider className="mx-auto max-w-7xl py-8" />
+                <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                      Product Description
                     </h2>
+                    {variant?.description?.trim() &&
+                      selectedValueLabels.length > 0 && (
+                        <span className="text-[11px] font-medium text-stone-500">
+                          {selectedValueLabels.join(" / ")}
+                        </span>
+                      )}
                   </div>
+                  {description && (
+                    <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-stone-600">
+                      {description}
+                    </p>
+                  )}
 
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 uppercase">
-                    Reviews Coming Soon
-                  </span>
+                  {/* Quiet identifier for people who come looking for it. */}
+                  {variant && (
+                    <p className="mt-4 border-t border-stone-100 pt-3 text-[10px] text-stone-400">
+                      Product ID:{" "}
+                      <span className="font-medium text-stone-500">
+                        {variant.sku}
+                      </span>
+                    </p>
+                  )}
                 </div>
+              </>
+            )}
 
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <ReviewStars
-                    average={product.reviews.average}
-                    count={product.reviews.count}
+            {/* ---------------- Features / care / gift / specs ---------------- */}
+            {(product.features.length > 0 ||
+              product.careInstructions.length > 0 ||
+              product.giftIncluded.length > 0) && (
+              <>
+                <SectionDivider className="mx-auto max-w-7xl py-8" />
+                <div className="space-y-3">
+                  <DetailList
+                    title="Product Features"
+                    items={product.features.map((feature) => feature.text)}
                   />
-                  <p className="text-[11px] text-stone-500">
-                    The review list, rating breakdown and review form will land
-                    here.
-                  </p>
+                  <DetailList
+                    title="Product Care Instructions"
+                    items={product.careInstructions.map((care) => care.text)}
+                  />
+                  <DetailList
+                    title="Gift Includes"
+                    items={product.giftIncluded.map((gift) => gift.text)}
+                  />
                 </div>
-              </section>
+              </>
+            )}
 
-              <div className="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm">
-                <Link
-                  href={
-                    product.category
-                      ? `/collections/${product.category.slug}`
-                      : "/collections"
+            {/* ---------------- Specifications ---------------- */}
+            <div className="mt-3 rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+              <h2 className="text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
+                Specifications
+              </h2>
+
+              <dl className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-2">
+                {options.length > 0 && (
+                  <SpecRow
+                    label={options.map((option) => option.name).join(" / ")}
+                    value={selectedValueLabels.join(" / ") || "—"}
+                  />
+                )}
+                <SpecRow
+                  label="Category"
+                  value={product.category?.name ?? "—"}
+                />
+                <SpecRow
+                  label="Subcategory"
+                  value={product.subcategory?.name ?? "—"}
+                />
+                <SpecRow
+                  label="Weight"
+                  value={
+                    variant?.weight !== null && variant?.weight !== undefined
+                      ? `${variant.weight} g`
+                      : "—"
                   }
-                  className="inline-flex items-center gap-1 font-semibold text-rose-600 hover:text-rose-700"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  Back to {product.category?.name ?? "collections"}
-                </Link>
-                <Link
-                  href="/collections"
-                  className="font-semibold text-stone-600 hover:text-stone-900"
-                >
-                  All collections
-                </Link>
+                />
+                <SpecRow
+                  label="Processing time"
+                  value={product.processingTime ?? "—"}
+                />
+              </dl>
+            </div>
+
+            {/* ---------------------------------------------------------------- */}
+            {/* TODO(reviews): replace this placeholder with the real reviews      */}
+            {/* module — paginated approved reviews from `product_reviews`, a      */}
+            {/* rating breakdown, helpful votes and a submit form. The summary     */}
+            {/* above already comes from the live review average.                  */}
+            {/* ---------------------------------------------------------------- */}
+            <SectionDivider className="mx-auto max-w-7xl py-8" />
+
+            <section
+              id="reviews"
+              className="rounded-2xl border border-dashed border-rose-200 bg-white/70 p-5 backdrop-blur-sm sm:rounded-3xl"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest text-rose-500/80 uppercase">
+                    Product Reviews
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-stone-900">
+                    What people are saying
+                  </h2>
+                </div>
+
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 uppercase">
+                  Reviews Coming Soon
+                </span>
               </div>
-            </>
-          )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <ReviewStars
+                  average={product.reviews.average}
+                  count={product.reviews.count}
+                />
+                <p className="text-[11px] text-stone-500">
+                  The review list, rating breakdown and review form will land
+                  here.
+                </p>
+              </div>
+            </section>
+
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm">
+              <Link
+                href={
+                  product.category
+                    ? `/collections/${product.category.slug}`
+                    : "/collections"
+                }
+                className="inline-flex items-center gap-1 font-semibold text-rose-600 hover:text-rose-700"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Back to {product.category?.name ?? "collections"}
+              </Link>
+              <Link
+                href="/collections"
+                className="font-semibold text-stone-600 hover:text-stone-900"
+              >
+                All collections
+              </Link>
+            </div>
+          </>
+        )}
 
         <PhotoViewer
           open={viewerOpen}

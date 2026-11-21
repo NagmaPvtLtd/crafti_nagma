@@ -973,7 +973,7 @@ function GenerateVariantsModal({
       open={open}
       onClose={onClose}
       title="Generate variants"
-      subtitle="Tick the combinations you need. Combinations that already exist are skipped, never rebuilt."
+      subtitle="Tick the combinations you want. Any combination that already exists is left as it is."
       wide
       footer={
         <>
@@ -1106,9 +1106,9 @@ function GenerateVariantsModal({
 
           <p className="text-[11px] leading-relaxed text-stone-500">
             Each new variant copies the base product&apos;s short description
-            and description. SKUs are built from{" "}
+            and description. The SKU is built from{" "}
             <code className="font-mono">{product.product.code}</code> plus the
-            option values, and are guaranteed unique.
+            option values, so every variant gets its own code.
           </p>
 
           {formError && (

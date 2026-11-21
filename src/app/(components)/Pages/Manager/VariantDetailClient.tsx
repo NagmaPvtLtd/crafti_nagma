@@ -497,10 +497,9 @@ export default function VariantDetailClient({
                         </>
                       ) : (
                         <>
-                          Disabling removes this variant&apos;s photos —
-                          original uploads and shallow links — to free up space,
-                          and hides it from the storefront. A variant that
-                          appears in an order cannot be disabled.
+                          Disabling this variant removes its photos and hides it
+                          from the storefront. A variant that appears in an order
+                          cannot be disabled.
                         </>
                       )}
                     </p>
@@ -603,10 +602,9 @@ export default function VariantDetailClient({
                 {data?.variant.sku || data?.variant.name}
               </span>{" "}
               will be hidden from the storefront. All of its photos will be
-              removed to free up space — every original ImageKit upload, every
-              shallow link this variant holds, and any links other variants made
-              to those uploads. The variant itself stays in the studio,
-              disabled, so you can complete it and activate it again later.
+              removed, including photos this variant is sharing with other
+              variants. The variant itself stays in the studio, disabled, so you
+              can complete it and activate it again later.
             </>
           }
           confirmLabel="Disable variant"
