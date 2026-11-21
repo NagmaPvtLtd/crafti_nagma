@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Boxes,
   Check,
+  CheckCircle2,
   ChevronRight,
   FolderTree,
   IndianRupee,
@@ -198,7 +199,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
 
                 <VariantsSection
                   variants={data.variants}
-                  productId={data.product.id}
+                  productRef={data.product.code || data.product.id}
                   onGenerate={() => setGenerateOpen(true)}
                 />
 
@@ -336,8 +337,8 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
   return (
     <div className="h-full rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
       <SectionEyebrow>Base product</SectionEyebrow>
-      <h2 className="mt-1 text-sm font-semibold text-stone-900">
-        Product details
+      <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+        Product Description
       </h2>
 
       <p className="mt-3 text-sm leading-relaxed text-stone-700">
@@ -476,17 +477,17 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       </div>
 
       {data.features.length > 0 && (
-        <div className="mt-4">
-          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-            Features
-          </p>
-          <ul className="mt-1.5 space-y-1">
+        <div className="mt-5 border-t border-stone-100 pt-4">
+          <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+            Product Features
+          </h3>
+          <ul className="mt-2 space-y-1.5">
             {data.features.map((item) => (
               <li
                 key={item.id}
-                className="flex items-start gap-1.5 text-[11px] leading-relaxed text-stone-600"
+                className="flex items-center gap-2 text-xs leading-snug text-stone-600"
               >
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-rose-400" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                 {item.value}
               </li>
             ))}
@@ -495,17 +496,17 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       )}
 
       {data.careInstructions.length > 0 && (
-        <div className="mt-4">
-          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-            Care instructions
-          </p>
-          <ul className="mt-1.5 space-y-1">
+        <div className="mt-5 border-t border-stone-100 pt-4">
+          <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+            Care Instructions
+          </h3>
+          <ul className="mt-2 space-y-1.5">
             {data.careInstructions.map((item) => (
               <li
                 key={item.id}
-                className="flex items-start gap-1.5 text-[11px] leading-relaxed text-stone-600"
+                className="flex items-center gap-2 text-xs leading-snug text-stone-600"
               >
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-stone-300" />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                 {item.value}
               </li>
             ))}
@@ -513,7 +514,13 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-stone-100 pt-3 sm:grid-cols-2">
+      <div className="mt-5 border-t border-stone-100 pt-4">
+        <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+          Product Specifications
+        </h3>
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         <dl className="space-y-2 text-xs">
           <DetailRow
             label="Delivery"
@@ -541,17 +548,17 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       </div>
 
       {(product.metaTitle || product.metaDescription) && (
-        <div className="mt-3 border-t border-stone-100 pt-3">
-          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+        <div className="mt-5 border-t border-stone-100 pt-4">
+          <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
             SEO
-          </p>
+          </h3>
           {product.metaTitle && (
-            <p className="mt-1 text-xs font-medium text-stone-700">
+            <p className="mt-2 text-sm font-medium text-stone-800">
               {product.metaTitle}
             </p>
           )}
           {product.metaDescription && (
-            <p className="mt-0.5 text-[11px] leading-relaxed text-stone-500">
+            <p className="mt-1 text-xs leading-relaxed text-stone-500">
               {product.metaDescription}
             </p>
           )}
@@ -592,11 +599,12 @@ function DetailRow({
 
 function VariantsSection({
   variants,
-  productId,
+  productRef,
   onGenerate,
 }: {
   variants: ProductVariantSummary[];
-  productId: string;
+  /** Product code — variant pages live under the code, not the raw id. */
+  productRef: string;
   onGenerate: () => void;
 }) {
   return (
@@ -604,7 +612,7 @@ function VariantsSection({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <SectionEyebrow>Purchasable</SectionEyebrow>
-          <h2 className="mt-1 text-sm font-semibold text-stone-900">
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
             Variants{" "}
             <span className="font-normal text-stone-400">
               ({variants.length})
@@ -639,7 +647,7 @@ function VariantsSection({
           {variants.map((variant) => (
             <li key={variant.id}>
               <Link
-                href={`/manager/product-studio/products/${productId}/variants/${variant.sku || variant.id}`}
+                href={`/manager/product-studio/products/${productRef}/variants/${variant.sku || variant.id}`}
                 className="group flex items-center gap-3 py-2.5"
               >
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
@@ -739,7 +747,7 @@ function ReviewsSection({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <SectionEyebrow>Feedback</SectionEyebrow>
-          <h2 className="mt-1 text-sm font-semibold text-stone-900">
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
             Reviews{" "}
             <span className="font-normal text-stone-400">({reviewCount})</span>
           </h2>

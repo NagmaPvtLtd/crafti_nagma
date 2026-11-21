@@ -2,204 +2,76 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import axios from "axios";
 import {
   ArrowRight,
   Flower2,
-  Frame,
-  Heart,
-  Home,
-  KeyRound,
+  Layers,
   Search,
   ShoppingBag,
   Sparkles,
-  Star,
   X,
 } from "lucide-react";
 
+import CustomLoader from "../CustomLoader";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import { inputClass } from "../utils/Form/fieldStyles";
-/* ------------------------------------------------------------------ */
-/*  Sample data — not wired to the API yet                             */
-/* ------------------------------------------------------------------ */
+import CollectionCard, { productPriceLabel } from "./CollectionCard";
+import type { CollectionsResponse } from "../../../types/Collection.types";
 
-type SampleProduct = {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  compareAt?: number;
-  badge?: "Bestseller" | "New";
-  blurb: string;
-  rating: number;
-  reviews: number;
-  tone: string;
-  icon: "flower" | "heart" | "key" | "frame" | "home";
-};
-
-const CATEGORIES = [
-  "All",
-  "Bouquets",
-  "Plushies",
-  "Keychains",
-  "Wall art",
-  "Home",
-] as const;
-
-const TONE = {
-  blush: "from-rose-100 via-rose-50 to-amber-50 text-rose-400",
-  sunny: "from-amber-100 via-amber-50 to-white text-amber-500",
-  mint: "from-emerald-100 via-emerald-50 to-white text-emerald-500",
-  sky: "from-sky-100 via-sky-50 to-white text-sky-500",
-  lilac: "from-violet-100 via-violet-50 to-white text-violet-400",
-} as const;
-
-const PRODUCTS: SampleProduct[] = [
-  {
-    id: "blush-bouquet",
-    name: "Blush Bouquet",
-    category: "Bouquets",
-    price: 899,
-    compareAt: 1099,
-    badge: "Bestseller",
-    blurb: "Roses and tulips in dusty pink, tied with a satin ribbon.",
-    rating: 5,
-    reviews: 32,
-    tone: TONE.blush,
-    icon: "flower",
-  },
-  {
-    id: "sunflower-bunch",
-    name: "Sunny Sunflower Bunch",
-    category: "Bouquets",
-    price: 749,
-    blurb: "Five cheerful sunflowers that never need watering.",
-    rating: 4.8,
-    reviews: 21,
-    tone: TONE.sunny,
-    icon: "flower",
-  },
-  {
-    id: "amigurumi-bunny",
-    name: "Amigurumi Bunny",
-    category: "Plushies",
-    price: 649,
-    badge: "New",
-    blurb: "A palm-sized bunny with floppy ears and a tiny bow.",
-    rating: 5,
-    reviews: 14,
-    tone: TONE.mint,
-    icon: "heart",
-  },
-  {
-    id: "bear-keychain",
-    name: "Little Bear Keychain",
-    category: "Keychains",
-    price: 249,
-    blurb: "Pocket-sized bear charm for keys, bags and everything else.",
-    rating: 4.7,
-    reviews: 41,
-    tone: TONE.sky,
-    icon: "key",
-  },
-  {
-    id: "embroidery-hoop",
-    name: "Wildflower Hoop",
-    category: "Wall art",
-    price: 1199,
-    compareAt: 1399,
-    blurb: 'Hand-embroidered wildflowers in a 8" bamboo hoop.',
-    rating: 4.9,
-    reviews: 18,
-    tone: TONE.lilac,
-    icon: "frame",
-  },
-  {
-    id: "cloud-pillow",
-    name: "Cloud Cuddle Pillow",
-    category: "Home",
-    price: 1499,
-    badge: "Bestseller",
-    blurb: "Chunky-knit cloud cushion, soft enough to nap on.",
-    rating: 5,
-    reviews: 27,
-    tone: TONE.sky,
-    icon: "home",
-  },
-  {
-    id: "daisy-bookmark",
-    name: "Daisy Bookmark",
-    category: "Keychains",
-    price: 199,
-    blurb: "A tiny daisy that keeps your page exactly where you left it.",
-    rating: 4.6,
-    reviews: 9,
-    tone: TONE.mint,
-    icon: "key",
-  },
-  {
-    id: "coaster-set",
-    name: "Cozy Coaster Set",
-    category: "Home",
-    price: 499,
-    badge: "New",
-    blurb: "Four round coasters in warm neutrals, bundled together.",
-    rating: 4.8,
-    reviews: 11,
-    tone: TONE.blush,
-    icon: "home",
-  },
-];
-
-const ICONS = {
-  flower: Flower2,
-  heart: Heart,
-  key: KeyRound,
-  frame: Frame,
-  home: Home,
-} as const;
-
-import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
-
-/* ------------------------------------------------------------------ */
-/*  Page                                                               */
-/* ------------------------------------------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*  /collections — featured picks, the category tree, then every product link */
+/* -------------------------------------------------------------------------- */
 
 export default function Collections() {
-  const [category, setCategory] = useState<string>("All");
+  const [data, setData] = useState<CollectionsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  /* links like /collections?category=Bouquets&q=daisy open with the filter set */
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const params = new URLSearchParams(window.location.search);
-      const search = params.get("q")?.trim();
-      const requested = params.get("category");
+    let cancelled = false;
 
-      if (search) setQuery(search);
-      if (requested && (CATEGORIES as readonly string[]).includes(requested)) {
-        setCategory(requested);
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await axios.get<CollectionsResponse>(
+          "/api/public/collections",
+        );
+        if (!cancelled) setData(res.data);
+      } catch {
+        if (!cancelled) setError("Could not load the collections right now.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    });
+    }
 
-    return () => cancelAnimationFrame(id);
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const visible = useMemo(() => {
+  const products = useMemo(() => {
+    const list = data?.products ?? [];
     const term = query.trim().toLowerCase();
-
-    return PRODUCTS.filter((product) => {
-      const matchesCategory =
-        category === "All" || product.category === category;
-      const matchesQuery =
-        !term ||
+    if (!term) return list;
+    return list.filter((product) => {
+      const path = `${product.category?.name ?? ""} ${
+        product.subcategory?.name ?? ""
+      }`;
+      return (
         product.name.toLowerCase().includes(term) ||
-        product.category.toLowerCase().includes(term);
-
-      return matchesCategory && matchesQuery;
+        product.code.toLowerCase().includes(term) ||
+        path.toLowerCase().includes(term)
+      );
     });
-  }, [category, query]);
+  }, [data, query]);
+
+  const featured = data?.featured ?? [];
+  const categories = data?.categories ?? [];
 
   return (
     <PageWrapper variant="hero" position="fixed">
@@ -216,108 +88,266 @@ export default function Collections() {
         {/* Header */}
         <section className="relative">
           <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="min-w-0">
-                <SectionEyebrow>Collections · sample catalogue</SectionEyebrow>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                  Handmade, ready to gift.
-                </h1>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Small-batch crochet pieces, made to order in India. Pick a
-                  design and we&apos;ll stitch it just for you.
-                </p>
-              </div>
+            <SectionEyebrow>Collections · live catalogue</SectionEyebrow>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+              Everything on the shelf.
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
+              Featured pieces first, then browse by category or jump straight
+              to a product.
+            </p>
 
-              <div className="flex w-full gap-2 sm:w-auto">
-                <div className="relative w-full sm:w-64">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search the collection"
-                    aria-label="Search the collection"
-                    className={`${inputClass(false)} rounded-full py-2 pl-9 pr-8 text-xs`}
-                  />
-                  {query && (
-                    <button
-                      type="button"
-                      onClick={() => setQuery("")}
-                      aria-label="Clear search"
-                      className="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer rounded-full p-0.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
-
-        {/* Filters + grid */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              {CATEGORIES.map((item) => {
-                const active = item === category;
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setCategory(item)}
-                    aria-pressed={active}
-                    className={`cursor-pointer rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
-                      active
-                        ? "border-rose-300 bg-rose-50 text-rose-700"
-                        : "border-stone-200 bg-white/80 text-stone-600 hover:border-rose-200 hover:text-stone-900"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
-
-              <span className="ml-auto text-[11px] text-stone-500">
-                {visible.length} of {PRODUCTS.length} pieces
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
+                <ShoppingBag className="h-3 w-3 text-rose-400" />
+                {data?.totalProducts ?? 0} products
               </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
+                <Layers className="h-3 w-3 text-rose-400" />
+                {categories.length} categories
+              </span>
+              <Link
+                href="#products"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:bg-white"
+              >
+                All product links
+                <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
-
-            {visible.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-200 bg-white/70 px-6 py-14 text-center backdrop-blur-sm sm:rounded-3xl">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500">
-                  <ShoppingBag className="h-5 w-5" />
-                </div>
-                <h2 className="mt-3 text-base font-semibold text-stone-900">
-                  Nothing matches yet
-                </h2>
-                <p className="mt-1 max-w-sm text-sm text-stone-600">
-                  Try another category, or clear the search to see everything
-                  again.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategory("All");
-                    setQuery("");
-                  }}
-                  className="mt-4 cursor-pointer rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
-                >
-                  Show all pieces
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {visible.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            )}
           </div>
         </section>
 
-        {/* Footer note - now inside PageWrapper */}
+        <SectionDivider className="mx-auto max-w-7xl px-4 py-6 sm:px-6" />
+
+        {loading ? (
+          <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">
+            <CustomLoader fullScreen={false} label="Loading the catalogue…" />
+          </div>
+        ) : error ? (
+          <div className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50/70 px-5 py-6 text-sm text-rose-700">
+              {error}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ---------------- Featured Products ---------------- */}
+            <section className="relative">
+              <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-10">
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <SectionEyebrow>Featured Products</SectionEyebrow>
+                    <h2 className="mt-1 text-lg font-semibold text-stone-900 sm:text-xl">
+                      Picked for you
+                    </h2>
+                  </div>
+                  <span className="text-[11px] text-stone-500">
+                    {featured.length} featured
+                  </span>
+                </div>
+
+                {featured.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-rose-200 bg-white/70 px-4 py-6 text-center text-xs text-stone-500">
+                    Nothing is marked as featured yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {featured.map((product) => (
+                      <CollectionCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <SectionDivider className="mx-auto max-w-7xl px-4 pb-8 sm:px-6" />
+
+            {/* ---------------- All Categories ---------------- */}
+            <section className="relative">
+              <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-10">
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <SectionEyebrow>All Categories</SectionEyebrow>
+                    <h2 className="mt-1 text-lg font-semibold text-stone-900 sm:text-xl">
+                      Browse by category
+                    </h2>
+                  </div>
+                  <span className="text-[11px] text-stone-500">
+                    {categories.length} categories
+                  </span>
+                </div>
+
+                {categories.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-rose-200 bg-white/70 px-4 py-6 text-center text-xs text-stone-500">
+                    No categories have been created yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {categories.map((category) => (
+                      <div
+                        key={category.id}
+                        className="rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl"
+                      >
+                        <Link
+                          href={category.href}
+                          className="group flex items-center justify-between gap-2"
+                        >
+                          <h3 className="text-sm font-semibold text-stone-900 group-hover:text-rose-600">
+                            {category.name}
+                          </h3>
+                          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-rose-600">
+                            {category.totalProductCount}
+                            <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                          </span>
+                        </Link>
+
+                        {category.subcategories.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {category.subcategories.map((sub) => (
+                              <Link
+                                key={sub.id}
+                                href={sub.href}
+                                className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600 transition-colors hover:border-rose-200 hover:text-rose-600"
+                              >
+                                {sub.name}
+                                <span className="ml-1 text-[10px] text-stone-400">
+                                  {sub.productCount}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-[11px] text-stone-400">
+                            No subcategories
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <SectionDivider className="mx-auto max-w-7xl px-4 pb-8 sm:px-6" />
+
+            {/* ---------------- Product links ---------------- */}
+            <section className="relative" id="products">
+              <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <SectionEyebrow>All Products</SectionEyebrow>
+                    <h2 className="mt-1 text-lg font-semibold text-stone-900 sm:text-xl">
+                      Every product link
+                    </h2>
+                  </div>
+
+                  <div className="relative w-full sm:w-72">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search products"
+                      aria-label="Search products"
+                      className={`${inputClass(false)} rounded-full py-2 pl-9 pr-8 text-xs`}
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={() => setQuery("")}
+                        aria-label="Clear search"
+                        className="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer rounded-full p-0.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {products.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-200 bg-white/70 px-6 py-12 text-center backdrop-blur-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500">
+                      <Flower2 className="h-5 w-5" />
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold text-stone-900">
+                      {query ? "No products match that search" : "No products yet"}
+                    </h3>
+                    <p className="mt-1 max-w-sm text-xs text-stone-600">
+                      {query
+                        ? "Try another name, code or category."
+                        : "Products added in the studio will appear here."}
+                    </p>
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={() => setQuery("")}
+                        className="mt-4 cursor-pointer rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+                      >
+                        Clear search
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <ul className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm sm:rounded-3xl">
+                    {products.map((product) => (
+                      <li
+                        key={product.id}
+                        className="border-b border-stone-100 last:border-b-0"
+                      >
+                        <Link
+                          href={product.href}
+                          className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-rose-50/40"
+                        >
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-stone-100 bg-rose-50">
+                            {product.imageUrl ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <Flower2 className="h-4 w-4 text-rose-300" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-stone-900 group-hover:text-rose-600">
+                              {product.name}
+                            </p>
+                            <p className="truncate text-[11px] text-stone-500">
+                              {product.category
+                                ? `${product.category.name}${
+                                    product.subcategory
+                                      ? ` · ${product.subcategory.name}`
+                                      : ""
+                                  }`
+                                : "Uncategorised"}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold tabular-nums text-stone-900">
+                              {productPriceLabel(product)}
+                            </p>
+                            {product.totalStock <= 0 && (
+                              <p className="text-[10px] font-semibold text-stone-400 uppercase">
+                                Sold out
+                              </p>
+                            )}
+                          </div>
+
+                          <ArrowRight className="h-4 w-4 shrink-0 text-stone-300 transition-colors group-hover:text-rose-500" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
         <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm sm:rounded-3xl">
             <span className="flex items-center gap-1.5">
@@ -334,87 +364,5 @@ export default function Collections() {
         </div>
       </div>
     </PageWrapper>
-  );
-}
-
-/* ================================================================== */
-/*  Product card                                                       */
-/* ================================================================== */
-
-function ProductCard({ product }: { product: SampleProduct }) {
-  const Icon = ICONS[product.icon];
-  const discount = product.compareAt
-    ? Math.round((1 - product.price / product.compareAt) * 100)
-    : null;
-
-  return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:rounded-3xl">
-      {/* placeholder artwork — no images needed for the sample */}
-      <div
-        className={`relative flex h-40 items-center justify-center bg-linear-to-br ${product.tone}`}
-      >
-        <Icon className="h-12 w-12 opacity-70 transition-transform duration-300 group-hover:scale-105" />
-
-        {product.badge && (
-          <span
-            className={`absolute top-3 left-3 rounded-full border bg-white/90 px-2 py-0.5 text-[10px] font-semibold ${
-              product.badge === "New"
-                ? "border-emerald-200 text-emerald-700"
-                : "border-rose-200 text-rose-600"
-            }`}
-          >
-            {product.badge}
-          </span>
-        )}
-
-        {discount !== null && (
-          <span className="absolute top-3 right-3 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
-            {discount}% off
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-1 flex-col p-4">
-        <p className="text-[10px] font-semibold tracking-widest text-rose-500/80 uppercase">
-          {product.category}
-        </p>
-        <h3 className="mt-1 text-sm font-semibold text-stone-900">
-          {product.name}
-        </h3>
-        <p className="mt-1 flex-1 text-[11px] leading-relaxed text-stone-500">
-          {product.blurb}
-        </p>
-
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-stone-500">
-          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-          <span className="font-medium text-stone-700">{product.rating}</span>
-          <span>· {product.reviews} reviews</span>
-        </div>
-
-        <div className="mt-3 flex items-end justify-between gap-2 border-t border-stone-100 pt-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tabular-nums text-stone-900">
-              {formatCurrency(product.price)}
-            </p>
-            {product.compareAt && (
-              <p className="text-[10px] text-stone-400 line-through tabular-nums">
-                {formatCurrency(product.compareAt)}
-              </p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              toast("Sample catalogue — ordering isn't connected yet.")
-            }
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-          >
-            View
-            <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </article>
   );
 }

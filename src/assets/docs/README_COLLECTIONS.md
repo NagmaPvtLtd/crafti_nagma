@@ -1,0 +1,278 @@
+# Storefront collections — routes, data flow and UI/UX structure
+
+This document explains how the public **collections** area works end to end: the
+four routes, the two public APIs feeding them, the components that render them,
+and the UI decisions behind each screen. It describes the code as it stands
+today; nothing here is planned work except the section marked **TODO**.
+
+Related files:
+
+| Layer | File |
+| --- | --- |
+| Landing page | `src/app/(components)/Pages/Collections.tsx` |
+| Category / subcategory page | `src/app/(components)/Pages/CollectionBrowse.tsx` |
+| Single product page | `src/app/(components)/Pages/CollectionProduct.tsx` |
+| Shared product card | `src/app/(components)/Pages/CollectionCard.tsx` |
+| Full-screen photo viewer | `src/app/(components)/utils/PhotoViewer.tsx` |
+| API — list / tree | `src/app/api/public/collections/route.ts` |
+| API — one product | `src/app/api/public/collections/product/route.ts` |
+| Shared DTOs | `src/types/Collection.types.ts` |
+
+---
+
+## 1. Routes
+
+| Route | File | Renders |
+| --- | --- | --- |
+| `/collections` | `src/app/collections/page.tsx` | `Collections` |
+| `/collections/[category]` | `src/app/collections/[category]/page.tsx` | `CollectionBrowse` |
+| `/collections/[category]/[subcategory]` | `src/app/collections/[category]/[subcategory]/page.tsx` | `CollectionBrowse` (with `subcategory`) |
+| `/collections/[category]/[subcategory]/[product]` | `src/app/collections/[category]/[subcategory]/[product]/page.tsx` | `CollectionProduct` |
+
+Route files stay thin: they `await params` (Next 16 async params), pass the
+segments through, and nothing else. All fetching, state and layout live in the
+client components.
+
+### URL conventions
+
+- Product links are always `/collections/{category}/{subcategory}/{productCode}`,
+  built **server-side** by the API (`productHref`) and shipped as `href` on each
+  product. Components never assemble these paths themselves.
+- When a product has no root category the segment is `all`; when it has no
+  subcategory the segment is `all` too. So an uncategorised product lives at
+  `/collections/all/all/{code}`.
+- `{product}` is the **product code** (`CHAR-P2600-XXXX`), not a database id,
+  URL-encoded on build and `decodeURIComponent`-ed in the page.
+- Category and subcategory pages look products up by **slug**, case-insensitively.
+- The category/subcategory segments in the product URL are decorative for the
+  lookup (`?code=` is what matters) — they exist so the breadcrumb matches the
+  path a shopper sees.
+
+---
+
+## 2. Data flow
+
+```
+                    ┌───────────────────────────────────────┐
+/collections ───────► GET /api/public/collections              │
+                    │  featured + category tree + products  │
+/collections/A ─────► GET /api/public/collections?category=A   │
+                    │  products scoped to A (subcats incl.) │
+/collections/A/B ───► GET /api/public/collections              │
+                    │  ?category=A&subcategory=B            │
+                    └───────────────────────────────────────┘
+                                  │  (axios, no auth)
+product page ───────► GET /api/public/collections/product?code=CHAR-P2600-XXXX
+```
+
+Both endpoints are **public and unauthenticated** — they sit under
+`/api/public/...`, so `src/proxy.ts` does not gate them. Only `products.status =
+'active'` rows are ever returned, and only `status = 'active'` variants are
+counted in prices and stock.
+
+### `GET /api/public/collections`
+
+Query params (all optional):
+
+| Param | Meaning |
+| --- | --- |
+| `category` | root category **slug**; `all` or empty means "everything" |
+| `subcategory` | subcategory **slug**; if present it wins over `category` |
+
+Response (`CollectionsResponse`):
+
+- `featured` — up to 8 featured products. **Empty when a scope is applied**, so
+  the browse pages don't repeat the landing page's featured strip.
+- `categories` — the root category tree. Each root carries `productCount`
+  (products filed directly on it), `totalProductCount` (itself + every
+  subcategory) and a `subcategories[]` array where each entry has its own
+  `productCount` and `href`.
+- `products` — the scoped (or full) product list, newest/most ordered first.
+- `totalProducts` — size of the **whole** catalogue, not the current scope.
+- `scope` — `null` for the unscoped call; otherwise `{ type, name, slug, found }`.
+  `found: false` is how the browse page knows to show "Category not found".
+
+Each `CollectionProduct` carries `priceFrom` / `priceTo` (min/max across active
+variants), the lowest `compareAtPrice`, summed `totalStock`, one thumbnail, its
+`category` / `subcategory` refs and the ready-made `href`.
+
+Thumbnail preference: product-level image first, otherwise the first variant
+photo with an active variant preferred.
+
+### `GET /api/public/collections/product?code=…`
+
+`code` accepts the product code, the slug, or the raw id (first match wins).
+Missing/over-long code → `400`, unknown product → `404`. Both are surfaced by
+the page as a friendly unavailable state.
+
+The payload (`CollectionProductDetail`) deliberately ships **everything the
+page can ever need in one response**:
+
+- all `options` with their values,
+- every `variant`, each with its own `optionValueIds`, price, compare-at, stock,
+  weight, status, copy and **its own images**,
+- `defaultVariantId`,
+- `features`, `careInstructions`, `giftIncluded` (sorted by `sort_order`),
+- `reviews { average, count }` from approved reviews only,
+- category refs, `processingTime`, `deliveryCharges`, `priceFrom`/`priceTo`.
+
+Because of that, switching option values is instant and local — no round trip,
+no partial page states while a variant loads.
+
+Variant photo fallback is resolved **server-side**: a variant with no photos of
+its own receives the product-level gallery, and the same fallback exists again
+on the client as a safety net.
+
+`defaultVariantId` = the first active variant with `stock > 0`, else the first
+active variant, else the first variant of any status.
+
+### Tables touched
+
+`products`, `product_variants`, `product_options`, `product_option_values`,
+`variant_option_values`, `product_categories`, `categories` (self-joined for the
+parent name/slug), `product_features`, `product_care_instructions`,
+`product_gift_included`, `product_reviews`, `imagekit_files`.
+
+Images always come from `imagekit_files` with `entity_type = 'product'` (product
+fallback gallery) or `entity_type = 'product_variant'` +
+`file_purpose = 'product_variant_image'`, ordered by `sort_order`.
+
+---
+
+## 3. UI/UX structure
+
+### 3.1 `/collections` — the landing page
+
+Reading order is deliberate: **Featured Products → All Categories → All Products
+links**.
+
+1. **Header** — eyebrow "Collections · live catalogue", title "Everything on the
+   shelf.", one line of orientation, then three small pills: product count,
+   category count, and a jump link to `#products`.
+2. **Featured Products** — "Picked for you" + count, responsive card grid
+   (1 / 2 / 3 / 4 columns). Empty state is a dashed note, never an empty gap.
+3. **All Categories** — one card per root category: name + total product count
+   with an arrow, then the subcategories as small count-bearing chips. A root
+   with no children says "No subcategories" instead of rendering nothing.
+4. **All Products** — a search field (filters by name, product code, category or
+   subcategory — case-insensitive, client-side, clear button) and a compact
+   link list: thumbnail, name, "Category · Subcategory", price (or range) and a
+   "Sold out" flag. Search empty state explains what it searched and offers
+   "Clear search".
+
+The whole page is inside `PageWrapper variant="hero"` with two soft rose blobs,
+per the shared UI/UX doc.
+
+### 3.2 `/collections/[category]` and `/[subcategory]` — browse
+
+1. **Breadcrumb** — Home › Collections › (root category when a subcategory is
+   open) › current scope.
+2. **Header** — eyebrow "Category" or "Subcategory", the scope name as the
+   `h1`, one orienting line. If the slug doesn't exist (`scope.found === false`)
+   the title becomes "Category not found" and the copy says so.
+3. **Scope chips** — "All {Category}" plus every subcategory of the root,
+   each with its product count. The active chip is rose-tinted; clicking moves
+   between the category page and its subcategory pages without a detour.
+4. **Product grid** — same `CollectionCard` as the landing page, with a
+   "N products" line and a link back to all collections. Empty, error and
+   loading states are explicit (`CustomLoader`, inline error banner, dashed
+   empty card with a CTA).
+
+A category page shows everything in that category **including** its
+subcategories' products; a subcategory page shows only its own.
+
+### 3.3 `/collections/{category}/{subcategory}/{code}` — single product
+
+Amazon-style reading order, all of it top-to-bottom in one column:
+
+1. **Breadcrumb** — Home › Collections › Category › Subcategory › product name.
+2. **Two-column block** (stacks on mobile):
+   - **Gallery** — 4:3 panel on a rose/amber gradient, the selected variant's
+     photos, a discount badge top-left when `compareAtPrice > price`, previous /
+     next arrows and a `current / total` counter when there is more than one
+     photo, and a thumbnail strip underneath. Clicking the photo or the `⤢`
+     button opens the **full-screen `PhotoViewer`** (white canvas, arrows, swipe,
+     arrow keys, Esc, thumbnails); it shares the same index, so closing returns
+     you to the photo you were on.
+   - **Details** — category · subcategory eyebrow, product name, **star row
+     directly under the title** (average + review count, or "No reviews yet",
+     vertically centred with the stars), featured pill, short description,
+     price with strikethrough compare-at and "Save X%", then the availability
+     badge.
+3. **Availability wording** (only stock counts are public):
+
+   | Stock | Badge |
+   | --- | --- |
+   | ≥ 15 | `Only 20 left in stock!` |
+   | 5 – 14 | `Only a few left in stock!` |
+   | 1 – 4 | `Low stock! Hurry up!` |
+   | 0 | `Out of stock` |
+   | inactive variant | `Currently unavailable` |
+
+4. **Options** — one row per `product_option`, chips per value, the selected one
+   rose-tinted with a ring. Values that would leave **no active variant** behind
+   are disabled and struck through, so an impossible combination can't be picked.
+   Picking a value re-resolves the variant and swaps image, price, stock,
+   description and availability in place.
+5. **Two small info pills** — processing time and the variant name, when present.
+6. **Product Description** — fixed heading (no variant name in it); the selected
+   variant's values sit as a small muted label on the right. The variant's own
+   description wins over the product's, `whitespace-pre-line` keeps the author's
+   line breaks, and the variant SKU appears as a quiet `Product ID: …` line after
+   the text (no code/SKU anywhere else on the page).
+7. **Product Features → Product Care Instructions → Gift Includes** — stacked
+   full-width cards, each a checked list, each omitted entirely when empty.
+8. **Specifications** — two-column `<dl>`: option name(s) + selected values,
+   Category, Subcategory (separate rows), Weight in grams, Processing time.
+   Every missing value renders an em dash (`—`), never a blank.
+9. **Reviews** — a dashed "Under construction" panel that still shows the live
+   average/count. **TODO(reviews):** replace it with paginated approved reviews
+   from `product_reviews`, a rating breakdown, helpful votes and a submit form.
+10. **Footer strip** — "Back to {category}" and "All collections".
+
+Loading uses `CustomLoader fullScreen={false}`; a 404 shows "This product does
+not exist or is no longer available." with a way back; any other failure shows a
+retry-free friendly message and the same escape link.
+
+### 3.4 `CollectionCard`
+
+One card, reused by the landing page, category and subcategory grids: gradient
+image area (or flower placeholder), "Featured" pill, "Sold out" pill, category ·
+subcategory eyebrow, name, two-line truncated blurb, price (single or range via
+`productPriceLabel`) and a "View" pill. The code/SKU is never shown here.
+
+### 3.5 `PhotoViewer`
+
+Shared full-screen viewer used by the storefront gallery and the manager's
+`MediaGallery`. Props: `open`, `onClose`, `images`, `index`, `onIndexChange`,
+`title`. It portals to `document.body` (so sticky page chrome such as the z-40
+navbar can't cover it), locks body scroll, wires ArrowLeft/ArrowRight/Escape,
+handles horizontal swipe for touch, and keeps a thumbnail strip at the bottom.
+
+---
+
+## 4. Conventions this area follows
+
+- `PageWrapper` is the outermost wrapper of every page here (`variant="hero"`,
+  `position="fixed"`), plus `SectionDivider` / `SectionEyebrow` and the
+  `mx-auto max-w-7xl px-4 sm:px-6` rhythm from the landing page.
+- `CustomLoader` only — no bespoke spinners or skeletons.
+- Cards/panels: `rounded-2xl sm:rounded-3xl`, `border-white/60 bg-white/85
+  backdrop-blur-sm`, rose accents (`rose-500/600`, `rose-50`), stone text.
+- Prices always go through `formatCurrency()`.
+- Images are plain `<img>` with the `@next/next/no-img-element` disable — ImageKit
+  hosts vary, and `next/image` only whitelists `ik.imagekit.io/nagmapvtltd/**`.
+- Errors are human sentences rendered as-is; the API never leaks SQL or stack
+  details to the storefront.
+
+---
+
+## 5. Known gaps
+
+- **Old product codes are not backfilled.** Products created before the
+  `CHAR-P2600-{last4}` scheme still carry their original code (e.g. `TEST-01M7`),
+  and their URLs use it. New products and new variant SKUs are generated by
+  `src/utils/Formator/productIdentity.util.ts`.
+- **Delivery charges are intentionally not shown** on the storefront product page
+  even though the API returns them.
+- **Reviews module** is a placeholder (see the TODO in `CollectionProduct.tsx`).

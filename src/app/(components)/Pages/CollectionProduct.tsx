@@ -1,0 +1,777 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import axios from "axios";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Flower2,
+  Package,
+  Sparkles,
+  Star,
+} from "lucide-react";
+
+import CustomLoader from "../CustomLoader";
+import PhotoViewer from "../utils/PhotoViewer";
+import PageWrapper from "../utils/PageWrapper";
+import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
+import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
+import type {
+  CollectionOption,
+  CollectionProductDetail,
+  CollectionProductResponse,
+  CollectionVariant,
+} from "../../../types/Collection.types";
+
+/* -------------------------------------------------------------------------- */
+/*  Star row — Amazon-style rating under the title                            */
+/* -------------------------------------------------------------------------- */
+
+function ReviewStars({
+  average,
+  count,
+}: {
+  average: number;
+  count: number;
+}) {
+  const rounded = Math.round(average);
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center justify-start gap-1.5">
+      <div className="flex items-center gap-0.5 self-center" aria-hidden>
+        {[1, 2, 3, 4, 5].map((step) => (
+          <Star
+            key={step}
+            className={`h-3.5 w-3.5 ${
+              count > 0 && step <= rounded
+                ? "fill-amber-400 text-amber-400"
+                : "text-stone-300"
+            }`}
+          />
+        ))}
+      </div>
+      {count > 0 ? (
+        <>
+          <span className="text-xs font-semibold text-stone-700">
+            {average.toFixed(1)}
+          </span>
+          <span className="text-[11px] text-stone-500">
+            · {count} review{count === 1 ? "" : "s"}
+          </span>
+        </>
+      ) : (
+        <span className="flex items-center self-center text-[11px] leading-none text-stone-500">
+          No reviews yet
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Small detail card used for features, care and gift contents               */
+/* -------------------------------------------------------------------------- */
+
+function SpecRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-stone-100 py-1.5">
+      <dt className="text-stone-500">{label}</dt>
+      <dd className="text-right font-semibold text-stone-800">{value}</dd>
+    </div>
+  );
+}
+
+function DetailList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+      <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+        {title}
+      </h2>
+      <ul className="mt-2.5 space-y-2">
+        {items.map((item, index) => (
+          <li
+            key={`${title}-${index}`}
+            className="flex items-center gap-2 text-sm leading-snug text-stone-600"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Stock wording — urgency rises as the count drops                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 15 or more  → "Only 20 left in stock!"
+ * 5 – 14      → "Only a few left in stock!"
+ * under 5     → "Low stock! Hurry up!"
+ */
+function stockLabel(stock: number | null): string {
+  if (stock === null) return "In stock";
+  if (stock < 5) return "Low stock! Hurry up!";
+  if (stock < 10) return "Only a few left in stock!";
+  return `Only ${stock} left in stock!`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Variant matching                                                          */
+/* -------------------------------------------------------------------------- */
+
+/** A variant fits a selection when it carries every value currently picked. */
+function matchesSelection(
+  variant: CollectionVariant,
+  selection: Record<string, string>,
+): boolean {
+  return Object.values(selection).every((valueId) =>
+    variant.optionValueIds.includes(valueId),
+  );
+}
+
+function selectionForVariant(
+  options: CollectionOption[],
+  variant: CollectionVariant | null,
+): Record<string, string> {
+  if (!variant) return {};
+
+  const next: Record<string, string> = {};
+  for (const option of options) {
+    const value = option.values.find((item) =>
+      variant.optionValueIds.includes(item.id),
+    );
+    if (value) next[option.id] = value.id;
+  }
+  return next;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  /collections/[category]/[subcategory]/[product code]                      */
+/* -------------------------------------------------------------------------- */
+
+export default function CollectionProduct({ code }: { code: string }) {
+  const [product, setProduct] = useState<CollectionProductDetail | null>(null);
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Record<string, string>>({});
+  const [imageIndex, setImageIndex] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await axios.get<CollectionProductResponse>(
+          "/api/public/collections/product",
+          { params: { code } },
+        );
+        if (cancelled) return;
+
+        const loaded = res.data.product;
+        const initial =
+          loaded.variants.find(
+            (variant) => variant.id === loaded.defaultVariantId,
+          ) ??
+          loaded.variants[0] ??
+          null;
+
+        setProduct(loaded);
+        setActiveVariantId(initial?.id ?? null);
+        setSelection(selectionForVariant(loaded.options, initial));
+        setImageIndex(0);
+      } catch (err) {
+        if (cancelled) return;
+        const status = axios.isAxiosError(err) ? err.response?.status : null;
+        setError(
+          status === 404
+            ? "This product does not exist or is no longer available."
+            : "Could not load this product right now.",
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  const options = product?.options ?? [];
+
+  const selectedValueLabels = options
+    .map(
+      (option) =>
+        option.values.find((value) => value.id === selection[option.id])
+          ?.value,
+    )
+    .filter((value): value is string => Boolean(value));
+
+  const activeVariant = useMemo(
+    () =>
+      product?.variants.find((variant) => variant.id === activeVariantId) ??
+      null,
+    [product, activeVariantId],
+  );
+
+  const gallery = useMemo(() => {
+    if (!product) return [];
+    if (activeVariant && activeVariant.images.length > 0) {
+      return activeVariant.images;
+    }
+    return product.images;
+  }, [product, activeVariant]);
+
+  const activeImage = gallery[imageIndex] ?? gallery[0] ?? null;
+
+  const price = activeVariant?.price ?? product?.priceFrom ?? null;
+  const compareAt = activeVariant?.compareAtPrice ?? null;
+  const stock = activeVariant?.stock ?? null;
+  const soldOut = stock !== null && stock <= 0;
+
+  const description =
+    activeVariant?.description?.trim() ||
+    product?.description ||
+    null;
+  const brief =
+    activeVariant?.briefDescription?.trim() ||
+    product?.briefDescription ||
+    null;
+
+  /** Values that would leave no active variant behind are greyed out. */
+  function isValueAvailable(optionId: string, valueId: string): boolean {
+    if (!product) return false;
+    if (selection[optionId] === valueId) return true;
+
+    const next = { ...selection, [optionId]: valueId };
+    return product.variants.some(
+      (variant) =>
+        variant.status === "active" && matchesSelection(variant, next),
+    );
+  }
+
+  function chooseValue(optionId: string, valueId: string) {
+    if (!product) return;
+
+    const next = { ...selection, [optionId]: valueId };
+    const candidates = product.variants.filter(
+      (variant) =>
+        variant.status === "active" && matchesSelection(variant, next),
+    );
+    if (candidates.length === 0) return;
+
+    /* Prefer the variant that fills every option, then the first match. */
+    const exact = candidates.find((variant) =>
+      product.options.every(
+        (option) => !next[option.id] || variant.optionValueIds.includes(next[option.id]),
+      ),
+    );
+    const chosen = exact ?? candidates[0];
+
+    setSelection(next);
+    setActiveVariantId(chosen.id);
+    setImageIndex(0);
+  }
+
+  const discount =
+    compareAt !== null && price !== null && compareAt > price
+      ? Math.round((1 - price / compareAt) * 100)
+      : null;
+
+  return (
+    <PageWrapper variant="hero" position="fixed">
+      <div className="relative flex flex-col overflow-hidden text-stone-800">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
+        />
+
+        <section className="relative">
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+            <nav className="flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
+              <Link href="/" className="hover:text-rose-600">
+                Home
+              </Link>
+              <ChevronRight className="h-3 w-3 text-stone-300" />
+              <Link href="/collections" className="hover:text-rose-600">
+                Collections
+              </Link>
+              {product?.category && (
+                <>
+                  <ChevronRight className="h-3 w-3 text-stone-300" />
+                  <Link
+                    href={`/collections/${product.category.slug}`}
+                    className="hover:text-rose-600"
+                  >
+                    {product.category.name}
+                  </Link>
+                </>
+              )}
+              {product?.subcategory && (
+                <>
+                  <ChevronRight className="h-3 w-3 text-stone-300" />
+                  <Link
+                    href={`/collections/${product.category?.slug ?? "all"}/${product.subcategory.slug}`}
+                    className="hover:text-rose-600"
+                  >
+                    {product.subcategory.name}
+                  </Link>
+                </>
+              )}
+              <ChevronRight className="h-3 w-3 text-stone-300" />
+              <span className="font-semibold text-stone-700">
+                {product?.name ?? code}
+              </span>
+            </nav>
+          </div>
+        </section>
+
+        <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 sm:pb-16">
+          {loading ? (
+            <CustomLoader fullScreen={false} label="Loading the product…" />
+          ) : error || !product ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-200 bg-white/70 px-6 py-14 text-center backdrop-blur-sm sm:rounded-3xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <h1 className="mt-3 text-base font-semibold text-stone-900">
+                Product unavailable
+              </h1>
+              <p className="mt-1 max-w-sm text-sm text-stone-600">{error}</p>
+              <Link
+                href="/collections"
+                className="mt-4 inline-flex items-center gap-1 rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Back to collections
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* ---------------- Gallery — selected variant's photos ---------------- */}
+                <div>
+                  <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-linear-to-br from-rose-100 via-rose-50 to-amber-50 sm:rounded-3xl">
+                    {activeImage ? (
+                      <button
+                        type="button"
+                        onClick={() => setViewerOpen(true)}
+                        aria-label="View photo full screen"
+                        className="h-full w-full cursor-zoom-in"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={activeImage.url}
+                          alt={activeImage.altText ?? product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <Flower2 className="h-14 w-14 text-rose-300" />
+                    )}
+
+                    {discount !== null && (
+                      <span className="absolute top-3 left-3 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {discount}% off
+                      </span>
+                    )}
+
+                    {activeImage && (
+                      <button
+                        type="button"
+                        onClick={() => setViewerOpen(true)}
+                        aria-label="View photo full screen"
+                        className="absolute top-3 right-3 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
+                    {gallery.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Previous image"
+                          onClick={() =>
+                            setImageIndex(
+                              (index) =>
+                                (index - 1 + gallery.length) % gallery.length,
+                            )
+                          }
+                          className="absolute top-1/2 left-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Next image"
+                          onClick={() =>
+                            setImageIndex((index) => (index + 1) % gallery.length)
+                          }
+                          className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                        <span className="absolute right-2 bottom-2 rounded-full bg-stone-900/70 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {imageIndex + 1} / {gallery.length}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {gallery.length > 1 && (
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                      {gallery.map((image, index) => (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => setImageIndex(index)}
+                          aria-label={`Show photo ${index + 1}`}
+                          className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
+                            index === imageIndex
+                              ? "border-rose-400"
+                              : "border-transparent hover:border-rose-200"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={image.url}
+                            alt={image.altText ?? product.name}
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ---------------- Details ---------------- */}
+                <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                  <SectionEyebrow>
+                    {product.subcategory
+                      ? `${product.category?.name ?? ""} · ${product.subcategory.name}`
+                      : (product.category?.name ?? "Uncategorised")}
+                  </SectionEyebrow>
+
+                  <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                    {product.name}
+                  </h1>
+
+                  <ReviewStars
+                    average={product.reviews.average}
+                    count={product.reviews.count}
+                  />
+
+                  {product.isFeatured && (
+                    <span className="mt-2 inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                      Featured
+                    </span>
+                  )}
+
+                  {brief && (
+                    <p className="mt-3 text-sm leading-relaxed text-stone-600">
+                      {brief}
+                    </p>
+                  )}
+
+                  {/* Price */}
+                  <div className="mt-4 flex flex-wrap items-end gap-2">
+                    <p className="text-2xl font-semibold tabular-nums text-stone-900">
+                      {price === null ? "Price on request" : formatCurrency(price)}
+                    </p>
+                    {compareAt !== null && compareAt > (price ?? 0) && (
+                      <p className="text-xs text-stone-400 line-through tabular-nums">
+                        {formatCurrency(compareAt)}
+                      </p>
+                    )}
+                    {discount !== null && (
+                      <span className="text-[11px] font-semibold text-emerald-600">
+                        Save {discount}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Availability */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-semibold ${
+                        !soldOut && activeVariant?.status === "active"
+                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border border-stone-200 bg-stone-100 text-stone-500"
+                      }`}
+                    >
+                      {activeVariant?.status === "inactive"
+                        ? "Currently unavailable"
+                        : soldOut
+                          ? "Out of stock"
+                          : stockLabel(stock)}
+                    </span>
+                    {activeVariant?.isFeatured && (
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
+                        Bestseller
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Options — pick values, variant swaps in place */}
+                  {options.length > 0 && (
+                    <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                      {options.map((option) => {
+                        const selectedValueId = selection[option.id];
+                        const selectedValue = option.values.find(
+                          (value) => value.id === selectedValueId,
+                        );
+
+                        return (
+                          <div key={option.id}>
+                            <p className="text-[11px] text-stone-500">
+                              <span className="font-semibold tracking-wide text-stone-700 uppercase">
+                                {option.name}
+                              </span>
+                              {selectedValue && (
+                                <span className="ml-2 font-semibold text-stone-900">
+                                  {selectedValue.value}
+                                </span>
+                              )}
+                            </p>
+
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {option.values.map((value) => {
+                                const active = value.id === selectedValueId;
+                                const available = isValueAvailable(
+                                  option.id,
+                                  value.id,
+                                );
+
+                                return (
+                                  <button
+                                    key={value.id}
+                                    type="button"
+                                    onClick={() =>
+                                      chooseValue(option.id, value.id)
+                                    }
+                                    disabled={!available}
+                                    aria-pressed={active}
+                                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                      active
+                                        ? "border-rose-400 bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+                                        : available
+                                          ? "cursor-pointer border-stone-200 bg-white text-stone-600 hover:border-rose-300 hover:text-stone-900"
+                                          : "cursor-not-allowed border-stone-100 bg-stone-50 text-stone-300 line-through"
+                                    }`}
+                                  >
+                                    {value.value}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-4 grid grid-cols-1 gap-2 text-[11px] text-stone-600 sm:grid-cols-2">
+                    {product.processingTime && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2">
+                        <Sparkles className="h-3.5 w-3.5 text-rose-400" />
+                        {product.processingTime}
+                      </span>
+                    )}
+                    {activeVariant?.name && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2">
+                        <Package className="h-3.5 w-3.5 text-rose-400" />
+                        {activeVariant.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {(description || activeVariant) && (
+                <>
+                  <SectionDivider className="mx-auto max-w-7xl py-8" />
+                  <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                        Product Description
+                      </h2>
+                      {activeVariant?.description?.trim() &&
+                        selectedValueLabels.length > 0 && (
+                          <span className="text-[11px] font-medium text-stone-500">
+                            {selectedValueLabels.join(" / ")}
+                          </span>
+                        )}
+                    </div>
+                    {description && (
+                      <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-stone-600">
+                        {description}
+                      </p>
+                    )}
+
+                    {/* Quiet identifier for people who come looking for it. */}
+                    {activeVariant && (
+                      <p className="mt-4 border-t border-stone-100 pt-3 text-[10px] text-stone-400">
+                        Product ID:{" "}
+                        <span className="font-medium text-stone-500">
+                          {activeVariant.sku}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* ---------------- Features / care / gift / specs ---------------- */}
+              {(product.features.length > 0 ||
+                product.careInstructions.length > 0 ||
+                product.giftIncluded.length > 0) && (
+                <>
+                  <SectionDivider className="mx-auto max-w-7xl py-8" />
+                  <div className="space-y-3">
+                    <DetailList
+                      title="Product Features"
+                      items={product.features.map((feature) => feature.text)}
+                    />
+                    <DetailList
+                      title="Product Care Instructions"
+                      items={product.careInstructions.map((care) => care.text)}
+                    />
+                    <DetailList
+                      title="Gift Includes"
+                      items={product.giftIncluded.map((gift) => gift.text)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* ---------------- Specifications ---------------- */}
+              <div className="mt-3 rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                <h2 className="text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
+                  Specifications
+                </h2>
+
+                <dl className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-2">
+                  {options.length > 0 && (
+                    <SpecRow
+                      label={options.map((option) => option.name).join(" / ")}
+                      value={selectedValueLabels.join(" / ") || "—"}
+                    />
+                  )}
+                  <SpecRow label="Category" value={product.category?.name ?? "—"} />
+                  <SpecRow
+                    label="Subcategory"
+                    value={product.subcategory?.name ?? "—"}
+                  />
+                  <SpecRow
+                    label="Weight"
+                    value={
+                      activeVariant?.weight !== null &&
+                      activeVariant?.weight !== undefined
+                        ? `${activeVariant.weight} g`
+                        : "—"
+                    }
+                  />
+                  <SpecRow
+                    label="Processing time"
+                    value={product.processingTime ?? "—"}
+                  />
+                </dl>
+              </div>
+
+              {/* ---------------------------------------------------------------- */}
+              {/* TODO(reviews): replace this placeholder with the real reviews      */}
+              {/* module — paginated approved reviews from `product_reviews`, a      */}
+              {/* rating breakdown, helpful votes and a submit form. The summary     */}
+              {/* above already comes from the live review average.                  */}
+              {/* ---------------------------------------------------------------- */}
+              <SectionDivider className="mx-auto max-w-7xl py-8" />
+
+              <section
+                id="reviews"
+                className="rounded-2xl border border-dashed border-rose-200 bg-white/70 p-5 backdrop-blur-sm sm:rounded-3xl"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-widest text-rose-500/80 uppercase">
+                      Product Reviews
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold text-stone-900">
+                      What people are saying
+                    </h2>
+                  </div>
+
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 uppercase">
+                    Under construction
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <ReviewStars
+                    average={product.reviews.average}
+                    count={product.reviews.count}
+                  />
+                  <p className="text-[11px] text-stone-500">
+                    The review list, rating breakdown and review form will land
+                    here.
+                  </p>
+                </div>
+              </section>
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm">
+                <Link
+                  href={
+                    product.category
+                      ? `/collections/${product.category.slug}`
+                      : "/collections"
+                  }
+                  className="inline-flex items-center gap-1 font-semibold text-rose-600 hover:text-rose-700"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Back to {product.category?.name ?? "collections"}
+                </Link>
+                <Link
+                  href="/collections"
+                  className="font-semibold text-stone-600 hover:text-stone-900"
+                >
+                  All collections
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+
+        <PhotoViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          images={gallery}
+          index={imageIndex}
+          onIndexChange={setImageIndex}
+          title={product?.name}
+        />
+      </div>
+    </PageWrapper>
+  );
+}

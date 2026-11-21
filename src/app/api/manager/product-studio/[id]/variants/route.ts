@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
-import { slugify } from "../../../../../../utils/Slug/slug.util";
+import { buildVariantSku } from "../../../../../../utils/Formator/productIdentity.util";
 import { requireManager } from "../../../../../../utils/Auth/Auth.requireRole.util";
 import { generateVariantsSchema } from "../../../../../../utils/zod/product/manager.productDetail.zod";
 import { getPool } from "../../../../../../lib/Database/main.db";
@@ -37,6 +37,10 @@ interface IdRow extends RowDataPacket {
   id: string;
 }
 
+interface CountRow extends RowDataPacket {
+  total: number | string;
+}
+
 interface ExistingValueRow extends RowDataPacket {
   variant_id: string;
   option_value_id: string;
@@ -65,14 +69,6 @@ interface ExistingValueRow extends RowDataPacket {
  *  3. Pricing defaults to `suggestPrice()`, which is still the flat ₹100
  *     placeholder — see src/utils/Pricing/pricing.util.ts.
  * -------------------------------------------------------------------------- */
-
-/** SKU-safe token for one option value: "Rose Pink" → "ROSEPINK". */
-function skuToken(value: string): string {
-  const token = slugify(value, { maxLength: 16, fallback: "v" })
-    .replace(/-/g, "")
-    .toUpperCase();
-  return token || "V";
-}
 
 /* -------------------------------------------------------------------------- */
 /*  POST /api/manager/product-studio/[id]/variants                            */
@@ -321,6 +317,12 @@ export async function POST(
       });
     }
 
+    const [existingCountRows] = await conn.query<CountRow[]>(
+      `SELECT COUNT(*) AS total FROM product_variants WHERE product_id = ?`,
+      [id],
+    );
+    let variantSequence = Number(existingCountRows[0]?.total ?? 0);
+
     const price = data.startingPrice || suggestPrice();
     const now = getCurrentDateTime();
 
@@ -329,8 +331,19 @@ export async function POST(
     const created: { id: string; name: string; sku: string }[] = [];
 
     for (const combo of pending) {
-      const suffix = combo.map((part) => skuToken(part.value)).join("-");
-      const skuBase = `${product.code}-${suffix}`.slice(0, 84);
+      variantSequence += 1;
+
+      const variantId = generateULID("var");
+      const label = combo.map((part) => part.value).join(" / ");
+      const name = `${product.name} — ${label}`.slice(0, 150);
+
+      /* PREFIX-P{YY}{NN}-{last 4 of variant id}-{VALUES} */
+      const skuBase = buildVariantSku({
+        productName: product.name,
+        variantId,
+        sequence: variantSequence,
+        values: combo.map((part) => part.value),
+      }).slice(0, 84);
 
       let sku = skuBase;
       let attempt = 2;
@@ -347,10 +360,6 @@ export async function POST(
           throw new Error(`Could not build a unique SKU from ${skuBase}`);
         }
       }
-
-      const label = combo.map((part) => part.value).join(" / ");
-      const name = `${product.name} — ${label}`.slice(0, 150);
-      const variantId = generateULID("var");
 
       await conn.query(
         `INSERT INTO product_variants

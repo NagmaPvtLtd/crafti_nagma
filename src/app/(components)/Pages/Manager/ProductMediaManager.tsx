@@ -3,9 +3,17 @@
 
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ImagePlus,
+  Loader2,
+  Maximize2,
+  Trash2,
+} from "lucide-react";
 
 import StudioModal from "./StudioModal";
+import PhotoViewer from "../../utils/PhotoViewer";
 import ConfirmDialog from "../../utils/ConfirmDialog";
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import type { ProductMediaItem } from "../../../../utils/zod/product/manager.productDetail.zod";
@@ -32,6 +40,8 @@ export function MediaGallery({
   const safeIndex = Math.min(index, Math.max(images.length - 1, 0));
   const active = images[safeIndex];
 
+  /* ---- Full-screen viewer ---------------------------------------- */
+  const [viewerOpen, setViewerOpen] = useState(false);
   if (images.length === 0) {
     return (
       <div
@@ -46,11 +56,27 @@ export function MediaGallery({
   return (
     <div className={className}>
       <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-stone-50">
-        <img
-          src={active.url}
-          alt={active.altText || alt}
-          className="aspect-4/3 w-full object-cover"
-        />
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          aria-label="View photo full screen"
+          className="block w-full cursor-zoom-in"
+        >
+          <img
+            src={active.url}
+            alt={active.altText || alt}
+            className="aspect-4/3 w-full object-cover"
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          aria-label="View photo full screen"
+          className="absolute top-2 right-2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
 
         {images.length > 1 && (
           <>
@@ -100,6 +126,15 @@ export function MediaGallery({
           ))}
         </div>
       )}
+
+      <PhotoViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        images={images}
+        index={safeIndex}
+        onIndexChange={setIndex}
+        title={alt}
+      />
     </div>
   );
 }
@@ -128,6 +163,7 @@ export default function ProductMediaManager({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<ProductMediaItem | null>(
     null,
   );
@@ -190,6 +226,34 @@ export default function ProductMediaManager({
     }
   }
 
+  /** Swap this photo with its neighbour and persist the whole order. */
+  async function move(media: ProductMediaItem, direction: -1 | 1) {
+    if (!variantId || movingId) return;
+
+    const index = images.findIndex((image) => image.id === media.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= images.length) return;
+
+    setMovingId(media.id);
+    try {
+      await axios.put(
+        MEDIA_URL,
+        {
+          productId,
+          variantId,
+          imageId: media.id,
+          direction: direction === -1 ? "earlier" : "later",
+        },
+        { withCredentials: true },
+      );
+      onChange();
+    } catch (err) {
+      toast.error(getAxiosErrorMessage(err, "Could not update the photo order"));
+    } finally {
+      setMovingId(null);
+    }
+  }
+
   return (
     <>
       <StudioModal
@@ -213,8 +277,8 @@ export default function ProductMediaManager({
           {images.length} image{images.length === 1 ? "" : "s"}
           {images.some((image) => image.isLinked)
             ? ` · ${images.filter((image) => image.isLinked).length} linked`
-            : ""}{" "}
-          · first image is the cover
+            : ""}
+          {" · "}First photo is the cover — use ← → to reorder
         </p>
         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600">
           {uploading ? (
@@ -245,10 +309,12 @@ export default function ProductMediaManager({
         </div>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {images.map((image) => (
+          {images.map((image, index) => (
             <li
               key={image.id}
-              className="group relative overflow-hidden rounded-2xl border border-stone-200 bg-stone-50"
+              className={`group relative overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 transition-opacity ${
+                movingId === image.id ? "opacity-60" : ""
+              }`}
             >
               <img
                 src={image.url}
@@ -278,6 +344,35 @@ export default function ProductMediaManager({
                   <Trash2 className="h-3.5 w-3.5" />
                 )}
               </button>
+
+              {images.length > 1 && (
+                <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void move(image, -1)}
+                    disabled={index === 0 || movingId !== null}
+                    aria-label="Move photo earlier"
+                    title="Move earlier"
+                    className="cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-600 shadow-md transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {movingId === image.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void move(image, 1)}
+                    disabled={index === images.length - 1 || movingId !== null}
+                    aria-label="Move photo later"
+                    title="Move later"
+                    className="cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-600 shadow-md transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>

@@ -226,6 +226,12 @@ const authOptions: NextAuthOptions = {
 
       /* 2. Global lock */
       const globalLock = await setting.isActive(pool, TOGGLE_NOBODY_CAN_LOGIN);
+      if (globalLock === null) {
+        console.warn(
+          `[AUTH - SIGNIN] ✕ project configuration not set | ${TOGGLE_NOBODY_CAN_LOGIN}`,
+        );
+        return loginRedirect("project_configuration_not_set");
+      }
       console.log(
         `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NOBODY_CAN_LOGIN}" = ${globalLock}`,
       );
@@ -273,6 +279,12 @@ const authOptions: NextAuthOptions = {
             pool,
             TOGGLE_NEW_USER_BLOCKED,
           );
+          if (newUserBlocked === null) {
+            console.warn(
+              `[AUTH - SIGNIN] ✕ project configuration not set | ${TOGGLE_NEW_USER_BLOCKED}`,
+            );
+            return loginRedirect("project_configuration_not_set");
+          }
           console.log(
             `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NEW_USER_BLOCKED}" = ${newUserBlocked} | new user: ${email}`,
           );

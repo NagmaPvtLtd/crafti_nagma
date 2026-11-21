@@ -61,6 +61,8 @@ import { RedisKeyService } from "./RedisKey.service";
 
 type SettingMap = Record<string, SettingResult>;
 
+export type SettingActiveResult = boolean | null;
+
 export class SettingService {
   /* ------------------------------------------------------------------ */
   /*  Read                                                              */
@@ -76,10 +78,15 @@ export class SettingService {
    *
    * @param db          A query executor (pool or connection).
    * @param field_name  The toggle name, e.g. `backend:nobody_can_login`.
-   * @returns           `true` if the toggle exists and is active.
+   * @returns           `true` if the toggle exists and is active, `false` if
+   *                    it exists and is inactive, `null` if the toggle row is
+   *                    not present anywhere.
    */
-  async isActive(db: DbExecutor, field_name: string): Promise<boolean> {
-    if (!field_name) return false;
+  async isActive(
+    db: DbExecutor,
+    field_name: string,
+  ): Promise<SettingActiveResult> {
+    if (!field_name) return null;
 
     const redis = getRedis();
     const { redis_key: key, redis_ttl: ttl } = RedisKeyService.settingsKey();
@@ -98,7 +105,7 @@ export class SettingService {
            Do a targeted DB lookup and cache the result only if allowed. */
         if (cache) {
           const row = await this.loadOne(db, field_name);
-          if (!row) return false;
+          if (!row) return null;
 
           if (row.save_in_redis) {
             const merged: SettingMap = { ...cache, [field_name]: row };
@@ -125,7 +132,7 @@ export class SettingService {
       }
     }
 
-    return hit?.active ?? false;
+    return hit ? hit.active : null;
   }
 
   /* ------------------------------------------------------------------ */

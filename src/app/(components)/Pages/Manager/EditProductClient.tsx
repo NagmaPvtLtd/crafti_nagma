@@ -409,6 +409,13 @@ export default function EditProductClient({
                     <Field
                       label="Meta title"
                       error={errors.metaTitle}
+                      action={
+                        <CopyButton
+                          label="Keep same as name"
+                          disabled={!form.name.trim()}
+                          onClick={() => setField("metaTitle", form.name)}
+                        />
+                      }
                       hint="The blue line in Google results. Around 60 characters is plenty."
                     >
                       <TextInput
@@ -422,6 +429,24 @@ export default function EditProductClient({
                     <Field
                       label="Meta description"
                       error={errors.metaDescription}
+                      action={
+                        <CopyButton
+                          label="Keep same as brief"
+                          disabled={
+                            !(
+                              form.briefDescription.trim() ||
+                              form.description.trim()
+                            )
+                          }
+                          onClick={() =>
+                            setField(
+                              "metaDescription",
+                              form.briefDescription.trim() ||
+                                form.description.trim(),
+                            )
+                          }
+                        />
+                      }
                       hint="The grey snippet under the title in search results. Around 155 characters."
                     >
                       <Textarea
@@ -683,6 +708,27 @@ export default function EditProductClient({
 /*  Building blocks                                                   */
 /* ================================================================== */
 
+function CopyButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="cursor-pointer rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-0.5 text-[10px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {label}
+    </button>
+  );
+}
+
 function SectionCard({
   step,
   eyebrow,
@@ -743,6 +789,9 @@ function ListEditor({
   addLabel: string;
   emptyLabel: string;
 }) {
+  /* Matches the VARCHAR(255) columns behind features and care instructions. */
+  const maxLength = 255;
+
   const replaceAt = (index: number, value: string) =>
     onChange(items.map((item, i) => (i === index ? value : item)));
 
@@ -763,12 +812,23 @@ function ListEditor({
             <span className="mt-2.5 w-4 shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-400">
               {index + 1}
             </span>
-            <TextInput
-              value={value}
-              onChange={(e) => replaceAt(index, e.target.value)}
-              placeholder={placeholder}
-              maxLength={255}
-            />
+            <div className="min-w-0 flex-1">
+              <TextInput
+                value={value}
+                onChange={(e) => replaceAt(index, e.target.value)}
+                placeholder={placeholder}
+                maxLength={maxLength}
+              />
+              <p
+                className={`mt-0.5 text-right text-[10px] tabular-nums ${
+                  value.length >= maxLength
+                    ? "font-semibold text-rose-500"
+                    : "text-stone-400"
+                }`}
+              >
+                {value.length}/{maxLength}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => onChange(items.filter((_, i) => i !== index))}

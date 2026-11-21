@@ -49,7 +49,7 @@ export default function ConfirmDialog({
       role="alertdialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/25 p-4"
+      className="fixed inset-0 z-80 flex items-center justify-center bg-stone-900/25 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !loading) onClose();
       }}

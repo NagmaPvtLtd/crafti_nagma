@@ -24,6 +24,8 @@ interface VariantRow extends RowDataPacket {
   product_id: string;
   product_name: string;
   product_code: string;
+  product_brief_description: string | null;
+  product_description: string | null;
   name: string | null;
   brief_description: string | null;
   description: string | null;
@@ -117,6 +119,8 @@ async function loadVariant(
   const [rows] = await conn.query<VariantRow[]>(
     `SELECT v.id, v.product_id,
             p.name AS product_name, p.code AS product_code,
+            p.brief_description AS product_brief_description,
+            p.description AS product_description,
             v.name, v.brief_description, v.description, v.sku,
             v.price, v.compare_at_price, v.stock, v.weight,
             v.status, v.is_featured, v.main_showcase, v.orders_count,
@@ -153,7 +157,7 @@ async function loadMedia(
       WHERE f.file_purpose = 'product_variant_image'
         AND f.entity_type = 'product_variant'
         AND f.entity_id = ?
-      ORDER BY f.sort_order ASC, f.created_at ASC`,
+      ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC`,
     [variantId],
   );
 
@@ -277,6 +281,11 @@ export async function GET(
         value: row.value,
       })),
       media,
+      baseProduct: {
+        name: variant.product_name,
+        briefDescription: variant.product_brief_description ?? "",
+        description: variant.product_description ?? "",
+      },
     };
 
     return NextResponse.json(payload);

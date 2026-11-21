@@ -326,4 +326,10 @@ export interface VariantDetailResponse {
   variant: VariantDetail;
   optionValues: { option: string; value: string }[];
   media: ProductMediaItem[];
+  /** Base product copy — what the sync buttons on the variant form pull from. */
+  baseProduct: {
+    name: string;
+    briefDescription: string;
+    description: string;
+  };
 }

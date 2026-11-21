@@ -105,6 +105,8 @@ export default function VariantDetailClient({
         mainShowcase: res.data.variant.mainShowcase,
       });
     } catch (err) {
+      /* A failed refresh must never blank a variant that is already on screen —
+         the photos and edits stay visible while the banner explains the miss. */
       setError(getAxiosErrorMessage(err, "Failed to load the variant"));
     } finally {
       setLoading(false);
@@ -303,7 +305,7 @@ export default function VariantDetailClient({
               </div>
             )}
 
-            {data && form && !error && (
+            {data && form && (
               <div className="space-y-5 sm:space-y-6">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                   <StatCard
@@ -347,36 +349,18 @@ export default function VariantDetailClient({
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                   <section className="lg:col-span-5">
                     <div className="h-full rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <div>
-                          <SectionEyebrow>Media</SectionEyebrow>
-                          <h2 className="mt-1 text-sm font-semibold text-stone-900">
-                            Variant photos
-                          </h2>
-                          <p className="mt-0.5 text-[11px] text-stone-500">
-                            {data.media.length} photo
-                            {data.media.length === 1 ? "" : "s"}
-                            {data.media.some((image) => image.isLinked)
-                              ? ` · ${data.media.filter((image) => image.isLinked).length} linked`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <button
-                            onClick={() => setExistingOpen(true)}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-300 hover:bg-stone-50"
-                          >
-                            <Images className="h-3 w-3" />
-                            Choose existing
-                          </button>
-                          <button
-                            onClick={() => setMediaOpen(true)}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-                          >
-                            <ImagePlus className="h-3 w-3" />
-                            Manage
-                          </button>
-                        </div>
+                      <div className="mb-3">
+                        <SectionEyebrow>Media</SectionEyebrow>
+                        <h2 className="mt-1 text-sm font-semibold text-stone-900">
+                          Variant photos
+                        </h2>
+                        <p className="mt-0.5 text-[11px] text-stone-500">
+                          {data.media.length} photo
+                          {data.media.length === 1 ? "" : "s"}
+                          {data.media.some((image) => image.isLinked)
+                            ? ` · ${data.media.filter((image) => image.isLinked).length} linked`
+                            : ""}
+                        </p>
                       </div>
 
                       <MediaGallery
@@ -399,7 +383,18 @@ export default function VariantDetailClient({
                       </p>
 
                       <div className="mt-3 space-y-3">
-                        <Field label="Name">
+                        <Field
+                          label="Name"
+                          action={
+                            <SyncButton
+                              title="Copy the base product's name into this variant"
+                              disabled={!data.baseProduct.name.trim()}
+                              onClick={() =>
+                                setField("name", data.baseProduct.name)
+                              }
+                            />
+                          }
+                        >
                           <TextInput
                             value={form.name}
                             onChange={(e) => setField("name", e.target.value)}
@@ -407,7 +402,21 @@ export default function VariantDetailClient({
                           />
                         </Field>
 
-                        <Field label="Short description">
+                        <Field
+                          label="Short description"
+                          action={
+                            <SyncButton
+                              title="Copy the base product's short description into this variant"
+                              disabled={!data.baseProduct.briefDescription.trim()}
+                              onClick={() =>
+                                setField(
+                                  "briefDescription",
+                                  data.baseProduct.briefDescription,
+                                )
+                              }
+                            />
+                          }
+                        >
                           <Textarea
                             value={form.briefDescription}
                             onChange={(e) =>
@@ -419,7 +428,21 @@ export default function VariantDetailClient({
                           />
                         </Field>
 
-                        <Field label="Description">
+                        <Field
+                          label="Description"
+                          action={
+                            <SyncButton
+                              title="Copy the base product's description into this variant"
+                              disabled={!data.baseProduct.description.trim()}
+                              onClick={() =>
+                                setField(
+                                  "description",
+                                  data.baseProduct.description,
+                                )
+                              }
+                            />
+                          }
+                        >
                           <Textarea
                             value={form.description}
                             onChange={(e) =>
@@ -614,6 +637,33 @@ export default function VariantDetailClient({
         />
       </div>
     </PageWrapper>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sync button — pulls one field from the base product                */
+/* ------------------------------------------------------------------ */
+
+function SyncButton({
+  title,
+  disabled,
+  onClick,
+}: {
+  title: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-0.5 text-[10px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <RefreshCw className="h-2.5 w-2.5" />
+      Sync
+    </button>
   );
 }
 

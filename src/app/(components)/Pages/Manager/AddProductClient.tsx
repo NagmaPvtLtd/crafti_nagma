@@ -209,9 +209,18 @@ export default function AddProductClient() {
   };
 
   const toggleCategory = (id: string) => {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
-    );
+    /* Picking a sub category also picks its parent main category. */
+    const parentId =
+      (categories ?? []).find((c) => c.id === id)?.parentId ?? null;
+
+    setSelectedCategoryIds((prev) => {
+      if (prev.includes(id)) return prev.filter((c) => c !== id);
+
+      const next = [...prev];
+      if (parentId && !next.includes(parentId)) next.push(parentId);
+      if (!next.includes(id)) next.push(id);
+      return next;
+    });
     setErrors((prev) => {
       if (!prev.categoryIds) return prev;
       const next = { ...prev };

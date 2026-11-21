@@ -227,6 +227,187 @@ export async function POST(req: NextRequest) {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  PUT /api/manager/product-studio/media                                     */
+/*  Reorder a variant's photos. Body: { productId, variantId, imageIds[] }.    */
+/*  `imageIds` must list every photo of that variant in the new order.        */
+/* -------------------------------------------------------------------------- */
+
+export async function PUT(req: NextRequest) {
+  const guard = await requireManager({
+    label: "PUT /api/manager/product-studio/media",
+  });
+  if (!guard.ok) return guard.response;
+
+  const managerId = guard.session.user.id;
+  if (!managerId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const json = (await req.json().catch(() => null)) as
+    | {
+        productId?: unknown;
+        variantId?: unknown;
+        imageId?: unknown;
+        direction?: unknown;
+      }
+    | null;
+
+  const productRef =
+    typeof json?.productId === "string" ? json.productId.trim() : "";
+  const variantRef =
+    typeof json?.variantId === "string" ? json.variantId.trim() : "";
+  const imageId =
+    typeof json?.imageId === "string" ? json.imageId.trim() : "";
+  const direction =
+    json?.direction === "earlier" || json?.direction === "later"
+      ? json.direction
+      : null;
+
+  if (productRef.length < 2 || productRef.length > 50) {
+    return NextResponse.json(
+      { error: "Invalid product reference" },
+      { status: 400 },
+    );
+  }
+  if (variantRef.length < 2 || variantRef.length > 100) {
+    return NextResponse.json(
+      { error: "Invalid variant reference" },
+      { status: 400 },
+    );
+  }
+  if (imageId.length < 10 || imageId.length > 40) {
+    return NextResponse.json({ error: "Invalid image id" }, { status: 400 });
+  }
+  if (!direction) {
+    return NextResponse.json(
+      { error: "direction must be \"earlier\" or \"later\"" },
+      { status: 400 },
+    );
+  }
+
+  const pool = await getPool();
+  const conn = await pool.getConnection();
+
+  try {
+    const [productRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM products WHERE id = ? OR code = ? LIMIT 1`,
+      [productRef, productRef],
+    );
+    const productId = productRows[0]?.id;
+    if (!productId) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    const [variantRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM product_variants
+        WHERE product_id = ? AND (id = ? OR sku = ?)
+        LIMIT 1`,
+      [productId, variantRef, variantRef],
+    );
+    const variantId = variantRows[0]?.id;
+    if (!variantId) {
+      return NextResponse.json(
+        { error: "Variant not found for this product" },
+        { status: 404 },
+      );
+    }
+
+    /* The variant's own photos — uploads and linked copies alike — in their
+       current order. The server owns this list, so a stale client can never
+       send a mismatched one. */
+    const [ownedRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM imagekit_files
+        WHERE file_purpose = 'product_variant_image'
+          AND entity_type = 'product_variant'
+          AND entity_id = ?
+        ORDER BY sort_order ASC, created_at ASC, id ASC`,
+      [variantId],
+    );
+
+    const ordered = ownedRows.map((row) => row.id);
+    const index = ordered.indexOf(imageId);
+    if (index === -1) {
+      return NextResponse.json(
+        { error: "Photo not found on this variant" },
+        { status: 404 },
+      );
+    }
+
+    const target = index + (direction === "earlier" ? -1 : 1);
+    if (target < 0 || target >= ordered.length) {
+      return NextResponse.json({
+        ok: true,
+        message: "Photo is already at the edge",
+        imageIds: ordered,
+      });
+    }
+
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+
+    const now = getCurrentDateTime();
+
+    await conn.beginTransaction();
+    try {
+      for (let position = 0; position < ordered.length; position++) {
+        await conn.query(
+          `UPDATE imagekit_files
+              SET sort_order = ?, updated_at = ?
+            WHERE id = ? AND entity_id = ?`,
+          [position, now, ordered[position], variantId],
+        );
+      }
+      await conn.query(
+        `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
+        [managerId, now, productId],
+      );
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    }
+
+    /* Re-read what the database actually holds, so the response can never
+       claim an order that was not persisted. */
+    const [finalRows] = await conn.query<IdRow[]>(
+      `SELECT id FROM imagekit_files
+        WHERE file_purpose = 'product_variant_image'
+          AND entity_type = 'product_variant'
+          AND entity_id = ?
+        ORDER BY sort_order ASC, created_at ASC, id ASC`,
+      [variantId],
+    );
+    const finalIds = finalRows.map((row) => row.id);
+
+    try {
+      await auditLog.log(pool, {
+        userId: managerId,
+        action: "UPDATE",
+        entityType: "VARIANT",
+        entityId: variantId,
+        description: `Variant photo order updated. [productId=${productId}, variantId=${variantId}, imageId=${imageId}, direction=${direction}]`,
+        metadata: { imageIds: finalIds },
+      });
+    } catch {
+      /* audit must never break the response */
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: "Photo order updated",
+      imageIds: finalIds,
+    });
+  } catch (err) {
+    console.error("[PRODUCT STUDIO - MEDIA - REORDER]", err);
+    return NextResponse.json(
+      { error: "Could not update the photo order" },
+      { status: 500 },
+    );
+  } finally {
+    conn.release();
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*  DELETE /api/manager/product-studio/media?id=<imagekit_files.id>            */
 /*  Removes the ImageKit file and its database rows.                          */
 /* -------------------------------------------------------------------------- */

@@ -8,6 +8,7 @@ import { getCurrentDateTime } from "../../../../utils/ValueFetcher/getDateTime.u
 import { auditLog } from "../../../../services/AuditLog.service";
 import { baseProductCreateSchema } from "../../../../utils/zod/product/manager.product.zod";
 import { buildUniqueSlug, slugify } from "../../../../utils/Slug/slug.util";
+import { buildProductCode } from "../../../../utils/Formator/productIdentity.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -32,17 +33,6 @@ interface ValueRow extends RowDataPacket {
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
-
-/** "Crochet Bouquets" → "CROCHET-BOUQUETS". */
-function codeBase(name: string): string {
-  return slugify(name, { fallback: "product", maxLength: 44 }).toUpperCase();
-}
-
-/** Internal, unique reference — the name plus 4 random characters. */
-function newCode(name: string): string {
-  const suffix = generateULID().slice(0, 4).toUpperCase();
-  return `${codeBase(name)}-${suffix}`;
-}
 
 function invalidInput(details: Record<string, string[]>) {
   return NextResponse.json(
@@ -166,14 +156,18 @@ export async function POST(req: NextRequest) {
       slugify(data.name, { fallback: "product" }),
     );
 
-    let code = newCode(data.name);
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const [taken] = await conn.query<IdRow[]>(
-        `SELECT id FROM products WHERE code = ? LIMIT 1`,
-        [code],
+    /* PREFIX-P{YY}00-{last 4 of the id} — see productIdentity.util.ts. */
+    const code = buildProductCode(data.name, productId);
+    const [codeTaken] = await conn.query<IdRow[]>(
+      `SELECT id FROM products WHERE code = ? LIMIT 1`,
+      [code],
+    );
+    if (codeTaken.length > 0) {
+      await conn.rollback();
+      return NextResponse.json(
+        { error: "That product code is already taken. Please try again." },
+        { status: 409 },
       );
-      if (taken.length === 0) break;
-      code = newCode(data.name);
     }
 
     /* ---- product ---- */

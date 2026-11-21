@@ -150,10 +150,18 @@ export default function LoginForm() {
               </button>
             </form>
 
-            <p className="mt-5 flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-center text-xs font-medium text-stone-600 transition-colors">
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={isBusy}
+              className="mt-5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-center text-xs font-medium text-stone-600 transition-colors hover:bg-rose-50/60 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy === "google" && (
+                <Loader2 size={14} className="animate-spin" />
+              )}
               <span className="text-rose-600">New User?</span> Signup with
               Google today!
-            </p>
+            </button>
           </div>
         </div>
       </div>

@@ -11,6 +11,7 @@ import {
   optionDeleteSchema,
   optionUpdateSchema,
 } from "../../../../../utils/zod/product/manager.option.zod";
+import { toPascalCase } from "../../../../../utils/Formator/toPascalCase.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -164,7 +165,9 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return invalidInput(parsed.error.flatten().fieldErrors);
   }
-  const { name, description } = parsed.data;
+  const { name: rawName, description } = parsed.data;
+  /** Display names are always stored in Pascal case. */
+  const name = toPascalCase(rawName);
 
   const pool = await getPool();
   const conn = await pool.getConnection();
