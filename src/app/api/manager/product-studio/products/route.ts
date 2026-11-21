@@ -54,7 +54,7 @@ const PRODUCT_SELECT = `
            WHERE v.product_id = p.id)                          AS min_price,
          (SELECT MAX(v.price) FROM product_variants v
            WHERE v.product_id = p.id)                          AS max_price
-    FROM products p`
+    FROM products p`;
 
 /**
  * Returns a paginated, filterable product catalogue list for the "All products" page.

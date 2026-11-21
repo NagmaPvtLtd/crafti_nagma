@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
@@ -398,7 +401,9 @@ export async function PUT(req: NextRequest) {
     /* ---- parent rules ---- */
     if (parentId) {
       if (parentId === id) {
-        return invalidInput({ parentId: ["A category cannot be its own parent"] });
+        return invalidInput({
+          parentId: ["A category cannot be its own parent"],
+        });
       }
 
       if (Number(existing.subcategory_count ?? 0) > 0) {

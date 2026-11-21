@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../../../utils/Api/apiResponse.util";
 
-import { resolveProductId, resolveVariantId } from "../../../../../../../utils/ProductStudio/productStudio.lookup.util";
+import {
+  resolveProductId,
+  resolveVariantId,
+} from "../../../../../../../utils/ProductStudio/productStudio.lookup.util";
 import type { RowDataPacket } from "mysql2";
 import type { PoolConnection } from "mysql2/promise";
 import {
@@ -201,10 +207,9 @@ async function unlinkAndHideEmptyVariants(
     [originalImageIds, excludedVariantId],
   );
 
-  await conn.query(
-    `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
-    [originalImageIds],
-  );
+  await conn.query(`DELETE FROM imagekit_files WHERE source_image_id IN (?)`, [
+    originalImageIds,
+  ]);
 
   const hidden: string[] = [];
   for (const linked of linkedRows) {
@@ -530,7 +535,8 @@ export async function PUT(
     }
 
     const now = getCurrentDateTime();
-    const activating = variant.status === "inactive" && data.status === "active";
+    const activating =
+      variant.status === "inactive" && data.status === "active";
     const disabling = variant.status === "active" && data.status === "inactive";
 
     /* ---- activation gate: only a presentable variant may go live ---- */

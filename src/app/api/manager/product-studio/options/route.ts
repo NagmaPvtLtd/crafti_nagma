@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
@@ -229,7 +232,9 @@ export async function POST(req: NextRequest) {
       [name],
     );
     if (taken.length > 0) {
-      return invalidInput({ name: ["An option with this name already exists"] });
+      return invalidInput({
+        name: ["An option with this name already exists"],
+      });
     }
 
     const id = generateULID("opt");
@@ -271,7 +276,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     if (isDuplicateEntry(err)) {
-      return invalidInput({ name: ["An option with this name already exists"] });
+      return invalidInput({
+        name: ["An option with this name already exists"],
+      });
     }
     console.error("[GLOBAL OPTIONS - CREATE - POST]", err);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
@@ -356,7 +363,9 @@ export async function PUT(req: NextRequest) {
       [name, id],
     );
     if (taken.length > 0) {
-      return invalidInput({ name: ["An option with this name already exists"] });
+      return invalidInput({
+        name: ["An option with this name already exists"],
+      });
     }
 
     await conn.query(
@@ -381,7 +390,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: true, message: "Option updated" });
   } catch (err) {
     if (isDuplicateEntry(err)) {
-      return invalidInput({ name: ["An option with this name already exists"] });
+      return invalidInput({
+        name: ["An option with this name already exists"],
+      });
     }
     console.error("[GLOBAL OPTIONS - UPDATE - PUT]", err);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
@@ -495,7 +506,11 @@ export async function DELETE(req: NextRequest) {
       /* audit must never break the response */
     }
 
-    return NextResponse.json({ ok: true, message: "Option deleted", deletedId: id });
+    return NextResponse.json({
+      ok: true,
+      message: "Option deleted",
+      deletedId: id,
+    });
   } catch (err) {
     console.error("[GLOBAL OPTIONS - DELETE]", err);
     return NextResponse.json({ error: "server_error" }, { status: 500 });

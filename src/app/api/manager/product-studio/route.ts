@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../utils/Auth/Auth.requireRole.util";
@@ -30,10 +33,6 @@ interface ValueRow extends RowDataPacket {
   option_id: string;
   value: string;
 }
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio                                            */
@@ -154,12 +153,16 @@ export async function POST(req: NextRequest) {
   const optionMap = new Map<string, string[]>();
   for (const option of data.options) {
     const existing = optionMap.get(option.optionId) ?? [];
-    optionMap.set(option.optionId, [...new Set([...existing, ...option.valueIds])]);
+    optionMap.set(option.optionId, [
+      ...new Set([...existing, ...option.valueIds]),
+    ]);
   }
-  const optionRequests = [...optionMap.entries()].map(([optionId, valueIds]) => ({
-    optionId,
-    valueIds,
-  }));
+  const optionRequests = [...optionMap.entries()].map(
+    ([optionId, valueIds]) => ({
+      optionId,
+      valueIds,
+    }),
+  );
   const optionIds = optionRequests.map((o) => o.optionId);
 
   const pool = await getPool();
@@ -191,9 +194,7 @@ export async function POST(req: NextRequest) {
     }
 
     /* ---- every value must belong to its option ---- */
-    const allValueIds = [
-      ...new Set(optionRequests.flatMap((o) => o.valueIds)),
-    ];
+    const allValueIds = [...new Set(optionRequests.flatMap((o) => o.valueIds))];
     const [valueRows] = await conn.query<ValueRow[]>(
       `SELECT id, option_id, value FROM global_option_values WHERE id IN (?)`,
       [allValueIds],
@@ -343,7 +344,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "Could not save the product",
-          details: { name: ["A product with this name already exists — try again"] },
+          details: {
+            name: ["A product with this name already exists — try again"],
+          },
         },
         { status: 409 },
       );

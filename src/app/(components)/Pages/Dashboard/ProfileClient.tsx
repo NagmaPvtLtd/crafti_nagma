@@ -9,7 +9,7 @@ import { Loader2, Pencil, Save, ShieldCheck, X } from "lucide-react";
 import type { ZodError } from "zod";
 
 import getApiErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
-import { SectionDivider } from "../../utils/SectionDiv";
+import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
 import PasswordInput from "../../utils/Form/PasswordInput";
@@ -138,55 +138,54 @@ export default function ProfileClient() {
 
   return (
     <PageWrapper variant="form">
-      <div className="flex min-h-[calc(100vh-4rem)] items-start justify-center px-4 py-10 sm:py-14">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
         <div className="w-full max-w-7xl">
-          <div className="rounded-3xl  p-6 sm:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-semibold text-stone-900">
-                  My Profile
-                </h1>
-                <p className="mt-0.5 text-sm text-stone-500">
-                  Manage your personal information and security.
-                </p>
-              </div>
-
-              {!editing ? (
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
-                >
-                  <Pencil size={13} />
-                  Edit
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
-                >
-                  <X size={13} />
-                  Cancel
-                </button>
-              )}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <SectionEyebrow href="/dashboard">Dashboard</SectionEyebrow>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+                My Profile
+              </h1>
+              <p className="mt-0.5 text-sm text-stone-500">
+                Manage your personal information and security.
+              </p>
             </div>
 
-            <SectionDivider className="my-6" size={11} />
-
-            {editing ? (
-              <EditForm
-                profile={profile}
-                onSaved={async () => {
-                  setEditing(false);
-                  await refetchProfile();
-                }}
-                onCancel={() => setEditing(false)}
-              />
+            {!editing ? (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
+              >
+                <Pencil size={13} />
+                Edit
+              </button>
             ) : (
-              <ViewMode profile={profile} />
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
+              >
+                <X size={13} />
+                Cancel
+              </button>
             )}
           </div>
+
+          <SectionDivider className="my-6" size={11} />
+
+          {editing ? (
+            <EditForm
+              profile={profile}
+              onSaved={async () => {
+                setEditing(false);
+                await refetchProfile();
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <ViewMode profile={profile} />
+          )}
         </div>
       </div>
     </PageWrapper>

@@ -48,8 +48,6 @@ type ModalState =
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-
-
 /* ------------------------------------------------------------------ */
 /*  Main                                                               */
 /* ------------------------------------------------------------------ */
@@ -91,7 +89,8 @@ export default function GlobalCategoriesClient() {
         if (active) setData(d);
       })
       .catch((e: unknown) => {
-        if (active) setError(getAxiosErrorMessage(e, "Failed to load categories"));
+        if (active)
+          setError(getAxiosErrorMessage(e, "Failed to load categories"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -185,127 +184,131 @@ export default function GlobalCategoriesClient() {
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <Link
-              href="/manager/product-studio"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
+        <SectionEyebrow href="/manager/product-studio">
+          PRODUCT STUDIO
+        </SectionEyebrow>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+              Global Categories
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+              Create categories &amp; sub categories to assign to your products.
+              Two levels — a main category and the sub categories that sit under
+              it.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void load()}
+              disabled={loading}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Product Studio
-            </Link>
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
 
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                  Global Categories
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Create categories &amp; sub categories to assign to your
-                  products. Two levels — a main category and the sub categories
-                  that sit under it.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => void load()}
-                  disabled={loading}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                  />
-                  <span className="hidden sm:inline">Refresh</span>
-                </button>
-
-                <button
-                  onClick={() => setModal({ mode: "create", parentId: null })}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  New category
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={() => setModal({ mode: "create", parentId: null })}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New category
+            </button>
+          </div>
+        </div>
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !data && (
-              <CustomLoader
-                fullScreen={false}
-                label="Untangling the category tree…"
-                hint="Main categories and their sub categories."
+        {loading && !data && (
+          <CustomLoader
+            fullScreen={false}
+            label="Untangling the category tree…"
+            hint="Main categories and their sub categories."
+          />
+        )}
+
+        {error && !loading && (
+          <ErrorState
+            title="Couldn't load categories"
+            message={error}
+            onRetry={() => void load()}
+          />
+        )}
+
+        {data && !error && (
+          <div className="space-y-6">
+            <StatStrip counts={data.counts} />
+
+            {roots.length === 0 && orphanSubs.length === 0 ? (
+              <EmptyState
+                onCreate={() => setModal({ mode: "create", parentId: null })}
               />
-            )}
+            ) : (
+              <div className="space-y-3">
+                <div className="mb-1 flex items-end justify-between gap-3">
+                  <div>
+                    <SectionEyebrow>Your tree</SectionEyebrow>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                      Categories
+                    </h2>
+                  </div>
+                  <p className="hidden text-xs text-stone-500 sm:block">
+                    {plural(categories.length, "entry", "entries")}
+                  </p>
+                </div>
 
-            {error && !loading && (
-              <ErrorState title="Couldn't load categories" message={error} onRetry={() => void load()} />
-            )}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {roots.map((root) => (
+                    <CategoryCard
+                      key={root.id}
+                      category={root}
+                      subcategories={childrenByParent.get(root.id) ?? []}
+                      onEdit={(c) => setModal({ mode: "edit", category: c })}
+                      onDelete={(c) => setToDelete(c)}
+                      onAddSub={(parentId) =>
+                        setModal({ mode: "create", parentId })
+                      }
+                    />
+                  ))}
+                </div>
 
-            {data && !error && (
-              <div className="space-y-6">
-                <StatStrip counts={data.counts} />
-
-                {roots.length === 0 && orphanSubs.length === 0 ? (
-                  <EmptyState
-                    onCreate={() => setModal({ mode: "create", parentId: null })}
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    <div className="mb-1 flex items-end justify-between gap-3">
-                      <div>
-                        <SectionEyebrow>Your tree</SectionEyebrow>
-                        <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                          Categories
-                        </h2>
-                      </div>
-                      <p className="hidden text-xs text-stone-500 sm:block">
-                        {plural(categories.length, "entry", "entries")}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      {roots.map((root) => (
-                        <CategoryCard
-                          key={root.id}
-                          category={root}
-                          subcategories={childrenByParent.get(root.id) ?? []}
-                          onEdit={(c) => setModal({ mode: "edit", category: c })}
-                          onDelete={(c) => setToDelete(c)}
-                          onAddSub={(parentId) =>
-                            setModal({ mode: "create", parentId })
-                          }
-                        />
+                {orphanSubs.length > 0 && (
+                  <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 text-xs text-amber-800 backdrop-blur-sm sm:rounded-3xl">
+                    <p className="font-semibold">
+                      {plural(
+                        orphanSubs.length,
+                        "sub category",
+                        "sub categories",
+                      )}{" "}
+                      without a parent
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {orphanSubs.map((c) => (
+                        <li key={c.id} className="flex items-center gap-2">
+                          <span className="font-mono text-[11px]">
+                            {c.slug}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setModal({ mode: "edit", category: c })
+                            }
+                            className="cursor-pointer font-semibold underline decoration-amber-400 underline-offset-2"
+                          >
+                            Fix parent
+                          </button>
+                        </li>
                       ))}
-                    </div>
-
-                    {orphanSubs.length > 0 && (
-                      <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 text-xs text-amber-800 backdrop-blur-sm sm:rounded-3xl">
-                        <p className="font-semibold">
-                          {plural(orphanSubs.length, "sub category", "sub categories")} without a parent
-                        </p>
-                        <ul className="mt-2 space-y-1">
-                          {orphanSubs.map((c) => (
-                            <li key={c.id} className="flex items-center gap-2">
-                              <span className="font-mono text-[11px]">
-                                {c.slug}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  setModal({ mode: "edit", category: c })
-                                }
-                                className="cursor-pointer font-semibold underline decoration-amber-400 underline-offset-2"
-                              >
-                                Fix parent
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    </ul>
                   </div>
                 )}
               </div>
             )}
+          </div>
+        )}
       </div>
 
       {modal && (
@@ -315,7 +318,8 @@ export default function GlobalCategoriesClient() {
             (r) =>
               !(
                 modal.mode === "edit" &&
-                (r.id === modal.category.id || modal.category.subcategoryCount > 0)
+                (r.id === modal.category.id ||
+                  modal.category.subcategoryCount > 0)
               ),
           )}
           onClose={() => setModal(null)}
@@ -377,7 +381,9 @@ function StatStrip({ counts }: { counts: GlobalCategoriesResponse["counts"] }) {
           <p className="mt-1.5 truncate text-base font-semibold tabular-nums text-stone-900 sm:text-lg">
             {it.value.toLocaleString("en-IN")}
           </p>
-          <p className="mt-0.5 truncate text-[10px] text-stone-400">{it.hint}</p>
+          <p className="mt-0.5 truncate text-[10px] text-stone-400">
+            {it.hint}
+          </p>
         </div>
       ))}
     </div>
@@ -747,7 +753,12 @@ function ConfirmDelete({
               {category.subcategoryCount > 0 && (
                 <p>
                   It still has{" "}
-                  {plural(category.subcategoryCount, "sub category", "sub categories")}.
+                  {plural(
+                    category.subcategoryCount,
+                    "sub category",
+                    "sub categories",
+                  )}
+                  .
                 </p>
               )}
               {category.productCount > 0 && (
@@ -805,7 +816,9 @@ function Overlay({
         onClick={onClose}
         role="presentation"
       />
-      <div className="relative flex w-full max-w-lg justify-center">{children}</div>
+      <div className="relative flex w-full max-w-lg justify-center">
+        {children}
+      </div>
     </div>
   );
 }
@@ -837,4 +850,3 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     </div>
   );
 }
-

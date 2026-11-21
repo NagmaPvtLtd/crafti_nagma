@@ -489,9 +489,7 @@ export async function POST(
         ok: true,
         message:
           `${created.length} variant${created.length === 1 ? "" : "s"} generated as inactive` +
-          (skippedCount > 0
-            ? ` · ${skippedCount} already existed`
-            : ""),
+          (skippedCount > 0 ? ` · ${skippedCount} already existed` : ""),
         createdCount: created.length,
         skippedCount,
         variants: created,

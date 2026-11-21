@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 
 import { requireManager } from "../../../../../../utils/Auth/Auth.requireRole.util";
@@ -389,7 +392,11 @@ export async function DELETE(req: NextRequest) {
       /* audit must never break the response */
     }
 
-    return NextResponse.json({ ok: true, message: "Value deleted", deletedId: id });
+    return NextResponse.json({
+      ok: true,
+      message: "Value deleted",
+      deletedId: id,
+    });
   } catch (err) {
     console.error("[GLOBAL OPTION VALUES - DELETE]", err);
     return NextResponse.json({ error: "server_error" }, { status: 500 });

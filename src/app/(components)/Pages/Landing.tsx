@@ -118,7 +118,7 @@ const LANDING_CONTENT = {
     footerNote: {
       before: "Track your order anytime from your",
       linkText: "account dashboard",
-      linkHref: "/account/orders",
+      linkHref: "/dashboard/orders",
       after: "— or reach out to us directly.",
     },
   },

@@ -342,21 +342,18 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const json = (await req.json().catch(() => null)) as
-    | {
-        productId?: unknown;
-        variantId?: unknown;
-        imageId?: unknown;
-        direction?: unknown;
-      }
-    | null;
+  const json = (await req.json().catch(() => null)) as {
+    productId?: unknown;
+    variantId?: unknown;
+    imageId?: unknown;
+    direction?: unknown;
+  } | null;
 
   const productRef =
     typeof json?.productId === "string" ? json.productId.trim() : "";
   const variantRef =
     typeof json?.variantId === "string" ? json.variantId.trim() : "";
-  const imageId =
-    typeof json?.imageId === "string" ? json.imageId.trim() : "";
+  const imageId = typeof json?.imageId === "string" ? json.imageId.trim() : "";
   const direction =
     json?.direction === "earlier" || json?.direction === "later"
       ? json.direction
@@ -379,7 +376,7 @@ export async function PUT(req: NextRequest) {
   }
   if (!direction) {
     return NextResponse.json(
-      { error: "direction must be \"earlier\" or \"later\"" },
+      { error: 'direction must be "earlier" or "later"' },
       { status: 400 },
     );
   }
@@ -641,10 +638,9 @@ export async function DELETE(req: NextRequest) {
 
     await conn.beginTransaction();
     try {
-      await conn.query(
-        `DELETE FROM imagekit_files WHERE source_image_id = ?`,
-        [media.image_id],
-      );
+      await conn.query(`DELETE FROM imagekit_files WHERE source_image_id = ?`, [
+        media.image_id,
+      ]);
       await conn.query(`DELETE FROM imagekit_files WHERE id = ?`, [
         media.image_id,
       ]);

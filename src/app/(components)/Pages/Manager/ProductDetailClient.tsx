@@ -56,7 +56,11 @@ const fmtDate = (iso: string | null) =>
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function ProductDetailClient({ productId }: { productId: string }) {
+export default function ProductDetailClient({
+  productId,
+}: {
+  productId: string;
+}) {
   const [data, setData] = useState<ProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,102 +101,96 @@ export default function ProductDetailClient({ productId }: { productId: string }
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <Link
-              href="/manager/product-studio/products"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 transition-colors hover:text-rose-600"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              All products
-            </Link>
-
-            {data ? (
-              <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <SectionEyebrow>Product overview</SectionEyebrow>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                      {data.product.name}
-                    </h1>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] text-stone-400">
-                    {data.product.code} · /{data.product.slug}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => void load()}
-                    disabled={loading}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RefreshCw
-                      className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                    />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </button>
-                  <Link
-                    href={`/manager/product-studio/products/${data.product.code || data.product.id}/edit`}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit product
-                  </Link>
-                  <button
-                    onClick={() => setGenerateOpen(true)}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
-                  >
-                    <Wand2 className="h-3.5 w-3.5" />
-                    Generate variants
-                  </button>
-                </div>
+        {data ? (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <SectionEyebrow href="/manager/product-studio/products">
+                Product overview
+              </SectionEyebrow>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+                  {data.product.name}
+                </h1>
               </div>
-            ) : (
-              <div className="mt-5 h-9 w-64 animate-pulse rounded-full bg-stone-200/70" />
-            )}
+              <p className="mt-1 font-mono text-[11px] text-stone-400">
+                {data.product.code} · /{data.product.slug}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => void load()}
+                disabled={loading}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+                />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+              <Link
+                href={`/manager/product-studio/products/${data.product.code || data.product.id}/edit`}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit product
+              </Link>
+              <button
+                onClick={() => setGenerateOpen(true)}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                Generate variants
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2 h-9 w-64 animate-pulse rounded-full bg-stone-200/70" />
+        )}
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !data && (
-              <CustomLoader fullScreen={false} label="Loading the product…" />
-            )}
+        {loading && !data && (
+          <CustomLoader fullScreen={false} label="Loading the product…" />
+        )}
 
-            {error && !loading && (
-              <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-rose-800">
-                    Couldn&apos;t load the product
-                  </p>
-                  <p className="mt-0.5 text-xs text-rose-700">{error}</p>
-                </div>
-                <button
-                  onClick={() => void load()}
-                  className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
+        {error && !loading && (
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-rose-800">
+                Couldn&apos;t load the product
+              </p>
+              <p className="mt-0.5 text-xs text-rose-700">{error}</p>
+            </div>
+            <button
+              onClick={() => void load()}
+              className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
-            {data && !error && (
-              <div className="space-y-5 sm:space-y-6">
-                <StatsStrip stats={data.stats} />
+        {data && !error && (
+          <div className="space-y-5 sm:space-y-6">
+            <StatsStrip stats={data.stats} />
 
-                <BaseDetails data={data} />
+            <BaseDetails data={data} />
 
-                <VariantsSection
-                  variants={data.variants}
-                  productRef={data.product.code || data.product.id}
-                  onGenerate={() => setGenerateOpen(true)}
-                />
+            <VariantsSection
+              variants={data.variants}
+              productRef={data.product.code || data.product.id}
+              onGenerate={() => setGenerateOpen(true)}
+            />
 
-                <ReviewsSection
-                  reviews={data.reviews}
-                  averageRating={data.stats.averageRating}
-                  reviewCount={data.stats.reviewCount}
-                />
-              </div>
-            )}
+            <ReviewsSection
+              reviews={data.reviews}
+              averageRating={data.stats.averageRating}
+              reviewCount={data.stats.reviewCount}
+            />
+          </div>
+        )}
 
         {data && (
           <>
@@ -438,7 +436,10 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
         ) : (
           <div className="mt-1.5 space-y-2">
             {data.options.map((option) => (
-              <div key={option.id} className="flex flex-wrap items-center gap-1.5">
+              <div
+                key={option.id}
+                className="flex flex-wrap items-center gap-1.5"
+              >
                 <span className="text-[11px] font-semibold text-stone-700">
                   {option.name}
                 </span>
@@ -507,10 +508,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
             label="Delivery"
             value={formatCurrency(product.deliveryCharges)}
           />
-          <DetailRow
-            label="Processing"
-            value={product.processingTime || "—"}
-          />
+          <DetailRow label="Processing" value={product.processingTime || "—"} />
         </dl>
 
         <dl className="space-y-2 text-xs">
@@ -675,7 +673,9 @@ function VariantGroup({
             }`}
           />
           {title}
-          <span className="font-normal text-stone-400">({variants.length})</span>
+          <span className="font-normal text-stone-400">
+            ({variants.length})
+          </span>
         </h3>
         <p className="text-[10px] text-stone-400">{hint}</p>
       </div>
@@ -749,9 +749,7 @@ function VariantRow({
           <p className="text-xs font-semibold tabular-nums text-stone-900">
             {formatCurrency(variant.price)}
           </p>
-          <p className="text-[10px] text-stone-500">
-            {variant.stock} in stock
-          </p>
+          <p className="text-[10px] text-stone-500">{variant.stock} in stock</p>
         </div>
 
         <span
@@ -776,7 +774,10 @@ function VariantRow({
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`${rating} out of 5`}>
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label={`${rating} out of 5`}
+    >
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
@@ -823,9 +824,7 @@ function ReviewsSection({
       {reviews.length === 0 ? (
         <div className="mt-3 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-stone-50/60 py-9 text-center">
           <Star className="h-5 w-5 text-stone-300" />
-          <p className="text-sm font-semibold text-stone-800">
-            No reviews yet
-          </p>
+          <p className="text-sm font-semibold text-stone-800">No reviews yet</p>
           <p className="max-w-sm text-[11px] leading-relaxed text-stone-500">
             Customer reviews for this product will appear here once they start
             coming in.
@@ -1003,9 +1002,7 @@ function GenerateVariantsModal({
     >
       {product.options.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-rose-200/70 bg-rose-50/30 px-4 py-8 text-center">
-          <p className="text-sm font-semibold text-stone-800">
-            No options yet
-          </p>
+          <p className="text-sm font-semibold text-stone-800">No options yet</p>
           <p className="mt-1 text-[11px] leading-relaxed text-stone-500">
             Add options and values to this product before generating variants.
           </p>
@@ -1020,9 +1017,10 @@ function GenerateVariantsModal({
               </span>{" "}
               Please select the available variants for this base product
               carefully — a wrong one can only be disabled from its variant
-              page. New variants start <span className="font-semibold">inactive</span>
-              : add a name, short description, description and at least one
-              photo, then activate them.
+              page. New variants start{" "}
+              <span className="font-semibold">inactive</span>: add a name, short
+              description, description and at least one photo, then activate
+              them.
             </span>
           </div>
 
@@ -1107,8 +1105,8 @@ function GenerateVariantsModal({
           </div>
 
           <p className="text-[11px] leading-relaxed text-stone-500">
-            Each new variant copies the base product&apos;s short description and
-            description. SKUs are built from{" "}
+            Each new variant copies the base product&apos;s short description
+            and description. SKUs are built from{" "}
             <code className="font-mono">{product.product.code}</code> plus the
             option values, and are guaranteed unique.
           </p>

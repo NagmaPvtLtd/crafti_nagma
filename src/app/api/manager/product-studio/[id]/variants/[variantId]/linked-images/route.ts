@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../../../../utils/Api/apiResponse.util";
 
 import { resolveProductId } from "../../../../../../../../utils/ProductStudio/productStudio.lookup.util";
 import type { RowDataPacket } from "mysql2";

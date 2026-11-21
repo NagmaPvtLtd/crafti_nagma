@@ -76,32 +76,32 @@ export default function Collections() {
   return (
     <PageWrapper variant="hero" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <SectionEyebrow>Collections · live catalogue</SectionEyebrow>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-              Everything on the shelf.
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Featured pieces first, then browse by category or jump straight
-              to a product.
-            </p>
+        <SectionEyebrow>Browse our Collection</SectionEyebrow>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+          Everything on the shelf.
+        </h1>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
+          Featured pieces first, then browse by category or jump straight to a
+          product.
+        </p>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
-                <ShoppingBag className="h-3 w-3 text-rose-400" />
-                {data?.totalProducts ?? 0} products
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
-                <Layers className="h-3 w-3 text-rose-400" />
-                {categories.length} categories
-              </span>
-              <Link
-                href="#products"
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:bg-white"
-              >
-                All product links
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
+            <ShoppingBag className="h-3 w-3 text-rose-400" />
+            {data?.totalProducts ?? 0} products
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
+            <Layers className="h-3 w-3 text-rose-400" />
+            {categories.length} categories
+          </span>
+          <Link
+            href="#products"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:bg-white"
+          >
+            All product links
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
 
         <SectionDivider className="my-6" size={11} />
 
@@ -255,7 +255,9 @@ export default function Collections() {
                       <Flower2 className="h-5 w-5" />
                     </div>
                     <h3 className="mt-3 text-sm font-semibold text-stone-900">
-                      {query ? "No products match that search" : "No products yet"}
+                      {query
+                        ? "No products match that search"
+                        : "No products yet"}
                     </h3>
                     <p className="mt-1 max-w-sm text-xs text-stone-600">
                       {query

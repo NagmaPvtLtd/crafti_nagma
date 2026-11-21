@@ -1,4 +1,3 @@
-// app/api/admin/dashboard/route.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 

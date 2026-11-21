@@ -158,7 +158,9 @@ export default function EditProductClient({
       });
       setCategories(res.data.categories);
     } catch (err) {
-      toast.error(getAxiosErrorMessage(err, "Could not refresh the categories"));
+      toast.error(
+        getAxiosErrorMessage(err, "Could not refresh the categories"),
+      );
     } finally {
       setRefreshing(false);
     }
@@ -301,404 +303,396 @@ export default function EditProductClient({
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <Link
-              href={`/manager/product-studio/products/${productKey}`}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back to product
-            </Link>
+        <SectionEyebrow href={`/manager/product-studio/products/${productKey}`}>
+          PRODUCT STUDIO
+        </SectionEyebrow>
 
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-              Edit product
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Change the shared details of this base product. Its variants, their
-              media and its slug are untouched.
-            </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+          Edit product
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+          Change the shared details of this base product. Its variants, their
+          media and its slug are untouched.
+        </p>
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !product && (
-              <CustomLoader
-                fullScreen={false}
-                label="Loading the product…"
-                hint="Its details, categories and options."
-              />
-            )}
+        {loading && !product && (
+          <CustomLoader
+            fullScreen={false}
+            label="Loading the product…"
+            hint="Its details, categories and options."
+          />
+        )}
 
-            {loadError && !loading && (
-              <ErrorState title="Couldn't load the product" message={loadError} onRetry={() => void load()} />
-            )}
+        {loadError && !loading && (
+          <ErrorState
+            title="Couldn't load the product"
+            message={loadError}
+            onRetry={() => void load()}
+          />
+        )}
 
-            {!loading && !loadError && product && (
-              <form onSubmit={handleSubmit} noValidate className="space-y-3">
-                <SectionCard
-                  step="1"
-                  eyebrow="The basics"
-                  title="Product information"
-                  hint="The shared story of this base product. Its variants start from this copy."
+        {!loading && !loadError && product && (
+          <form onSubmit={handleSubmit} noValidate className="space-y-3">
+            <SectionCard
+              step="1"
+              eyebrow="The basics"
+              title="Product information"
+              hint="The shared story of this base product. Its variants start from this copy."
+            >
+              <div className="space-y-4">
+                <Field
+                  label="Product name"
+                  required
+                  error={errors.name}
+                  hint="How the base is labelled in the studio and on the website."
                 >
-                  <div className="space-y-4">
-                    <Field
-                      label="Product name"
-                      required
-                      error={errors.name}
-                      hint="How the base is labelled in the studio and on the website."
-                    >
-                      <TextInput
-                        value={form.name}
-                        onChange={(e) => setField("name", e.target.value)}
-                        placeholder="Crochet Bouquet"
-                        maxLength={255}
-                      />
-                    </Field>
+                  <TextInput
+                    value={form.name}
+                    onChange={(e) => setField("name", e.target.value)}
+                    placeholder="Crochet Bouquet"
+                    maxLength={255}
+                  />
+                </Field>
 
-                    <Field
-                      label="Product code"
-                      error={errors.code}
-                      hint="Internal reference. Uppercase letters, digits, dash or underscore — must be unique."
-                    >
-                      <TextInput
-                        value={form.code}
-                        onChange={(e) =>
-                          setField("code", e.target.value.toUpperCase())
-                        }
-                        placeholder="CROCHET-BOUQUET-4F2A"
-                        maxLength={50}
-                        className="font-mono"
-                      />
-                    </Field>
-
-                    <Field
-                      label="Brief description"
-                      error={errors.briefDescription}
-                      hint="One or two lines for cards and listings — keep it short."
-                    >
-                      <Textarea
-                        value={form.briefDescription}
-                        onChange={(e) =>
-                          setField("briefDescription", e.target.value)
-                        }
-                        placeholder="Hand-tied crochet flowers that never wilt."
-                        maxLength={500}
-                        rows={2}
-                      />
-                    </Field>
-
-                    <Field
-                      label="Description"
-                      error={errors.description}
-                      hint="The full story — materials, size, care, anything the customer should know."
-                    >
-                      <Textarea
-                        value={form.description}
-                        onChange={(e) => setField("description", e.target.value)}
-                        placeholder="Made with soft cotton yarn, each bouquet is stitched by hand…"
-                        rows={5}
-                      />
-                    </Field>
-                  </div>
-                </SectionCard>
-
-                <SectionCard
-                  step="2"
-                  eyebrow="Search & sharing"
-                  title="Meta details"
-                  hint="What search engines and link previews show. Leave blank to fall back to the product name and brief."
+                <Field
+                  label="Product code"
+                  error={errors.code}
+                  hint="Internal reference. Uppercase letters, digits, dash or underscore — must be unique."
                 >
-                  <div className="space-y-4">
-                    <Field
-                      label="Meta title"
-                      error={errors.metaTitle}
-                      action={
-                        <CopyButton
-                          label="Keep same as name"
-                          disabled={!form.name.trim()}
-                          onClick={() => setField("metaTitle", form.name)}
-                        />
-                      }
-                      hint="The blue line in Google results. Around 60 characters is plenty."
-                    >
-                      <TextInput
-                        value={form.metaTitle}
-                        onChange={(e) => setField("metaTitle", e.target.value)}
-                        placeholder="Crochet Bouquet — handmade flowers"
-                        maxLength={255}
-                      />
-                    </Field>
+                  <TextInput
+                    value={form.code}
+                    onChange={(e) =>
+                      setField("code", e.target.value.toUpperCase())
+                    }
+                    placeholder="CROCHET-BOUQUET-4F2A"
+                    maxLength={50}
+                    className="font-mono"
+                  />
+                </Field>
 
-                    <Field
-                      label="Meta description"
-                      error={errors.metaDescription}
-                      action={
-                        <CopyButton
-                          label="Keep same as brief"
-                          disabled={
-                            !(
-                              form.briefDescription.trim() ||
-                              form.description.trim()
-                            )
-                          }
-                          onClick={() =>
-                            setField(
-                              "metaDescription",
-                              form.briefDescription.trim() ||
-                                form.description.trim(),
-                            )
-                          }
-                        />
-                      }
-                      hint="The grey snippet under the title in search results. Around 155 characters."
-                    >
-                      <Textarea
-                        value={form.metaDescription}
-                        onChange={(e) =>
-                          setField("metaDescription", e.target.value)
-                        }
-                        placeholder="Hand-tied crochet flowers that never wilt."
-                        maxLength={500}
-                        rows={2}
-                      />
-                    </Field>
-                  </div>
-                </SectionCard>
+                <Field
+                  label="Brief description"
+                  error={errors.briefDescription}
+                  hint="One or two lines for cards and listings — keep it short."
+                >
+                  <Textarea
+                    value={form.briefDescription}
+                    onChange={(e) =>
+                      setField("briefDescription", e.target.value)
+                    }
+                    placeholder="Hand-tied crochet flowers that never wilt."
+                    maxLength={500}
+                    rows={2}
+                  />
+                </Field>
 
-                <SectionCard
-                  step="3"
-                  eyebrow="Where it lives"
-                  title="Categories"
-                  hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
-                  error={errors.categoryIds}
+                <Field
+                  label="Description"
+                  error={errors.description}
+                  hint="The full story — materials, size, care, anything the customer should know."
+                >
+                  <Textarea
+                    value={form.description}
+                    onChange={(e) => setField("description", e.target.value)}
+                    placeholder="Made with soft cotton yarn, each bouquet is stitched by hand…"
+                    rows={5}
+                  />
+                </Field>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step="2"
+              eyebrow="Search & sharing"
+              title="Meta details"
+              hint="What search engines and link previews show. Leave blank to fall back to the product name and brief."
+            >
+              <div className="space-y-4">
+                <Field
+                  label="Meta title"
+                  error={errors.metaTitle}
                   action={
-                    <RefreshButton
-                      onClick={() => void reloadCategories()}
-                      busy={refreshing}
-                      disabled={refreshing}
+                    <CopyButton
+                      label="Keep same as name"
+                      disabled={!form.name.trim()}
+                      onClick={() => setField("metaTitle", form.name)}
                     />
                   }
+                  hint="The blue line in Google results. Around 60 characters is plenty."
                 >
-                  {roots.length === 0 ? (
-                    <PoolHint
-                      href="/manager/product-studio/categories"
-                      label="Create your first category"
-                      text="No categories yet — a product needs at least one."
+                  <TextInput
+                    value={form.metaTitle}
+                    onChange={(e) => setField("metaTitle", e.target.value)}
+                    placeholder="Crochet Bouquet — handmade flowers"
+                    maxLength={255}
+                  />
+                </Field>
+
+                <Field
+                  label="Meta description"
+                  error={errors.metaDescription}
+                  action={
+                    <CopyButton
+                      label="Keep same as brief"
+                      disabled={
+                        !(
+                          form.briefDescription.trim() ||
+                          form.description.trim()
+                        )
+                      }
+                      onClick={() =>
+                        setField(
+                          "metaDescription",
+                          form.briefDescription.trim() ||
+                            form.description.trim(),
+                        )
+                      }
                     />
-                  ) : (
-                    <div className="space-y-2">
-                      {roots.map((root) => {
-                        const subcategories =
-                          childrenByParent.get(root.id) ?? [];
+                  }
+                  hint="The grey snippet under the title in search results. Around 155 characters."
+                >
+                  <Textarea
+                    value={form.metaDescription}
+                    onChange={(e) =>
+                      setField("metaDescription", e.target.value)
+                    }
+                    placeholder="Hand-tied crochet flowers that never wilt."
+                    maxLength={500}
+                    rows={2}
+                  />
+                </Field>
+              </div>
+            </SectionCard>
 
-                        return (
-                          <div
-                            key={root.id}
-                            className={`overflow-hidden rounded-xl border bg-white transition-colors ${
-                              selectedCategoryIds.includes(root.id)
-                                ? "border-rose-200"
-                                : "border-stone-200"
-                            }`}
-                          >
-                            <CategoryRow
-                              kind="main"
-                              name={root.name}
-                              childCount={subcategories.length}
-                              checked={selectedCategoryIds.includes(root.id)}
-                              onToggle={() => toggleCategory(root.id)}
-                            />
+            <SectionCard
+              step="3"
+              eyebrow="Where it lives"
+              title="Categories"
+              hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
+              error={errors.categoryIds}
+              action={
+                <RefreshButton
+                  onClick={() => void reloadCategories()}
+                  busy={refreshing}
+                  disabled={refreshing}
+                />
+              }
+            >
+              {roots.length === 0 ? (
+                <PoolHint
+                  href="/manager/product-studio/categories"
+                  label="Create your first category"
+                  text="No categories yet — a product needs at least one."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {roots.map((root) => {
+                    const subcategories = childrenByParent.get(root.id) ?? [];
 
-                            {subcategories.length > 0 && (
-                              <div className="border-t border-dashed border-stone-200 bg-stone-50/50 py-1 pr-2">
-                                {subcategories.map((sub) => (
-                                  <CategoryRow
-                                    key={sub.id}
-                                    kind="sub"
-                                    name={sub.name}
-                                    checked={selectedCategoryIds.includes(
-                                      sub.id,
-                                    )}
-                                    onToggle={() => toggleCategory(sub.id)}
-                                  />
-                                ))}
-                              </div>
-                            )}
+                    return (
+                      <div
+                        key={root.id}
+                        className={`overflow-hidden rounded-xl border bg-white transition-colors ${
+                          selectedCategoryIds.includes(root.id)
+                            ? "border-rose-200"
+                            : "border-stone-200"
+                        }`}
+                      >
+                        <CategoryRow
+                          kind="main"
+                          name={root.name}
+                          childCount={subcategories.length}
+                          checked={selectedCategoryIds.includes(root.id)}
+                          onToggle={() => toggleCategory(root.id)}
+                        />
+
+                        {subcategories.length > 0 && (
+                          <div className="border-t border-dashed border-stone-200 bg-stone-50/50 py-1 pr-2">
+                            {subcategories.map((sub) => (
+                              <CategoryRow
+                                key={sub.id}
+                                kind="sub"
+                                name={sub.name}
+                                checked={selectedCategoryIds.includes(sub.id)}
+                                onToggle={() => toggleCategory(sub.id)}
+                              />
+                            ))}
                           </div>
-                        );
-                      })}
-
-                      <p className="pt-1 text-[11px] text-stone-500">
-                        {selectedCategoryIds.length === 0
-                          ? "Nothing selected yet."
-                          : `${selectedCategoryIds.length} selected.`}
-                      </p>
-                    </div>
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  step="4"
-                  eyebrow="Money & fulfilment"
-                  title="Delivery, processing and status"
-                >
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                      label="Delivery charges (₹)"
-                      error={errors.deliveryCharges}
-                      hint="Added to the order total. Enter 0 for free delivery."
-                    >
-                      <TextInput
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.deliveryCharges}
-                        onChange={(e) =>
-                          setField("deliveryCharges", e.target.value)
-                        }
-                        className="tabular-nums"
-                      />
-                    </Field>
-
-                    <Field
-                      label="Processing time"
-                      error={errors.processingTime}
-                      hint="How long it takes to get an order ready before it ships."
-                    >
-                      <TextInput
-                        value={form.processingTime}
-                        onChange={(e) =>
-                          setField("processingTime", e.target.value)
-                        }
-                        placeholder="3–5 business days"
-                        maxLength={100}
-                      />
-                    </Field>
-
-                    <div className="sm:col-span-2">
-                      <div className="mb-1 flex items-center gap-1.5">
-                        <label
-                          htmlFor="product-status"
-                          className="text-xs font-semibold tracking-wider text-stone-700 uppercase"
-                        >
-                          Status
-                        </label>
-                        <Hint text="Active products are visible on the website. Inactive ones stay in the studio but disappear from the collections." />
-                      </div>
-                      <select
-                        id="product-status"
-                        value={form.status}
-                        onChange={(e) =>
-                          setField(
-                            "status",
-                            e.target.value as FormState["status"],
-                          )
-                        }
-                        className={`${inputClass(Boolean(errors.status))} cursor-pointer`}
-                      >
-                        <option value="active">Active — visible</option>
-                        <option value="inactive">Inactive — hidden</option>
-                      </select>
-                    </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard
-                  step="5"
-                  eyebrow="What shoppers read"
-                  title="Features & care instructions"
-                  hint="Bullet lists shared by every variant of this product — they are not set per variant."
-                >
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold tracking-wider text-stone-700 uppercase">
-                        Features
-                      </p>
-                      <ListEditor
-                        items={features}
-                        onChange={setFeatures}
-                        placeholder="Hand-stitched with soft cotton yarn"
-                        addLabel="Add a feature"
-                        emptyLabel="No features yet — add the highlights of this product."
-                      />
-                    </div>
-
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold tracking-wider text-stone-700 uppercase">
-                        Care instructions
-                      </p>
-                      <ListEditor
-                        items={careInstructions}
-                        onChange={setCareInstructions}
-                        placeholder="Gentle hand wash, dry flat in shade"
-                        addLabel="Add an instruction"
-                        emptyLabel="No care instructions yet — tell shoppers how to look after it."
-                      />
-                    </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard
-                  step="6"
-                  eyebrow="Showcase"
-                  title="Where this product is featured"
-                  hint="Both are optional. They decide whether this product is pushed forward on the website."
-                >
-                  <div className="space-y-2">
-                    <CheckboxRow
-                      checked={form.isFeatured}
-                      onChange={(checked) => setField("isFeatured", checked)}
-                      label="Is featured"
-                      hint="Ticked, this product appears in the featured picks on the home page."
-                      description="Extra visibility on the home page."
-                    />
-                    <CheckboxRow
-                      checked={form.mainShowcase}
-                      onChange={(checked) => setField("mainShowcase", checked)}
-                      label="Main showcase"
-                      hint="Ticked, this product becomes the thumbnail of its category — the image shoppers see before they open the category."
-                      description="Represent its category on the website."
-                    />
-                  </div>
-                </SectionCard>
-
-                {formError && (
-                  <div className="flex items-start gap-2 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:rounded-3xl">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{formError}</span>
-                  </div>
-                )}
-
-                <div className="sticky bottom-4 z-20 rounded-2xl border border-white/70 bg-white/95 px-3 py-3 shadow-lg shadow-rose-100/60 sm:rounded-3xl sm:px-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] text-stone-500">
-                      {selectedCategoryIds.length} categor
-                      {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
-                      {form.status}
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/manager/product-studio/products/${productKey}`}
-                        className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
-                      >
-                        Cancel
-                      </Link>
-                      <button
-                        type="submit"
-                        disabled={saving || !form.name.trim()}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {saving ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Check className="h-3.5 w-3.5" />
                         )}
-                        Save changes
-                      </button>
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
+
+                  <p className="pt-1 text-[11px] text-stone-500">
+                    {selectedCategoryIds.length === 0
+                      ? "Nothing selected yet."
+                      : `${selectedCategoryIds.length} selected.`}
+                  </p>
                 </div>
-              </form>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              step="4"
+              eyebrow="Money & fulfilment"
+              title="Delivery, processing and status"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  label="Delivery charges (₹)"
+                  error={errors.deliveryCharges}
+                  hint="Added to the order total. Enter 0 for free delivery."
+                >
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.deliveryCharges}
+                    onChange={(e) =>
+                      setField("deliveryCharges", e.target.value)
+                    }
+                    className="tabular-nums"
+                  />
+                </Field>
+
+                <Field
+                  label="Processing time"
+                  error={errors.processingTime}
+                  hint="How long it takes to get an order ready before it ships."
+                >
+                  <TextInput
+                    value={form.processingTime}
+                    onChange={(e) => setField("processingTime", e.target.value)}
+                    placeholder="3–5 business days"
+                    maxLength={100}
+                  />
+                </Field>
+
+                <div className="sm:col-span-2">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <label
+                      htmlFor="product-status"
+                      className="text-xs font-semibold tracking-wider text-stone-700 uppercase"
+                    >
+                      Status
+                    </label>
+                    <Hint text="Active products are visible on the website. Inactive ones stay in the studio but disappear from the collections." />
+                  </div>
+                  <select
+                    id="product-status"
+                    value={form.status}
+                    onChange={(e) =>
+                      setField("status", e.target.value as FormState["status"])
+                    }
+                    className={`${inputClass(Boolean(errors.status))} cursor-pointer`}
+                  >
+                    <option value="active">Active — visible</option>
+                    <option value="inactive">Inactive — hidden</option>
+                  </select>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step="5"
+              eyebrow="What shoppers read"
+              title="Features & care instructions"
+              hint="Bullet lists shared by every variant of this product — they are not set per variant."
+            >
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold tracking-wider text-stone-700 uppercase">
+                    Features
+                  </p>
+                  <ListEditor
+                    items={features}
+                    onChange={setFeatures}
+                    placeholder="Hand-stitched with soft cotton yarn"
+                    addLabel="Add a feature"
+                    emptyLabel="No features yet — add the highlights of this product."
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold tracking-wider text-stone-700 uppercase">
+                    Care instructions
+                  </p>
+                  <ListEditor
+                    items={careInstructions}
+                    onChange={setCareInstructions}
+                    placeholder="Gentle hand wash, dry flat in shade"
+                    addLabel="Add an instruction"
+                    emptyLabel="No care instructions yet — tell shoppers how to look after it."
+                  />
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step="6"
+              eyebrow="Showcase"
+              title="Where this product is featured"
+              hint="Both are optional. They decide whether this product is pushed forward on the website."
+            >
+              <div className="space-y-2">
+                <CheckboxRow
+                  checked={form.isFeatured}
+                  onChange={(checked) => setField("isFeatured", checked)}
+                  label="Is featured"
+                  hint="Ticked, this product appears in the featured picks on the home page."
+                  description="Extra visibility on the home page."
+                />
+                <CheckboxRow
+                  checked={form.mainShowcase}
+                  onChange={(checked) => setField("mainShowcase", checked)}
+                  label="Main showcase"
+                  hint="Ticked, this product becomes the thumbnail of its category — the image shoppers see before they open the category."
+                  description="Represent its category on the website."
+                />
+              </div>
+            </SectionCard>
+
+            {formError && (
+              <div className="flex items-start gap-2 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:rounded-3xl">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{formError}</span>
+              </div>
             )}
+
+            <div className="sticky bottom-4 z-20 rounded-2xl border border-white/70 bg-white/95 px-3 py-3 shadow-lg shadow-rose-100/60 sm:rounded-3xl sm:px-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-stone-500">
+                  {selectedCategoryIds.length} categor
+                  {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
+                  {form.status}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/manager/product-studio/products/${productKey}`}
+                    className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={saving || !form.name.trim()}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    Save changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
 
       <ConfirmDialog
@@ -869,9 +863,7 @@ function ListEditor({
         type="button"
         onClick={() => onChange([...items, ""])}
         disabled={!canAdd}
-        title={
-          canAdd ? addLabel : "Fill the last line before adding another"
-        }
+        title={canAdd ? addLabel : "Fill the last line before adding another"}
         className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-200 disabled:hover:bg-white disabled:hover:text-stone-500"
       >
         <Plus className="h-3 w-3" />
@@ -1061,4 +1053,3 @@ function CheckboxRow({
     </label>
   );
 }
-

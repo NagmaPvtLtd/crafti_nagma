@@ -40,7 +40,9 @@ import type {
 const BASE = "/api/manager/product-studio/options";
 const VALUES = `${BASE}/values`;
 
-type OptionModalState = { mode: "create" } | { mode: "edit"; option: GlobalOption };
+type OptionModalState =
+  | { mode: "create" }
+  | { mode: "edit"; option: GlobalOption };
 
 type DeleteTarget =
   | { kind: "option"; option: GlobalOption }
@@ -49,8 +51,6 @@ type DeleteTarget =
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-
 
 /* ------------------------------------------------------------------ */
 /*  Main                                                               */
@@ -62,9 +62,10 @@ export default function GlobalOptionsClient() {
   const [error, setError] = useState<string | null>(null);
 
   const [optionModal, setOptionModal] = useState<OptionModalState | null>(null);
-  const [valueEdit, setValueEdit] = useState<
-    { option: GlobalOption; value: GlobalOptionValue } | null
-  >(null);
+  const [valueEdit, setValueEdit] = useState<{
+    option: GlobalOption;
+    value: GlobalOptionValue;
+  } | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -134,11 +135,7 @@ export default function GlobalOptionsClient() {
   /* ---- value create ---- */
   const addValue = useCallback(
     async (optionId: string, value: string): Promise<boolean> => {
-      await axios.post(
-        VALUES,
-        { optionId, value },
-        { withCredentials: true },
-      );
+      await axios.post(VALUES, { optionId, value }, { withCredentials: true });
       toast.success("Value added");
       await load();
       return true;
@@ -163,9 +160,12 @@ export default function GlobalOptionsClient() {
     setDeleting(true);
     try {
       if (toDelete.kind === "option") {
-        await axios.delete(`${BASE}?id=${encodeURIComponent(toDelete.option.id)}`, {
-          withCredentials: true,
-        });
+        await axios.delete(
+          `${BASE}?id=${encodeURIComponent(toDelete.option.id)}`,
+          {
+            withCredentials: true,
+          },
+        );
         toast.success("Option deleted");
       } else {
         await axios.delete(
@@ -189,107 +189,100 @@ export default function GlobalOptionsClient() {
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <Link
-              href="/manager/product-studio"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
+        <SectionEyebrow href="/manager/product-studio">
+          PRODUCT STUDIO
+        </SectionEyebrow>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+              Global Options
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+              Create the pool of options your products can have — Colour, Size,
+              Material — and fill each one with its values. Yellow, Red and Blue
+              go inside Colour; Small, Medium and Large inside Size.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void load()}
+              disabled={loading}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Product Studio
-            </Link>
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
 
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                  Global Options
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Create the pool of options your products can have — Colour,
-                  Size, Material — and fill each one with its values. Yellow, Red
-                  and Blue go inside Colour; Small, Medium and Large inside Size.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => void load()}
-                  disabled={loading}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                  />
-                  <span className="hidden sm:inline">Refresh</span>
-                </button>
-
-                <button
-                  onClick={() => setOptionModal({ mode: "create" })}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  New option
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={() => setOptionModal({ mode: "create" })}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New option
+            </button>
+          </div>
+        </div>
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !data && (
-              <CustomLoader
-                fullScreen={false}
-                label="Gathering the option pool…"
-                hint="Colours, sizes, materials and their values."
-              />
-            )}
+        {loading && !data && (
+          <CustomLoader
+            fullScreen={false}
+            label="Gathering the option pool…"
+            hint="Colours, sizes, materials and their values."
+          />
+        )}
 
-            {error && !loading && (
-              <ErrorState title="Couldn't load options" message={error} onRetry={() => void load()} />
-            )}
+        {error && !loading && (
+          <ErrorState
+            title="Couldn't load options"
+            message={error}
+            onRetry={() => void load()}
+          />
+        )}
 
-            {data && !error && (
-              <div className="space-y-6">
-                {counts && <StatStrip counts={counts} />}
+        {data && !error && (
+          <div className="space-y-6">
+            {counts && <StatStrip counts={counts} />}
 
-                {options.length === 0 ? (
-                  <EmptyState
-                    onCreate={() => setOptionModal({ mode: "create" })}
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    <div className="mb-1 flex items-end justify-between gap-3">
-                      <div>
-                        <SectionEyebrow>The pool</SectionEyebrow>
-                        <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                          Options &amp; values
-                        </h2>
-                      </div>
-                      <p className="hidden text-xs text-stone-500 sm:block">
-                        {plural(options.length, "option")}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      {options.map((option) => (
-                        <OptionCard
-                          key={option.id}
-                          option={option}
-                          onEdit={() => setOptionModal({ mode: "edit", option })}
-                          onDelete={() =>
-                            setToDelete({ kind: "option", option })
-                          }
-                          onAddValue={addValue}
-                          onEditValue={(value) =>
-                            setValueEdit({ option, value })
-                          }
-                          onDeleteValue={(value) =>
-                            setToDelete({ kind: "value", option, value })
-                          }
-                        />
-                      ))}
-                    </div>
+            {options.length === 0 ? (
+              <EmptyState onCreate={() => setOptionModal({ mode: "create" })} />
+            ) : (
+              <div className="space-y-3">
+                <div className="mb-1 flex items-end justify-between gap-3">
+                  <div>
+                    <SectionEyebrow>The pool</SectionEyebrow>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                      Options &amp; values
+                    </h2>
                   </div>
-                )}
+                  <p className="hidden text-xs text-stone-500 sm:block">
+                    {plural(options.length, "option")}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {options.map((option) => (
+                    <OptionCard
+                      key={option.id}
+                      option={option}
+                      onEdit={() => setOptionModal({ mode: "edit", option })}
+                      onDelete={() => setToDelete({ kind: "option", option })}
+                      onAddValue={addValue}
+                      onEditValue={(value) => setValueEdit({ option, value })}
+                      onDeleteValue={(value) =>
+                        setToDelete({ kind: "value", option, value })
+                      }
+                    />
+                  ))}
+                </div>
               </div>
             )}
+          </div>
+        )}
       </div>
 
       {optionModal && (
@@ -363,7 +356,9 @@ function StatStrip({ counts }: { counts: GlobalOptionsResponse["counts"] }) {
           <p className="mt-1.5 truncate text-base font-semibold tabular-nums text-stone-900 sm:text-lg">
             {it.value.toLocaleString("en-IN")}
           </p>
-          <p className="mt-0.5 truncate text-[10px] text-stone-400">{it.hint}</p>
+          <p className="mt-0.5 truncate text-[10px] text-stone-400">
+            {it.hint}
+          </p>
         </div>
       ))}
     </div>
@@ -899,7 +894,9 @@ function Overlay({
         onClick={onClose}
         role="presentation"
       />
-      <div className="relative flex w-full max-w-lg justify-center">{children}</div>
+      <div className="relative flex w-full max-w-lg justify-center">
+        {children}
+      </div>
     </div>
   );
 }
@@ -931,4 +928,3 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     </div>
   );
 }
-

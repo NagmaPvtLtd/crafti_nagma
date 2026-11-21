@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
-  ArrowLeft,
   Check,
   FolderTree,
   Info,
@@ -327,442 +326,429 @@ export default function AddProductClient() {
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <Link
-              href="/manager/product-studio"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 transition-colors hover:text-rose-700"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Product Studio
-            </Link>
-
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-              Add a product
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Set up the base product once — its categories, options and copy —
-              and every variant you make from it inherits them.
-            </p>
+        <SectionEyebrow href="/manager/product-studio">
+          PRODUCT STUDIO
+        </SectionEyebrow>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+          Add a product
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+          Set up the base product once — its categories, options and copy — and
+          every variant you make from it inherits them.
+        </p>
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !categories && (
-              <CustomLoader
-                fullScreen={false}
-                label="Laying out the product form…"
-                hint="Categories, options and their values."
-              />
-            )}
+        {loading && !categories && (
+          <CustomLoader
+            fullScreen={false}
+            label="Laying out the product form…"
+            hint="Categories, options and their values."
+          />
+        )}
 
-            {loadError && !loading && (
-              <ErrorState
-                title="Couldn't load the form"
-                message={loadError}
-                onRetry={() => window.location.reload()}
-              />
-            )}
+        {loadError && !loading && (
+          <ErrorState
+            title="Couldn't load the form"
+            message={loadError}
+            onRetry={() => window.location.reload()}
+          />
+        )}
 
-            {!loading && !loadError && (
-              <form onSubmit={handleSubmit} noValidate className="space-y-3">
-                <BaseNotice />
+        {!loading && !loadError && (
+          <form onSubmit={handleSubmit} noValidate className="space-y-3">
+            <BaseNotice />
 
-                <PoolWarnings
-                  categories={categories ?? []}
-                  options={availableOptions}
-                />
+            <PoolWarnings
+              categories={categories ?? []}
+              options={availableOptions}
+            />
 
-                <SectionCard
-                  step="1"
-                  eyebrow="The basics"
-                  title="Product information"
-                  hint="The shared story of this base product. Its variants start from this copy."
+            <SectionCard
+              step="1"
+              eyebrow="The basics"
+              title="Product information"
+              hint="The shared story of this base product. Its variants start from this copy."
+            >
+              <div className="space-y-4">
+                <Field
+                  label="Product name"
+                  required
+                  error={errors.name}
+                  hint="How the base is labelled in the studio and on the website."
                 >
-                  <div className="space-y-4">
-                    <Field
-                      label="Product name"
-                      required
-                      error={errors.name}
-                      hint="How the base is labelled in the studio and on the website."
-                    >
-                      <TextInput
-                        value={form.name}
-                        onChange={(e) => setField("name", e.target.value)}
-                        placeholder="Crochet Bouquet"
-                        maxLength={255}
-                      />
-                    </Field>
+                  <TextInput
+                    value={form.name}
+                    onChange={(e) => setField("name", e.target.value)}
+                    placeholder="Crochet Bouquet"
+                    maxLength={255}
+                  />
+                </Field>
 
-                    <Field
-                      label="Brief description"
-                      error={errors.briefDescription}
-                      hint="One or two lines for cards and listings — keep it short."
-                    >
-                      <Textarea
-                        value={form.briefDescription}
-                        onChange={(e) =>
-                          setField("briefDescription", e.target.value)
-                        }
-                        placeholder="Hand-tied crochet flowers that never wilt."
-                        maxLength={500}
-                        rows={2}
-                      />
-                    </Field>
-
-                    <Field
-                      label="Description"
-                      error={errors.description}
-                      hint="The full story — materials, size, care, anything the customer should know."
-                    >
-                      <Textarea
-                        value={form.description}
-                        onChange={(e) =>
-                          setField("description", e.target.value)
-                        }
-                        placeholder="Made with soft cotton yarn, each bouquet is stitched by hand…"
-                        rows={5}
-                      />
-                    </Field>
-                  </div>
-                </SectionCard>
-
-                <SectionCard
-                  step="2"
-                  eyebrow="Search & sharing"
-                  title="Meta details"
-                  hint="What search engines and link previews show. Leave blank to fall back to the product name and brief."
+                <Field
+                  label="Brief description"
+                  error={errors.briefDescription}
+                  hint="One or two lines for cards and listings — keep it short."
                 >
-                  <div className="space-y-4">
-                    <Field
-                      label="Meta title"
-                      error={errors.metaTitle}
-                      action={
-                        <CopyButton
-                          label="Keep same as name"
-                          disabled={!form.name.trim()}
-                          onClick={() => setField("metaTitle", form.name)}
-                        />
-                      }
-                      hint="The blue line in Google results. Around 60 characters is plenty."
-                    >
-                      <TextInput
-                        value={form.metaTitle}
-                        onChange={(e) => setField("metaTitle", e.target.value)}
-                        placeholder="Crochet Bouquet — handmade flowers"
-                        maxLength={255}
-                      />
-                    </Field>
+                  <Textarea
+                    value={form.briefDescription}
+                    onChange={(e) =>
+                      setField("briefDescription", e.target.value)
+                    }
+                    placeholder="Hand-tied crochet flowers that never wilt."
+                    maxLength={500}
+                    rows={2}
+                  />
+                </Field>
 
-                    <Field
-                      label="Meta description"
-                      error={errors.metaDescription}
-                      action={
-                        <CopyButton
-                          label="Keep same as brief"
-                          disabled={
-                            !(
-                              form.briefDescription.trim() ||
-                              form.description.trim()
-                            )
-                          }
-                          onClick={() =>
-                            setField(
-                              "metaDescription",
-                              form.briefDescription.trim() ||
-                                form.description.trim(),
-                            )
-                          }
-                        />
-                      }
-                      hint="The grey snippet under the title in search results. Around 155 characters."
-                    >
-                      <Textarea
-                        value={form.metaDescription}
-                        onChange={(e) =>
-                          setField("metaDescription", e.target.value)
-                        }
-                        placeholder="Hand-tied crochet flowers that never wilt."
-                        maxLength={500}
-                        rows={2}
-                      />
-                    </Field>
-                  </div>
-                </SectionCard>
+                <Field
+                  label="Description"
+                  error={errors.description}
+                  hint="The full story — materials, size, care, anything the customer should know."
+                >
+                  <Textarea
+                    value={form.description}
+                    onChange={(e) => setField("description", e.target.value)}
+                    placeholder="Made with soft cotton yarn, each bouquet is stitched by hand…"
+                    rows={5}
+                  />
+                </Field>
+              </div>
+            </SectionCard>
 
-                <SectionCard
-                  step="3"
-                  eyebrow="Where it lives"
-                  title="Categories"
-                  hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
-                  error={errors.categoryIds}
+            <SectionCard
+              step="2"
+              eyebrow="Search & sharing"
+              title="Meta details"
+              hint="What search engines and link previews show. Leave blank to fall back to the product name and brief."
+            >
+              <div className="space-y-4">
+                <Field
+                  label="Meta title"
+                  error={errors.metaTitle}
                   action={
-                    <RefreshButton
-                      onClick={reloadPools}
-                      busy={refreshing}
-                      disabled={loading || refreshing}
+                    <CopyButton
+                      label="Keep same as name"
+                      disabled={!form.name.trim()}
+                      onClick={() => setField("metaTitle", form.name)}
                     />
                   }
+                  hint="The blue line in Google results. Around 60 characters is plenty."
                 >
-                  {roots.length === 0 ? (
-                    <PoolHint
-                      href="/manager/product-studio/categories"
-                      label="Create your first category"
-                      text="No categories yet — a product needs at least one."
+                  <TextInput
+                    value={form.metaTitle}
+                    onChange={(e) => setField("metaTitle", e.target.value)}
+                    placeholder="Crochet Bouquet — handmade flowers"
+                    maxLength={255}
+                  />
+                </Field>
+
+                <Field
+                  label="Meta description"
+                  error={errors.metaDescription}
+                  action={
+                    <CopyButton
+                      label="Keep same as brief"
+                      disabled={
+                        !(
+                          form.briefDescription.trim() ||
+                          form.description.trim()
+                        )
+                      }
+                      onClick={() =>
+                        setField(
+                          "metaDescription",
+                          form.briefDescription.trim() ||
+                            form.description.trim(),
+                        )
+                      }
                     />
-                  ) : (
-                    <div className="space-y-2">
-                      {roots.map((root) => {
-                        const subcategories =
-                          childrenByParent.get(root.id) ?? [];
-
-                        return (
-                          <div
-                            key={root.id}
-                            className={`overflow-hidden rounded-xl border bg-white transition-colors ${
-                              selectedCategoryIds.includes(root.id)
-                                ? "border-rose-200"
-                                : "border-stone-200"
-                            }`}
-                          >
-                            <CategoryRow
-                              kind="main"
-                              name={root.name}
-                              childCount={subcategories.length}
-                              checked={selectedCategoryIds.includes(root.id)}
-                              onToggle={() => toggleCategory(root.id)}
-                            />
-
-                            {subcategories.length > 0 && (
-                              <div className="border-t border-dashed border-stone-200 bg-stone-50/50 py-1 pr-2">
-                                {subcategories.map((sub) => (
-                                  <CategoryRow
-                                    key={sub.id}
-                                    kind="sub"
-                                    name={sub.name}
-                                    checked={selectedCategoryIds.includes(
-                                      sub.id,
-                                    )}
-                                    onToggle={() => toggleCategory(sub.id)}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      <p className="pt-1 text-[11px] text-stone-500">
-                        {selectedCategoryIds.length === 0
-                          ? "Nothing selected yet."
-                          : `${selectedCategoryIds.length} selected.`}
-                      </p>
-                    </div>
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  step="4"
-                  eyebrow="Choices"
-                  title="Options & values"
-                  hint="Options are the pools a variant is built from — Colour, Size, Material. Tick a pool, then pick its values. The first value is selected for you as the default."
-                  error={errors.options}
+                  }
+                  hint="The grey snippet under the title in search results. Around 155 characters."
                 >
-                  {availableOptions.length === 0 ? (
-                    <PoolHint
-                      href="/manager/product-studio/options"
-                      label="Create an option pool"
-                      text="No options yet — a base product needs at least one option with a value."
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      {availableOptions.map((option) => {
-                        const chosen = selectedValues[option.id];
-                        const included = chosen !== undefined;
+                  <Textarea
+                    value={form.metaDescription}
+                    onChange={(e) =>
+                      setField("metaDescription", e.target.value)
+                    }
+                    placeholder="Hand-tied crochet flowers that never wilt."
+                    maxLength={500}
+                    rows={2}
+                  />
+                </Field>
+              </div>
+            </SectionCard>
 
-                        return (
-                          <div
-                            key={option.id}
-                            className="rounded-xl border border-stone-200 bg-white p-3"
-                          >
-                            <label className="flex cursor-pointer items-start gap-2.5">
-                              <input
-                                type="checkbox"
-                                checked={included}
-                                onChange={() => toggleOption(option)}
-                                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-rose-500"
+            <SectionCard
+              step="3"
+              eyebrow="Where it lives"
+              title="Categories"
+              hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
+              error={errors.categoryIds}
+              action={
+                <RefreshButton
+                  onClick={reloadPools}
+                  busy={refreshing}
+                  disabled={loading || refreshing}
+                />
+              }
+            >
+              {roots.length === 0 ? (
+                <PoolHint
+                  href="/manager/product-studio/categories"
+                  label="Create your first category"
+                  text="No categories yet — a product needs at least one."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {roots.map((root) => {
+                    const subcategories = childrenByParent.get(root.id) ?? [];
+
+                    return (
+                      <div
+                        key={root.id}
+                        className={`overflow-hidden rounded-xl border bg-white transition-colors ${
+                          selectedCategoryIds.includes(root.id)
+                            ? "border-rose-200"
+                            : "border-stone-200"
+                        }`}
+                      >
+                        <CategoryRow
+                          kind="main"
+                          name={root.name}
+                          childCount={subcategories.length}
+                          checked={selectedCategoryIds.includes(root.id)}
+                          onToggle={() => toggleCategory(root.id)}
+                        />
+
+                        {subcategories.length > 0 && (
+                          <div className="border-t border-dashed border-stone-200 bg-stone-50/50 py-1 pr-2">
+                            {subcategories.map((sub) => (
+                              <CategoryRow
+                                key={sub.id}
+                                kind="sub"
+                                name={sub.name}
+                                checked={selectedCategoryIds.includes(sub.id)}
+                                onToggle={() => toggleCategory(sub.id)}
                               />
-                              <span className="min-w-0 flex-1">
-                                <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-stone-800">
-                                  {option.name}
-                                  <span className="text-[10px] font-normal text-stone-400">
-                                    {option.valueCount} value
-                                    {option.valueCount === 1 ? "" : "s"}
-                                  </span>
-                                </span>
-                                <span className="mt-0.5 block text-[11px] text-stone-500">
-                                  {option.description || "No description yet"}
-                                </span>
-                              </span>
-                              {included && (
-                                <span className="shrink-0 rounded-full border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 text-[10px] font-medium text-rose-600">
-                                  {chosen.length} picked
-                                </span>
-                              )}
-                            </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
 
-                            {included && (
-                              <div className="mt-2 flex flex-wrap gap-1.5 border-t border-dashed border-stone-100 pt-2">
-                                {option.values.length === 0 ? (
-                                  <p className="text-[11px] text-amber-700">
-                                    This pool has no values yet — add them in{" "}
-                                    Global Options.
-                                  </p>
-                                ) : (
-                                  option.values.map((value) => (
-                                    <SelectChip
-                                      key={value.id}
-                                      selected={chosen.includes(value.id)}
-                                      onClick={() =>
-                                        toggleValue(option.id, value.id)
-                                      }
-                                    >
-                                      {value.value}
-                                    </SelectChip>
-                                  ))
-                                )}
-                              </div>
+                  <p className="pt-1 text-[11px] text-stone-500">
+                    {selectedCategoryIds.length === 0
+                      ? "Nothing selected yet."
+                      : `${selectedCategoryIds.length} selected.`}
+                  </p>
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              step="4"
+              eyebrow="Choices"
+              title="Options & values"
+              hint="Options are the pools a variant is built from — Colour, Size, Material. Tick a pool, then pick its values. The first value is selected for you as the default."
+              error={errors.options}
+            >
+              {availableOptions.length === 0 ? (
+                <PoolHint
+                  href="/manager/product-studio/options"
+                  label="Create an option pool"
+                  text="No options yet — a base product needs at least one option with a value."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {availableOptions.map((option) => {
+                    const chosen = selectedValues[option.id];
+                    const included = chosen !== undefined;
+
+                    return (
+                      <div
+                        key={option.id}
+                        className="rounded-xl border border-stone-200 bg-white p-3"
+                      >
+                        <label className="flex cursor-pointer items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={included}
+                            onChange={() => toggleOption(option)}
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-rose-500"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-stone-800">
+                              {option.name}
+                              <span className="text-[10px] font-normal text-stone-400">
+                                {option.valueCount} value
+                                {option.valueCount === 1 ? "" : "s"}
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-stone-500">
+                              {option.description || "No description yet"}
+                            </span>
+                          </span>
+                          {included && (
+                            <span className="shrink-0 rounded-full border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 text-[10px] font-medium text-rose-600">
+                              {chosen.length} picked
+                            </span>
+                          )}
+                        </label>
+
+                        {included && (
+                          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-dashed border-stone-100 pt-2">
+                            {option.values.length === 0 ? (
+                              <p className="text-[11px] text-amber-700">
+                                This pool has no values yet — add them in Global
+                                Options.
+                              </p>
+                            ) : (
+                              option.values.map((value) => (
+                                <SelectChip
+                                  key={value.id}
+                                  selected={chosen.includes(value.id)}
+                                  onClick={() =>
+                                    toggleValue(option.id, value.id)
+                                  }
+                                >
+                                  {value.value}
+                                </SelectChip>
+                              ))
                             )}
                           </div>
-                        );
-                      })}
-
-                      <p className="pt-1 text-[11px] text-stone-500">
-                        {includedOptions.length === 0
-                          ? "No option selected yet."
-                          : `${includedOptions.length} option${
-                              includedOptions.length === 1 ? "" : "s"
-                            } selected.`}
-                      </p>
-                    </div>
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  step="5"
-                  eyebrow="Money & visibility"
-                  title="Delivery and status"
-                >
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                      label="Delivery charges (₹)"
-                      error={errors.deliveryCharges}
-                      hint="Added to the order total. Enter 0 for free delivery."
-                    >
-                      <TextInput
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={form.deliveryCharges}
-                        onChange={(e) =>
-                          setField("deliveryCharges", e.target.value)
-                        }
-                        className="tabular-nums"
-                      />
-                    </Field>
-
-                    <div>
-                      <div className="mb-1 flex items-center gap-1.5">
-                        <label
-                          htmlFor="product-status"
-                          className="text-xs font-semibold tracking-wider text-stone-700 uppercase"
-                        >
-                          Status
-                        </label>
-                        <Hint text="Active products are visible on the website. Inactive ones stay in the studio but disappear from the collections." />
-                      </div>
-                      <select
-                        id="product-status"
-                        value={form.status}
-                        onChange={(e) =>
-                          setField(
-                            "status",
-                            e.target.value as FormState["status"],
-                          )
-                        }
-                        className={`${inputClass(false)} cursor-pointer`}
-                      >
-                        <option value="active">Active — visible</option>
-                        <option value="inactive">Inactive — hidden</option>
-                      </select>
-                      <p className="mt-1 text-xs text-stone-500">
-                        You can flip this later from the product.
-                      </p>
-                    </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard
-                  step="6"
-                  eyebrow="Showcase"
-                  title="Where this product is featured"
-                  hint="Both are optional. They decide whether this product is pushed forward on the website."
-                >
-                  <div className="space-y-2">
-                    <CheckboxRow
-                      checked={form.isFeatured}
-                      onChange={(checked) => setField("isFeatured", checked)}
-                      label="Is featured"
-                      hint="Ticked, this product appears in the featured picks on the home page."
-                      description="Extra visibility on the home page."
-                    />
-                    <CheckboxRow
-                      checked={form.mainShowcase}
-                      onChange={(checked) => setField("mainShowcase", checked)}
-                      label="Main showcase"
-                      hint="Ticked, this product becomes the thumbnail of its category — the image shoppers see before they open the category."
-                      description="Represent its category on the website."
-                    />
-                  </div>
-                </SectionCard>
-
-                {formError && (
-                  <div className="flex items-start gap-2 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:rounded-3xl">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{formError}</span>
-                  </div>
-                )}
-
-                <div className="sticky bottom-4 z-20 rounded-2xl border border-white/70 bg-white/95 px-3 py-3 shadow-lg shadow-rose-100/60 sm:rounded-3xl sm:px-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] text-stone-500">
-                      {selectedCategoryIds.length} categor
-                      {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
-                      {includedOptions.length} option
-                      {includedOptions.length === 1 ? "" : "s"} · {form.status}
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href="/manager/product-studio"
-                        className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
-                      >
-                        Cancel
-                      </Link>
-                      <button
-                        type="submit"
-                        disabled={!canSubmit}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {saving ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Check className="h-3.5 w-3.5" />
                         )}
-                        Create base product
-                      </button>
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
+
+                  <p className="pt-1 text-[11px] text-stone-500">
+                    {includedOptions.length === 0
+                      ? "No option selected yet."
+                      : `${includedOptions.length} option${
+                          includedOptions.length === 1 ? "" : "s"
+                        } selected.`}
+                  </p>
                 </div>
-              </form>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              step="5"
+              eyebrow="Money & visibility"
+              title="Delivery and status"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  label="Delivery charges (₹)"
+                  error={errors.deliveryCharges}
+                  hint="Added to the order total. Enter 0 for free delivery."
+                >
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.deliveryCharges}
+                    onChange={(e) =>
+                      setField("deliveryCharges", e.target.value)
+                    }
+                    className="tabular-nums"
+                  />
+                </Field>
+
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <label
+                      htmlFor="product-status"
+                      className="text-xs font-semibold tracking-wider text-stone-700 uppercase"
+                    >
+                      Status
+                    </label>
+                    <Hint text="Active products are visible on the website. Inactive ones stay in the studio but disappear from the collections." />
+                  </div>
+                  <select
+                    id="product-status"
+                    value={form.status}
+                    onChange={(e) =>
+                      setField("status", e.target.value as FormState["status"])
+                    }
+                    className={`${inputClass(false)} cursor-pointer`}
+                  >
+                    <option value="active">Active — visible</option>
+                    <option value="inactive">Inactive — hidden</option>
+                  </select>
+                  <p className="mt-1 text-xs text-stone-500">
+                    You can flip this later from the product.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              step="6"
+              eyebrow="Showcase"
+              title="Where this product is featured"
+              hint="Both are optional. They decide whether this product is pushed forward on the website."
+            >
+              <div className="space-y-2">
+                <CheckboxRow
+                  checked={form.isFeatured}
+                  onChange={(checked) => setField("isFeatured", checked)}
+                  label="Is featured"
+                  hint="Ticked, this product appears in the featured picks on the home page."
+                  description="Extra visibility on the home page."
+                />
+                <CheckboxRow
+                  checked={form.mainShowcase}
+                  onChange={(checked) => setField("mainShowcase", checked)}
+                  label="Main showcase"
+                  hint="Ticked, this product becomes the thumbnail of its category — the image shoppers see before they open the category."
+                  description="Represent its category on the website."
+                />
+              </div>
+            </SectionCard>
+
+            {formError && (
+              <div className="flex items-start gap-2 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3 text-xs text-rose-700 sm:rounded-3xl">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{formError}</span>
+              </div>
             )}
+
+            <div className="sticky bottom-4 z-20 rounded-2xl border border-white/70 bg-white/95 px-3 py-3 shadow-lg shadow-rose-100/60 sm:rounded-3xl sm:px-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-stone-500">
+                  {selectedCategoryIds.length} categor
+                  {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
+                  {includedOptions.length} option
+                  {includedOptions.length === 1 ? "" : "s"} · {form.status}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/manager/product-studio"
+                    className="cursor-pointer rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-50"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    Create base product
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
     </PageWrapper>
   );
@@ -1143,4 +1129,3 @@ function CheckboxRow({
     </label>
   );
 }
-

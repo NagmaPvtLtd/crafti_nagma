@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invalidInput, isDuplicateEntry } from "../../../../../utils/Api/apiResponse.util";
+import {
+  invalidInput,
+  isDuplicateEntry,
+} from "../../../../../utils/Api/apiResponse.util";
 import type { RowDataPacket } from "mysql2";
 import { auditLog } from "../../../../../services/AuditLog.service";
 import { ImageKitService } from "../../../../../services/Imagekit.service";
@@ -228,10 +231,7 @@ export async function GET(
     );
     const id = refRows[0]?.id;
     if (!id) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     const [productRows] = await conn.query<ProductRow[]>(
