@@ -1,0 +1,1 @@
+I have given ability to manually change the product code / variant code. Hence, if the code being changed then check in the database that it should not match any existing product code and throw error and return error that this product code is already used. choose different one.

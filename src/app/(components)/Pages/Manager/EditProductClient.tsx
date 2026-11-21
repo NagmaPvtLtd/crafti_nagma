@@ -25,8 +25,12 @@ import TextInput from "../../utils/Form/TextInput";
 import Textarea from "../../utils/Form/Textarea";
 import { inputClass } from "../../utils/Form/fieldStyles";
 import CustomLoader from "../../CustomLoader";
+import ConfirmDialog from "../../utils/ConfirmDialog";
 import { productBaseUpdateSchema } from "../../../../utils/zod/product/manager.productDetail.zod";
-import type { ProductDetailResponse } from "../../../../utils/zod/product/manager.productDetail.zod";
+import type {
+  ProductBaseUpdateInput,
+  ProductDetailResponse,
+} from "../../../../utils/zod/product/manager.productDetail.zod";
 import type {
   GlobalCategoriesResponse,
   GlobalCategory,
@@ -100,6 +104,10 @@ export default function EditProductClient({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [pendingSave, setPendingSave] = useState<ProductBaseUpdateInput | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -240,6 +248,18 @@ export default function EditProductClient({
       return;
     }
 
+    /* Disabling a live product is destructive — ask before hiding it and
+       removing the photos of all of its variants. */
+    if (form.status === "inactive" && product?.product.status === "active") {
+      setPendingSave(parsed.data);
+      setDisableOpen(true);
+      return;
+    }
+
+    await submit(parsed.data);
+  };
+
+  const submit = async (payload: ProductBaseUpdateInput) => {
     setSaving(true);
     setErrors({});
 
@@ -247,12 +267,14 @@ export default function EditProductClient({
       const res = await axios.put<{
         ok: true;
         product: { id: string; code: string };
-      }>(`/api/manager/product-studio/${productId}`, parsed.data, {
+      }>(`/api/manager/product-studio/${productId}`, payload, {
         withCredentials: true,
       });
 
       const saved = res.data.product;
       toast.success("Product updated");
+      setDisableOpen(false);
+      setPendingSave(null);
       router.push(
         `/manager/product-studio/products/${saved?.code || saved?.id || productKey}`,
       );
@@ -273,6 +295,7 @@ export default function EditProductClient({
       setErrors(mapped);
       const message = getAxiosErrorMessage(err, "Could not update the product");
       setFormError(message);
+      setDisableOpen(false);
       toast.error(message);
     } finally {
       setSaving(false);
@@ -700,6 +723,30 @@ export default function EditProductClient({
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={disableOpen}
+        title="Disable this product?"
+        description={
+          <>
+            <span className="font-semibold">{product?.product.name}</span> will
+            be hidden from the storefront together with every one of its
+            variants. All variant photos — original ImageKit uploads and shallow
+            links — will be removed to free up space, and every variant will be
+            marked inactive. Products whose variants appear in an order cannot
+            be disabled.
+          </>
+        }
+        confirmLabel="Disable product"
+        loading={saving}
+        onConfirm={() => {
+          if (pendingSave) void submit(pendingSave);
+        }}
+        onClose={() => {
+          setDisableOpen(false);
+          setPendingSave(null);
+        }}
+      />
     </PageWrapper>
   );
 }

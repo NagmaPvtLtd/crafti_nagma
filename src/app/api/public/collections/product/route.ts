@@ -9,6 +9,7 @@ import type {
   CollectionProductImage,
   CollectionProductResponse,
   CollectionVariant,
+  CollectionVariantRef,
 } from "../../../../../types/Collection.types";
 
 /* -------------------------------------------------------------------------- */
@@ -33,8 +34,11 @@ interface ImageRow extends RowDataPacket {
   alt_text: string | null;
 }
 
-interface VariantImageRow extends ImageRow {
-  variant_id: string;
+interface VariantRefRow extends RowDataPacket {
+  id: string;
+  sku: string;
+  stock: number | string;
+  status: "active" | "inactive";
 }
 
 interface VariantRow extends RowDataPacket {
@@ -109,19 +113,30 @@ function toNumber(value: number | string | null): number | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  GET /api/public/collections/product?code=<product code>                   */
-/*  One active product with its options, variants (each with its own photos), */
-/*  review summary and category path. The storefront opens on                   */
-/*  `defaultVariantId` and swaps everything as the shopper picks values.       */
+/*  GET /api/public/collections/product?code=<code>&variant=<sku>             */
+/*                                                                            */
+/*  Only ONE variant's full data is loaded per request — the one named by     */
+/*  `variant` (its SKU, or its id), falling back to the product's default.    */
+/*  `variants` ships just the SKU skeleton (id, SKU, status, option values)   */
+/*  so the option chips know which SKU to ask for next; changing a value      */
+/*  triggers a fresh request for that SKU instead of shipping every variant.  */
 /* -------------------------------------------------------------------------- */
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const ref = (searchParams.get("code") ?? "").trim();
+  const variantRef = (searchParams.get("variant") ?? "").trim();
 
   if (!ref || ref.length > 120) {
     return NextResponse.json(
       { error: "A product code is required" },
+      { status: 400 },
+    );
+  }
+
+  if (variantRef.length > 120) {
+    return NextResponse.json(
+      { error: "That variant reference is not valid" },
       { status: 400 },
     );
   }
@@ -157,36 +172,12 @@ export async function GET(req: NextRequest) {
       [row.id],
     );
 
-    /* Every variant photo, grouped per variant by the time the payload is built. */
-    const [variantImages] = await conn.query<VariantImageRow[]>(
-      `SELECT f.id, f.entity_id AS variant_id, f.url, f.alt_text
-         FROM imagekit_files f
-         JOIN product_variants v ON v.id = f.entity_id
-        WHERE f.entity_type = 'product_variant'
-          AND f.file_purpose = 'product_variant_image'
-          AND v.product_id = ?
-        ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC`,
-      [row.id],
-    );
-
-    const imagesByVariant = new Map<string, CollectionProductImage[]>();
-    for (const image of variantImages) {
-      const list = imagesByVariant.get(image.variant_id) ?? [];
-      list.push({
-        id: image.id,
-        url: image.url,
-        altText: image.alt_text ?? null,
-      });
-      imagesByVariant.set(image.variant_id, list);
-    }
-
-    const [variantRows] = await conn.query<VariantRow[]>(
-      `SELECT v.id, v.sku, v.name, v.brief_description, v.description,
-              v.price, v.compare_at_price, v.stock, v.weight,
-              v.status, v.is_featured
+    /* The SKU skeleton for every variant — no copy, no price, no photos. */
+    const [variantRefRows] = await conn.query<VariantRefRow[]>(
+      `SELECT v.id, v.sku, v.stock, v.status
          FROM product_variants v
         WHERE v.product_id = ?
-        ORDER BY v.status = 'active' DESC, v.price ASC, v.created_at ASC`,
+        ORDER BY v.status = 'active' DESC, v.price ASC, v.created_at ASC, v.id ASC`,
       [row.id],
     );
 
@@ -274,7 +265,6 @@ export async function GET(req: NextRequest) {
       }))
       .filter((option) => option.values.length > 0);
 
-    /* ---------------- variants ---------------- */
     const valuesByVariant = new Map<string, string[]>();
     for (const link of variantValueRows) {
       const list = valuesByVariant.get(link.variant_id) ?? [];
@@ -282,45 +272,85 @@ export async function GET(req: NextRequest) {
       valuesByVariant.set(link.variant_id, list);
     }
 
-    const variants: CollectionVariant[] = variantRows.map((variant) => {
-      const own = imagesByVariant.get(variant.id) ?? [];
-      const fallback: CollectionProductImage[] =
-        own.length > 0
-          ? []
-          : productImages.map((image) => ({
-              id: image.id,
-              url: image.url,
-              altText: image.alt_text ?? null,
-            }));
+    /* ---------------- which variant? ---------------- */
+    const requested = variantRef
+      ? (variantRefRows.find((item) => item.sku === variantRef) ??
+        variantRefRows.find((item) => item.id === variantRef) ??
+        null)
+      : null;
 
-      return {
-        id: variant.id,
-        sku: variant.sku,
-        name: variant.name,
-        briefDescription: variant.brief_description,
-        description: variant.description,
-        price: Number(variant.price ?? 0),
-        compareAtPrice: toNumber(variant.compare_at_price),
-        stock: Number(variant.stock ?? 0),
-        weight: toNumber(variant.weight),
-        status: variant.status === "inactive" ? "inactive" : "active",
-        isFeatured: Boolean(variant.is_featured),
-        images: own.length > 0 ? own : fallback,
-        optionValueIds: valuesByVariant.get(variant.id) ?? [],
-      };
-    });
-
-    const openableVariants = variants.filter(
-      (variant) => variant.status === "active",
-    );
-    const defaultVariant =
-      openableVariants.find((variant) => variant.stock > 0) ??
-      openableVariants[0] ??
-      variants[0] ??
+    const chosen =
+      requested ??
+      variantRefRows.find(
+        (item) => item.status === "active" && Number(item.stock) > 0,
+      ) ??
+      variantRefRows.find((item) => item.status === "active") ??
+      variantRefRows[0] ??
       null;
 
-    /* prices across active variants (list/card context) */
-    const prices = openableVariants.map((variant) => variant.price);
+    /* ---------------- one variant, in full ---------------- */
+    let variant: CollectionVariant | null = null;
+
+    if (chosen) {
+      const [fullRows] = await conn.query<VariantRow[]>(
+        `SELECT v.id, v.sku, v.name, v.brief_description, v.description,
+                v.price, v.compare_at_price, v.stock, v.weight,
+                v.status, v.is_featured
+           FROM product_variants v
+          WHERE v.id = ?
+          LIMIT 1`,
+        [chosen.id],
+      );
+
+      const [imageRows] = await conn.query<ImageRow[]>(
+        `SELECT f.id, f.url, f.alt_text
+           FROM imagekit_files f
+          WHERE f.entity_type = 'product_variant'
+            AND f.file_purpose = 'product_variant_image'
+            AND f.entity_id = ?
+          ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC`,
+        [chosen.id],
+      );
+
+      const full = fullRows[0];
+      if (full) {
+        const ownImages: CollectionProductImage[] = imageRows.map((image) => ({
+          id: image.id,
+          url: image.url,
+          altText: image.alt_text ?? null,
+        }));
+
+        variant = {
+          id: full.id,
+          sku: full.sku,
+          name: full.name,
+          briefDescription: full.brief_description,
+          description: full.description,
+          price: Number(full.price ?? 0),
+          compareAtPrice: toNumber(full.compare_at_price),
+          stock: Number(full.stock ?? 0),
+          weight: toNumber(full.weight),
+          status: full.status === "inactive" ? "inactive" : "active",
+          isFeatured: Boolean(full.is_featured),
+          images:
+            ownImages.length > 0
+              ? ownImages
+              : productImages.map((image) => ({
+                  id: image.id,
+                  url: image.url,
+                  altText: image.alt_text ?? null,
+                })),
+          optionValueIds: valuesByVariant.get(full.id) ?? [],
+        };
+      }
+    }
+
+    const variants: CollectionVariantRef[] = variantRefRows.map((item) => ({
+      id: item.id,
+      sku: item.sku,
+      status: item.status === "inactive" ? "inactive" : "active",
+      optionValueIds: valuesByVariant.get(item.id) ?? [],
+    }));
 
     /* ---------------- category path ---------------- */
     const subLink = linkRows.find((link) => link.parent_id !== null) ?? null;
@@ -359,8 +389,6 @@ export async function GET(req: NextRequest) {
         altText: image.alt_text ?? null,
       })),
       options,
-      variants,
-      defaultVariantId: defaultVariant?.id ?? null,
       reviews: {
         average: reviewCount > 0 ? Number(reviews?.review_average ?? 0) : 0,
         count: reviewCount,
@@ -377,8 +405,6 @@ export async function GET(req: NextRequest) {
         id: gift.id,
         text: gift.item,
       })),
-      priceFrom: prices.length > 0 ? Math.min(...prices) : null,
-      priceTo: prices.length > 0 ? Math.max(...prices) : null,
       category,
       subcategory,
       href: `/collections/${category?.slug ?? ALL_SEGMENT}/${
@@ -386,7 +412,7 @@ export async function GET(req: NextRequest) {
       }/${encodeURIComponent(row.code)}`,
     };
 
-    const payload: CollectionProductResponse = { ok: true, product };
+    const payload: CollectionProductResponse = { ok: true, product, variant, variants };
     return NextResponse.json(payload);
   } catch (err) {
     console.error("[PUBLIC - COLLECTIONS - PRODUCT - GET]", err);

@@ -106,9 +106,9 @@ export default function AddProductClient() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   /** optionId → selected value ids */
-  const [selectedValues, setSelectedValues] = useState<Record<string, string[]>>(
-    {},
-  );
+  const [selectedValues, setSelectedValues] = useState<
+    Record<string, string[]>
+  >({});
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -155,7 +155,9 @@ export default function AddProductClient() {
       })
       .catch((err: unknown) => {
         if (active) {
-          setLoadError(getAxiosErrorMessage(err, "Could not load the form data"));
+          setLoadError(
+            getAxiosErrorMessage(err, "Could not load the form data"),
+          );
         }
       })
       .finally(() => {
@@ -432,7 +434,9 @@ export default function AddProductClient() {
                     >
                       <Textarea
                         value={form.description}
-                        onChange={(e) => setField("description", e.target.value)}
+                        onChange={(e) =>
+                          setField("description", e.target.value)
+                        }
                         placeholder="Made with soft cotton yarn, each bouquet is stitched by hand…"
                         rows={5}
                       />
@@ -509,7 +513,7 @@ export default function AddProductClient() {
                   title="Categories"
                   hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
                   error={errors.categoryIds}
-                                    action={
+                  action={
                     <RefreshButton
                       onClick={reloadPools}
                       busy={refreshing}
@@ -752,8 +756,7 @@ export default function AddProductClient() {
                       {selectedCategoryIds.length} categor
                       {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
                       {includedOptions.length} option
-                      {includedOptions.length === 1 ? "" : "s"} ·{" "}
-                      {form.status}
+                      {includedOptions.length === 1 ? "" : "s"} · {form.status}
                     </p>
 
                     <div className="flex items-center gap-2">
@@ -1037,7 +1040,9 @@ function CategoryRow({
           className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-rose-500"
         />
 
-        {isMain && <FolderTree className="h-3.5 w-3.5 shrink-0 text-rose-400" />}
+        {isMain && (
+          <FolderTree className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+        )}
 
         <span
           className={`min-w-0 flex-1 truncate ${

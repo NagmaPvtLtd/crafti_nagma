@@ -607,6 +607,9 @@ function VariantsSection({
   productRef: string;
   onGenerate: () => void;
 }) {
+  const active = variants.filter((variant) => variant.status === "active");
+  const disabled = variants.filter((variant) => variant.status !== "active");
+
   return (
     <section className="rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -643,72 +646,146 @@ function VariantsSection({
           </p>
         </div>
       ) : (
-        <ul className="mt-3 divide-y divide-stone-100">
+        <div className="mt-3 space-y-4">
+          <VariantGroup
+            title="Active variants"
+            hint="Live on the storefront."
+            tone="active"
+            variants={active}
+            productRef={productRef}
+            empty="No active variants yet — complete one and activate it."
+          />
+          <VariantGroup
+            title="Disabled variants"
+            hint="Hidden from the storefront."
+            tone="disabled"
+            variants={disabled}
+            productRef={productRef}
+            empty="No disabled variants."
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function VariantGroup({
+  title,
+  hint,
+  tone,
+  variants,
+  productRef,
+  empty,
+}: {
+  title: string;
+  hint: string;
+  tone: "active" | "disabled";
+  variants: ProductVariantSummary[];
+  productRef: string;
+  empty: string;
+}) {
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-1.5">
+        <h3 className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              tone === "active" ? "bg-emerald-500" : "bg-stone-400"
+            }`}
+          />
+          {title}
+          <span className="font-normal text-stone-400">({variants.length})</span>
+        </h3>
+        <p className="text-[10px] text-stone-400">{hint}</p>
+      </div>
+
+      {variants.length === 0 ? (
+        <p className="mt-1.5 rounded-xl border border-dashed border-stone-200 px-3 py-3 text-[11px] leading-relaxed text-stone-400">
+          {empty}
+        </p>
+      ) : (
+        <ul className="mt-1 divide-y divide-stone-100">
           {variants.map((variant) => (
-            <li key={variant.id}>
-              <Link
-                href={`/manager/product-studio/products/${productRef}/variants/${variant.sku || variant.id}`}
-                className="group flex items-center gap-3 py-2.5"
-              >
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
-                  {variant.imageUrl ? (
-                    <img
-                      src={variant.imageUrl}
-                      alt={variant.name || variant.sku}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-stone-300">
-                      <Layers className="h-3.5 w-3.5" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-stone-900">
-                    {variant.name || variant.sku}
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                    {variant.optionValues.map((value) => (
-                      <span
-                        key={`${value.option}-${value.value}`}
-                        className="rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-[9px] text-stone-500"
-                      >
-                        {value.value}
-                      </span>
-                    ))}
-                    <span className="font-mono text-[9px] text-stone-400">
-                      {variant.sku}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-semibold tabular-nums text-stone-900">
-                    {formatCurrency(variant.price)}
-                  </p>
-                  <p className="text-[10px] text-stone-500">
-                    {variant.stock} in stock
-                  </p>
-                </div>
-
-                <span
-                  className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline ${
-                    variant.status === "active"
-                      ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-                      : "border-stone-200/70 bg-stone-50 text-stone-600"
-                  }`}
-                >
-                  {variant.status}
-                </span>
-
-                <ChevronRight className="h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500" />
-              </Link>
-            </li>
+            <VariantRow
+              key={variant.id}
+              variant={variant}
+              productRef={productRef}
+            />
           ))}
         </ul>
       )}
-    </section>
+    </div>
+  );
+}
+
+function VariantRow({
+  variant,
+  productRef,
+}: {
+  variant: ProductVariantSummary;
+  productRef: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={`/manager/product-studio/products/${productRef}/variants/${variant.sku || variant.id}`}
+        className="group flex items-center gap-3 py-2.5"
+      >
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
+          {variant.imageUrl ? (
+            <img
+              src={variant.imageUrl}
+              alt={variant.name || variant.sku}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-stone-300">
+              <Layers className="h-3.5 w-3.5" />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold text-stone-900">
+            {variant.name || variant.sku}
+          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            {variant.optionValues.map((value) => (
+              <span
+                key={`${value.option}-${value.value}`}
+                className="rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-[9px] text-stone-500"
+              >
+                {value.value}
+              </span>
+            ))}
+            <span className="font-mono text-[9px] text-stone-400">
+              {variant.sku}
+            </span>
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <p className="text-xs font-semibold tabular-nums text-stone-900">
+            {formatCurrency(variant.price)}
+          </p>
+          <p className="text-[10px] text-stone-500">
+            {variant.stock} in stock
+          </p>
+        </div>
+
+        <span
+          className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline ${
+            variant.status === "active"
+              ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+              : "border-stone-200/70 bg-stone-50 text-stone-600"
+          }`}
+        >
+          {variant.status}
+        </span>
+
+        <ChevronRight className="h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500" />
+      </Link>
+    </li>
   );
 }
 
@@ -954,6 +1031,20 @@ function GenerateVariantsModal({
         </div>
       ) : (
         <div className="space-y-3">
+          <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[11px] leading-relaxed text-amber-800">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-semibold">
+                Variants cannot be removed once generated.
+              </span>{" "}
+              Please select the available variants for this base product
+              carefully — a wrong one can only be disabled from its variant
+              page. New variants start <span className="font-semibold">inactive</span>
+              : add a name, short description, description and at least one
+              photo, then activate them.
+            </span>
+          </div>
+
           <div className="rounded-2xl border border-stone-200 bg-white px-3.5 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">

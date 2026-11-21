@@ -1,0 +1,4 @@
+- Always try to understand how the files in components and utils folder contribute and how services works.
+- This will allow you to always check the project instead of repeating a simple function which you think you need but that function may already be in the function but just so you can't find it in time or bother finding it you recreate it.
+- So always approach in a way so it covers this to some obvious extend to make scalable and reusable and readable code because writing same function everywhere again and again is just lazy.
+-

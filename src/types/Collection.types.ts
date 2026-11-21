@@ -113,6 +113,15 @@ export type CollectionGiftItem = {
   text: string;
 };
 
+/** The SKU skeleton of a variant — just enough to pick one and fetch its data. */
+export type CollectionVariantRef = {
+  id: string;
+  sku: string;
+  status: "active" | "inactive";
+  /** `product_option_values.id` this variant fills — one per option. */
+  optionValueIds: string[];
+};
+
 export type CollectionProductDetail = {
   id: string;
   code: string;
@@ -126,15 +135,10 @@ export type CollectionProductDetail = {
   /** Product-level photos, used only when a variant has none of its own. */
   images: CollectionProductImage[];
   options: CollectionOption[];
-  variants: CollectionVariant[];
-  /** Variant the page opens on. */
-  defaultVariantId: string | null;
   reviews: CollectionReviewSummary;
   features: CollectionFeature[];
   careInstructions: CollectionCareInstruction[];
   giftIncluded: CollectionGiftItem[];
-  priceFrom: number | null;
-  priceTo: number | null;
   category: CollectionCategoryRef | null;
   subcategory: CollectionCategoryRef | null;
   href: string;
@@ -143,4 +147,8 @@ export type CollectionProductDetail = {
 export type CollectionProductResponse = {
   ok: true;
   product: CollectionProductDetail;
+  /** Full data of the one variant the page shows (requested by SKU). */
+  variant: CollectionVariant | null;
+  /** Every variant's SKU, so the option chips know what to request next. */
+  variants: CollectionVariantRef[];
 };

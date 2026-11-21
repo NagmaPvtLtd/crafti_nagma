@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import {
   AlertCircle,
@@ -26,6 +27,7 @@ import type {
   CollectionProductDetail,
   CollectionProductResponse,
   CollectionVariant,
+  CollectionVariantRef,
 } from "../../../types/Collection.types";
 
 /* -------------------------------------------------------------------------- */
@@ -132,12 +134,12 @@ function stockLabel(stock: number | null): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Variant matching                                                          */
+/*  Variant matching — works on the SKU skeleton, not the full variant        */
 /* -------------------------------------------------------------------------- */
 
 /** A variant fits a selection when it carries every value currently picked. */
 function matchesSelection(
-  variant: CollectionVariant,
+  variant: CollectionVariantRef,
   selection: Record<string, string>,
 ): boolean {
   return Object.values(selection).every((valueId) =>
@@ -162,45 +164,86 @@ function selectionForVariant(
 }
 
 /* -------------------------------------------------------------------------- */
-/*  /collections/[category]/[subcategory]/[product code]                      */
+/*  /collections/[category]/[subcategory]/[product code]?variant=[sku]        */
+/*  One variant per request: the URL's SKU picks what the server sends, so a  */
+/*  shared link reopens exactly the variant it was copied from.               */
 /* -------------------------------------------------------------------------- */
 
 export default function CollectionProduct({ code }: { code: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requestedSku = searchParams.get("variant") ?? "";
+
   const [product, setProduct] = useState<CollectionProductDetail | null>(null);
-  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [variant, setVariant] = useState<CollectionVariant | null>(null);
+  const [variantRefs, setVariantRefs] = useState<CollectionVariantRef[]>([]);
   const [selection, setSelection] = useState<Record<string, string>>({});
   const [imageIndex, setImageIndex] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** `code|sku` already on screen — keeps the URL normalisation from refetching. */
+  const loadedKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const key = `${code}|${requestedSku}`;
+    if (loadedKeyRef.current === key) return;
+
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
+      const sameProduct =
+        loadedKeyRef.current !== null &&
+        loadedKeyRef.current.split("|")[0] === code;
+
+      if (sameProduct) {
+        setSwitching(true);
+      } else {
+        setProduct(null);
+        setVariant(null);
+        setVariantRefs([]);
+        setLoading(true);
+      }
       setError(null);
+
       try {
         const res = await axios.get<CollectionProductResponse>(
           "/api/public/collections/product",
-          { params: { code } },
+          {
+            params: {
+              code,
+              ...(requestedSku ? { variant: requestedSku } : {}),
+            },
+          },
         );
         if (cancelled) return;
 
-        const loaded = res.data.product;
-        const initial =
-          loaded.variants.find(
-            (variant) => variant.id === loaded.defaultVariantId,
-          ) ??
-          loaded.variants[0] ??
-          null;
-
-        setProduct(loaded);
-        setActiveVariantId(initial?.id ?? null);
-        setSelection(selectionForVariant(loaded.options, initial));
+        const loaded = res.data;
+        setProduct(loaded.product);
+        setVariantRefs(loaded.variants);
+        setVariant(loaded.variant);
+        setSelection(
+          selectionForVariant(loaded.product.options, loaded.variant),
+        );
         setImageIndex(0);
+
+        loadedKeyRef.current = loaded.variant
+          ? `${code}|${loaded.variant.sku}`
+          : key;
+
+        /* Keep the address bar on the actual variant, so copy-link shares it. */
+        if (loaded.variant && loaded.variant.sku !== requestedSku) {
+          router.replace(
+            `${pathname}?variant=${encodeURIComponent(loaded.variant.sku)}`,
+            { scroll: false },
+          );
+        }
       } catch (err) {
         if (cancelled) return;
+        loadedKeyRef.current = null;
         const status = axios.isAxiosError(err) ? err.response?.status : null;
         setError(
           status === 404
@@ -208,7 +251,10 @@ export default function CollectionProduct({ code }: { code: string }) {
             : "Could not load this product right now.",
         );
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setSwitching(false);
+        }
       }
     }
 
@@ -216,7 +262,7 @@ export default function CollectionProduct({ code }: { code: string }) {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, requestedSku, pathname, router]);
 
   const options = product?.options ?? [];
 
@@ -228,36 +274,23 @@ export default function CollectionProduct({ code }: { code: string }) {
     )
     .filter((value): value is string => Boolean(value));
 
-  const activeVariant = useMemo(
-    () =>
-      product?.variants.find((variant) => variant.id === activeVariantId) ??
-      null,
-    [product, activeVariantId],
-  );
-
   const gallery = useMemo(() => {
     if (!product) return [];
-    if (activeVariant && activeVariant.images.length > 0) {
-      return activeVariant.images;
-    }
+    if (variant && variant.images.length > 0) return variant.images;
     return product.images;
-  }, [product, activeVariant]);
+  }, [product, variant]);
 
   const activeImage = gallery[imageIndex] ?? gallery[0] ?? null;
 
-  const price = activeVariant?.price ?? product?.priceFrom ?? null;
-  const compareAt = activeVariant?.compareAtPrice ?? null;
-  const stock = activeVariant?.stock ?? null;
+  const price = variant?.price ?? null;
+  const compareAt = variant?.compareAtPrice ?? null;
+  const stock = variant?.stock ?? null;
   const soldOut = stock !== null && stock <= 0;
 
   const description =
-    activeVariant?.description?.trim() ||
-    product?.description ||
-    null;
+    variant?.description?.trim() || product?.description || null;
   const brief =
-    activeVariant?.briefDescription?.trim() ||
-    product?.briefDescription ||
-    null;
+    variant?.briefDescription?.trim() || product?.briefDescription || null;
 
   /** Values that would leave no active variant behind are greyed out. */
   function isValueAvailable(optionId: string, valueId: string): boolean {
@@ -265,33 +298,42 @@ export default function CollectionProduct({ code }: { code: string }) {
     if (selection[optionId] === valueId) return true;
 
     const next = { ...selection, [optionId]: valueId };
-    return product.variants.some(
-      (variant) =>
-        variant.status === "active" && matchesSelection(variant, next),
+    return variantRefs.some(
+      (item) => item.status === "active" && matchesSelection(item, next),
     );
   }
 
+  /**
+   * Picking a value resolves the matching variant's SKU and puts it in the
+   * URL; the effect above then asks the backend for that variant's data.
+   */
   function chooseValue(optionId: string, valueId: string) {
-    if (!product) return;
+    if (!product || switching) return;
 
     const next = { ...selection, [optionId]: valueId };
-    const candidates = product.variants.filter(
-      (variant) =>
-        variant.status === "active" && matchesSelection(variant, next),
+    const candidates = variantRefs.filter(
+      (item) => item.status === "active" && matchesSelection(item, next),
     );
     if (candidates.length === 0) return;
 
     /* Prefer the variant that fills every option, then the first match. */
-    const exact = candidates.find((variant) =>
-      product.options.every(
-        (option) => !next[option.id] || variant.optionValueIds.includes(next[option.id]),
-      ),
-    );
-    const chosen = exact ?? candidates[0];
+    const chosen =
+      candidates.find((item) =>
+        product.options.every(
+          (option) =>
+            !next[option.id] || item.optionValueIds.includes(next[option.id]),
+        ),
+      ) ?? candidates[0];
 
     setSelection(next);
-    setActiveVariantId(chosen.id);
     setImageIndex(0);
+
+    if (chosen.id === variant?.id) return;
+
+    setSwitching(true);
+    router.replace(`${pathname}?variant=${encodeURIComponent(chosen.sku)}`, {
+      scroll: false,
+    });
   }
 
   const discount =
@@ -468,7 +510,12 @@ export default function CollectionProduct({ code }: { code: string }) {
                 </div>
 
                 {/* ---------------- Details ---------------- */}
-                <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                <div
+                  aria-busy={switching}
+                  className={`rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm transition-opacity sm:rounded-3xl ${
+                    switching ? "opacity-70" : ""
+                  }`}
+                >
                   <SectionEyebrow>
                     {product.subcategory
                       ? `${product.category?.name ?? ""} · ${product.subcategory.name}`
@@ -517,25 +564,29 @@ export default function CollectionProduct({ code }: { code: string }) {
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                     <span
                       className={`rounded-full px-2 py-0.5 font-semibold ${
-                        !soldOut && activeVariant?.status === "active"
+                        variant &&
+                        !soldOut &&
+                        variant.status === "active"
                           ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                           : "border border-stone-200 bg-stone-100 text-stone-500"
                       }`}
                     >
-                      {activeVariant?.status === "inactive"
+                      {!variant
                         ? "Currently unavailable"
-                        : soldOut
-                          ? "Out of stock"
-                          : stockLabel(stock)}
+                        : variant.status === "inactive"
+                          ? "Currently unavailable"
+                          : soldOut
+                            ? "Out of stock"
+                            : stockLabel(stock)}
                     </span>
-                    {activeVariant?.isFeatured && (
+                    {variant?.isFeatured && (
                       <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
                         Bestseller
                       </span>
                     )}
                   </div>
 
-                  {/* Options — pick values, variant swaps in place */}
+                  {/* Options — pick values, the chosen variant is fetched by SKU */}
                   {options.length > 0 && (
                     <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
                       {options.map((option) => {
@@ -572,7 +623,7 @@ export default function CollectionProduct({ code }: { code: string }) {
                                     onClick={() =>
                                       chooseValue(option.id, value.id)
                                     }
-                                    disabled={!available}
+                                    disabled={!available || switching}
                                     aria-pressed={active}
                                     className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
                                       active
@@ -600,17 +651,17 @@ export default function CollectionProduct({ code }: { code: string }) {
                         {product.processingTime}
                       </span>
                     )}
-                    {activeVariant?.name && (
+                    {variant?.name && (
                       <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2">
                         <Package className="h-3.5 w-3.5 text-rose-400" />
-                        {activeVariant.name}
+                        {variant.name}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {(description || activeVariant) && (
+              {(description || variant) && (
                 <>
                   <SectionDivider className="mx-auto max-w-7xl py-8" />
                   <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
@@ -618,7 +669,7 @@ export default function CollectionProduct({ code }: { code: string }) {
                       <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
                         Product Description
                       </h2>
-                      {activeVariant?.description?.trim() &&
+                      {variant?.description?.trim() &&
                         selectedValueLabels.length > 0 && (
                           <span className="text-[11px] font-medium text-stone-500">
                             {selectedValueLabels.join(" / ")}
@@ -632,11 +683,11 @@ export default function CollectionProduct({ code }: { code: string }) {
                     )}
 
                     {/* Quiet identifier for people who come looking for it. */}
-                    {activeVariant && (
+                    {variant && (
                       <p className="mt-4 border-t border-stone-100 pt-3 text-[10px] text-stone-400">
                         Product ID:{" "}
                         <span className="font-medium text-stone-500">
-                          {activeVariant.sku}
+                          {variant.sku}
                         </span>
                       </p>
                     )}
@@ -688,9 +739,8 @@ export default function CollectionProduct({ code }: { code: string }) {
                   <SpecRow
                     label="Weight"
                     value={
-                      activeVariant?.weight !== null &&
-                      activeVariant?.weight !== undefined
-                        ? `${activeVariant.weight} g`
+                      variant?.weight !== null && variant?.weight !== undefined
+                        ? `${variant.weight} g`
                         : "—"
                     }
                   />
@@ -724,7 +774,7 @@ export default function CollectionProduct({ code }: { code: string }) {
                   </div>
 
                   <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 uppercase">
-                    Under construction
+                    Reviews Coming Soon
                   </span>
                 </div>
 

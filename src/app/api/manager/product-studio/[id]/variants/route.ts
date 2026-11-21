@@ -367,7 +367,7 @@ export async function POST(
             price, compare_at_price, stock, weight, status,
             is_featured, main_showcase, orders_count,
             created_by, updated_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, ?, NULL, ?, NULL)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'inactive', 0, 0, 0, ?, NULL, ?, NULL)`,
         [
           variantId,
           id,
@@ -378,7 +378,6 @@ export async function POST(
           price,
           data.compareAtPrice ?? null,
           data.stock,
-          product.status,
           managerId,
           now,
         ],
@@ -409,7 +408,7 @@ export async function POST(
         action: "CREATE",
         entityType: "VARIANT",
         entityId: id,
-        description: `Generated ${created.length} variant${created.length === 1 ? "" : "s"} (${skippedCount} already existed). [productId=${id}, price=${price}, stock=${data.stock}]`,
+        description: `Generated ${created.length} variant${created.length === 1 ? "" : "s"} (inactive by default, ${skippedCount} already existed). [productId=${id}, price=${price}, stock=${data.stock}]`,
         metadata: { variants: created.map((v) => v.sku) },
       });
     } catch {
@@ -420,7 +419,7 @@ export async function POST(
       {
         ok: true,
         message:
-          `${created.length} variant${created.length === 1 ? "" : "s"} generated` +
+          `${created.length} variant${created.length === 1 ? "" : "s"} generated as inactive` +
           (skippedCount > 0
             ? ` · ${skippedCount} already existed`
             : ""),

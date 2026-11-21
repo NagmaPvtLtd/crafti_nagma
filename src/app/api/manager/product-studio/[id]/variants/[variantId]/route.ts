@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import type { PoolConnection } from "mysql2/promise";
 import {
+  VARIANT_ACTIVATION_RULES,
   VariantDetailResponse,
   variantUpdateSchema,
 } from "../../../../../../../utils/zod/product/manager.productDetail.zod";
@@ -359,44 +360,177 @@ export async function PUT(
     }
 
     const now = getCurrentDateTime();
+    const activating = variant.status === "inactive" && data.status === "active";
+    const disabling = variant.status === "active" && data.status === "inactive";
 
-    await conn.query(
-      `UPDATE product_variants
-          SET name = ?,
-              brief_description = ?,
-              description = ?,
-              price = ?,
-              compare_at_price = ?,
-              stock = ?,
-              weight = ?,
-              status = ?,
-              is_featured = ?,
-              main_showcase = ?,
-              updated_by = ?,
-              updated_at = ?
-        WHERE id = ? AND product_id = ?`,
-      [
-        data.name || null,
-        data.briefDescription || null,
-        data.description || null,
-        data.price,
-        data.compareAtPrice ?? null,
-        data.stock,
-        data.weight ?? null,
-        data.status,
-        data.isFeatured ? 1 : 0,
-        data.mainShowcase ? 1 : 0,
-        managerId,
-        now,
-        variantId,
-        productId,
-      ],
-    );
+    /* ---- activation gate: only a presentable variant may go live ---- */
+    if (activating) {
+      const problems: Record<string, string[]> = {};
 
-    await conn.query(
-      `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
-      [managerId, now, productId],
-    );
+      if (data.name.trim().length < VARIANT_ACTIVATION_RULES.name) {
+        problems.name = [
+          `Name must be at least ${VARIANT_ACTIVATION_RULES.name} characters long`,
+        ];
+      }
+      if (
+        data.briefDescription.trim().length <
+        VARIANT_ACTIVATION_RULES.briefDescription
+      ) {
+        problems.briefDescription = [
+          `Short description must be at least ${VARIANT_ACTIVATION_RULES.briefDescription} characters long`,
+        ];
+      }
+      if (
+        data.description.trim().length < VARIANT_ACTIVATION_RULES.description
+      ) {
+        problems.description = [
+          `Description must be at least ${VARIANT_ACTIVATION_RULES.description} characters long`,
+        ];
+      }
+
+      const [mediaRows] = await conn.query<OrderCountRow[]>(
+        `SELECT COUNT(*) AS total
+           FROM imagekit_files
+          WHERE file_purpose = 'product_variant_image'
+            AND entity_type = 'product_variant'
+            AND entity_id = ?`,
+        [variantId],
+      );
+      if (Number(mediaRows[0]?.total ?? 0) === 0) {
+        problems.media = [
+          "Add at least one photo — an upload or a linked photo — before activating",
+        ];
+      }
+
+      const firstProblem = Object.values(problems)[0]?.[0];
+      if (firstProblem) {
+        return NextResponse.json(
+          { error: firstProblem, details: problems },
+          { status: 400 },
+        );
+      }
+    }
+
+    /* ---- disabling frees the photos, and is refused once the variant sold ---- */
+    let ownedFiles: OwnedFileRow[] = [];
+    let removedImages = 0;
+
+    if (disabling) {
+      const [orderRows] = await conn.query<OrderCountRow[]>(
+        `SELECT COUNT(*) AS total FROM order_items WHERE variant_id = ?`,
+        [variantId],
+      );
+      const orderCount = Number(orderRows[0]?.total ?? 0);
+      if (orderCount > 0) {
+        return NextResponse.json(
+          {
+            error: `This variant appears in ${orderCount} order${orderCount === 1 ? "" : "s"} and cannot be disabled.`,
+          },
+          { status: 409 },
+        );
+      }
+
+      const [fileRows] = await conn.query<OwnedFileRow[]>(
+        `SELECT id, file_id
+           FROM imagekit_files
+          WHERE entity_type = 'product_variant'
+            AND file_purpose = 'product_variant_image'
+            AND entity_id = ?
+            AND source_image_id IS NULL`,
+        [variantId],
+      );
+      ownedFiles = fileRows;
+
+      /* ImageKit first — a failed delete must never leave an orphan object
+         behind. A 404 counts as success (the file was already gone). */
+      for (const file of ownedFiles) {
+        if (!file.file_id) continue;
+        const removed = await ImageKitService.deleteFileStrict(file.file_id);
+        if (!removed) {
+          return NextResponse.json(
+            {
+              error:
+                "Could not delete this variant's image files from ImageKit. Nothing was changed — try again.",
+            },
+            { status: 502 },
+          );
+        }
+      }
+    }
+
+    await conn.beginTransaction();
+    try {
+      if (disabling) {
+        const originalImageIds = ownedFiles.map((file) => file.id);
+        if (originalImageIds.length > 0) {
+          await conn.query(
+            `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
+            [originalImageIds],
+          );
+        }
+
+        const [mediaCountRows] = await conn.query<OrderCountRow[]>(
+          `SELECT COUNT(*) AS total
+             FROM imagekit_files
+            WHERE entity_type = 'product_variant'
+              AND file_purpose = 'product_variant_image'
+              AND entity_id = ?`,
+          [variantId],
+        );
+        removedImages = Number(mediaCountRows[0]?.total ?? 0);
+
+        await conn.query(
+          `DELETE FROM imagekit_files
+            WHERE entity_type = 'product_variant'
+              AND file_purpose = 'product_variant_image'
+              AND entity_id = ?`,
+          [variantId],
+        );
+      }
+
+      await conn.query(
+        `UPDATE product_variants
+            SET name = ?,
+                brief_description = ?,
+                description = ?,
+                price = ?,
+                compare_at_price = ?,
+                stock = ?,
+                weight = ?,
+                status = ?,
+                is_featured = ?,
+                main_showcase = ?,
+                updated_by = ?,
+                updated_at = ?
+          WHERE id = ? AND product_id = ?`,
+        [
+          data.name || null,
+          data.briefDescription || null,
+          data.description || null,
+          data.price,
+          data.compareAtPrice ?? null,
+          data.stock,
+          data.weight ?? null,
+          data.status,
+          data.isFeatured ? 1 : 0,
+          data.mainShowcase ? 1 : 0,
+          managerId,
+          now,
+          variantId,
+          productId,
+        ],
+      );
+
+      await conn.query(
+        `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
+        [managerId, now, productId],
+      );
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    }
 
     try {
       await auditLog.log(pool, {
@@ -404,7 +538,7 @@ export async function PUT(
         action: "UPDATE",
         entityType: "VARIANT",
         entityId: variantId,
-        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, status=${data.status}]`,
+        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, status=${data.status}${disabling ? `, removedImages=${removedImages}` : ""}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -412,13 +546,14 @@ export async function PUT(
 
     return NextResponse.json({
       ok: true,
-      message: "Variant updated",
+      message: disabling ? "Variant disabled" : "Variant updated",
       variant: {
         id: variantId,
         price: data.price,
         stock: data.stock,
         status: data.status,
       },
+      removedImages,
     });
   } catch (err) {
     if (isDuplicateEntry(err)) {

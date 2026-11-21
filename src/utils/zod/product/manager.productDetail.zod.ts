@@ -91,6 +91,17 @@ export type GenerateVariantsInput = z.infer<typeof generateVariantsSchema>;
 /*  Edit a variant                                                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Minimum copy lengths a variant must reach before it may be activated, plus
+ * at least one photo (an upload or a shallow link). Shared by the API gate and
+ * the variant page's hint so the two never drift apart.
+ */
+export const VARIANT_ACTIVATION_RULES = {
+  name: 3,
+  briefDescription: 10,
+  description: 20,
+} as const;
+
 export const variantUpdateSchema = z.object({
   name: optionalText(150),
   briefDescription: optionalText(500),

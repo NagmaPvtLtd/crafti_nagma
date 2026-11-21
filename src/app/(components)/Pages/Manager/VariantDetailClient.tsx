@@ -3,7 +3,6 @@
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
@@ -17,7 +16,6 @@ import {
   Loader2,
   Package,
   RefreshCw,
-  Trash2,
   TrendingUp,
 } from "lucide-react";
 
@@ -32,7 +30,10 @@ import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
 import ExistingPhotosModal from "./ExistingPhotosModal";
 import ConfirmDialog from "../../utils/ConfirmDialog";
-import type { VariantDetailResponse } from "../../../../utils/zod/product/manager.productDetail.zod";
+import {
+  VARIANT_ACTIVATION_RULES,
+  type VariantDetailResponse,
+} from "../../../../utils/zod/product/manager.productDetail.zod";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -65,7 +66,6 @@ export default function VariantDetailClient({
   variantId: string;
 }) {
   const [data, setData] = useState<VariantDetailResponse | null>(null);
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,8 +74,7 @@ export default function VariantDetailClient({
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [existingOpen, setExistingOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,7 +122,7 @@ export default function VariantDetailClient({
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
 
-  async function save() {
+  async function persist(status: "active" | "inactive") {
     if (!form || saving) return;
     setSaving(true);
     setFormError(null);
@@ -141,38 +140,34 @@ export default function VariantDetailClient({
               : Number(form.compareAtPrice),
           stock: Number(form.stock || 0),
           weight: form.weight.trim() === "" ? null : Number(form.weight),
-          status: form.status,
+          status,
           isFeatured: form.isFeatured,
           mainShowcase: form.mainShowcase,
         },
         { withCredentials: true },
       );
-      toast.success("Variant updated");
+      toast.success(status === "inactive" ? "Variant disabled" : "Variant updated");
+      setDisableOpen(false);
       void load();
     } catch (err) {
+      setDisableOpen(false);
       setFormError(getAxiosErrorMessage(err, "Could not update the variant"));
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteVariant() {
-    if (deleting || !data) return;
+  /** Disabling frees this variant's photos, so it asks before doing it. */
+  async function save() {
+    if (!form || saving) return;
 
-    setDeleting(true);
-    try {
-      await axios.delete(
-        `/api/manager/product-studio/${productId}/variants/${variantId}`,
-        { withCredentials: true },
-      );
-      toast.success("Variant deleted");
-      router.push(
-        `/manager/product-studio/products/${data.variant.productCode || productId}`,
-      );
-    } catch (err) {
-      toast.error(getAxiosErrorMessage(err, "Could not delete the variant"));
-      setDeleting(false);
+    if (form.status === "inactive" && data?.variant.status === "active") {
+      setFormError(null);
+      setDisableOpen(true);
+      return;
     }
+
+    await persist(form.status);
   }
 
   return (
@@ -258,17 +253,6 @@ export default function VariantDetailClient({
                   >
                     <ImagePlus className="h-3.5 w-3.5" />
                     Manage images
-                  </button>                  <button
-                    onClick={() => setConfirmOpen(true)}
-                    disabled={deleting}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {deleting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Delete
                   </button>
                 </div>
               </div>
@@ -528,6 +512,26 @@ export default function VariantDetailClient({
                           </select>
                         </Field>
 
+                        <p className="rounded-xl border border-dashed border-stone-200 bg-stone-50/60 px-3 py-2 text-[11px] leading-relaxed text-stone-500">
+                          {form.status === "inactive" ? (
+                            <>
+                              To activate this variant it needs a name (
+                              {VARIANT_ACTIVATION_RULES.name}+ characters), a
+                              short description (
+                              {VARIANT_ACTIVATION_RULES.briefDescription}+), a
+                              description ({VARIANT_ACTIVATION_RULES.description}
+                              +) and at least one photo — uploaded or linked.
+                            </>
+                          ) : (
+                            <>
+                              Disabling removes this variant&apos;s photos —
+                              original uploads and shallow links — to free up
+                              space, and hides it from the storefront. A variant
+                              that appears in an order cannot be disabled.
+                            </>
+                          )}
+                        </p>
+
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700">
                             <input
@@ -619,21 +623,24 @@ export default function VariantDetailClient({
           />
         )}
         <ConfirmDialog
-          open={confirmOpen}
-          title="Delete this variant?"
+          open={disableOpen}
+          title="Disable this variant?"
           description={
             <>
               <span className="font-mono">
                 {data?.variant.sku || data?.variant.name}
               </span>{" "}
-              will be removed with its own photos. Links other variants made to
-              those photos disappear too. This cannot be undone.
+              will be hidden from the storefront. All of its photos will be
+              removed to free up space — every original ImageKit upload, every
+              shallow link this variant holds, and any links other variants
+              made to those uploads. The variant itself stays in the studio,
+              disabled, so you can complete it and activate it again later.
             </>
           }
-          confirmLabel="Delete variant"
-          loading={deleting}
-          onConfirm={() => void deleteVariant()}
-          onClose={() => setConfirmOpen(false)}
+          confirmLabel="Disable variant"
+          loading={saving}
+          onConfirm={() => void persist("inactive")}
+          onClose={() => setDisableOpen(false)}
         />
       </div>
     </PageWrapper>

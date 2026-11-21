@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { auditLog } from "../../../../../services/AuditLog.service";
+import { ImageKitService } from "../../../../../services/Imagekit.service";
 import { generateULID } from "../../../../../utils/generateULID.util";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
 import { requireManager } from "../../../../../utils/Auth/Auth.requireRole.util";
@@ -34,6 +35,15 @@ interface ProductRow extends RowDataPacket {
 
 interface IdRow extends RowDataPacket {
   id: string;
+}
+
+interface OwnedFileRow extends RowDataPacket {
+  id: string;
+  file_id: string | null;
+}
+
+interface TotalRow extends RowDataPacket {
+  total: number | string;
 }
 
 interface CategoryRow extends RowDataPacket {
@@ -558,8 +568,107 @@ export async function PUT(
       }
     }
 
+    /* Disabling the base product hides everything under it: every variant is
+       disabled and all of their photos are removed to free up space. It is
+       refused as soon as any variant of this product sits in an order. */
+    const disabling =
+      existingRows[0].status === "active" && data.status === "inactive";
+
     const now = getCurrentDateTime();
+    let ownedFiles: OwnedFileRow[] = [];
+    let variantIds: string[] = [];
+    let removedImages = 0;
+
+    if (disabling) {
+      const [orderRows] = await conn.query<TotalRow[]>(
+        `SELECT COUNT(*) AS total
+           FROM order_items oi
+           JOIN product_variants v ON v.id = oi.variant_id
+          WHERE v.product_id = ?`,
+        [id],
+      );
+      const orderCount = Number(orderRows[0]?.total ?? 0);
+      if (orderCount > 0) {
+        return NextResponse.json(
+          {
+            error: `This product's variants appear in ${orderCount} order item${orderCount === 1 ? "" : "s"} and cannot be disabled.`,
+          },
+          { status: 409 },
+        );
+      }
+
+      const [variantRows] = await conn.query<IdRow[]>(
+        `SELECT id FROM product_variants WHERE product_id = ?`,
+        [id],
+      );
+      variantIds = variantRows.map((row) => row.id);
+
+      if (variantIds.length > 0) {
+        const [fileRows] = await conn.query<OwnedFileRow[]>(
+          `SELECT id, file_id
+             FROM imagekit_files
+            WHERE entity_type = 'product_variant'
+              AND file_purpose = 'product_variant_image'
+              AND entity_id IN (?)
+              AND source_image_id IS NULL`,
+          [variantIds],
+        );
+        ownedFiles = fileRows;
+
+        /* ImageKit first — a failed delete must never leave orphan objects
+           behind. A 404 counts as success (the file was already gone). */
+        for (const file of ownedFiles) {
+          if (!file.file_id) continue;
+          const removed = await ImageKitService.deleteFileStrict(file.file_id);
+          if (!removed) {
+            return NextResponse.json(
+              {
+                error:
+                  "Could not delete this product's variant image files from ImageKit. Nothing was changed — try again.",
+              },
+              { status: 502 },
+            );
+          }
+        }
+      }
+    }
+
     await conn.beginTransaction();
+
+    if (disabling && variantIds.length > 0) {
+      const originalImageIds = ownedFiles.map((file) => file.id);
+      if (originalImageIds.length > 0) {
+        await conn.query(
+          `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
+          [originalImageIds],
+        );
+      }
+
+      const [mediaCountRows] = await conn.query<TotalRow[]>(
+        `SELECT COUNT(*) AS total
+           FROM imagekit_files
+          WHERE entity_type = 'product_variant'
+            AND file_purpose = 'product_variant_image'
+            AND entity_id IN (?)`,
+        [variantIds],
+      );
+      removedImages = Number(mediaCountRows[0]?.total ?? 0);
+
+      await conn.query(
+        `DELETE FROM imagekit_files
+          WHERE entity_type = 'product_variant'
+            AND file_purpose = 'product_variant_image'
+            AND entity_id IN (?)`,
+        [variantIds],
+      );
+
+      await conn.query(
+        `UPDATE product_variants
+            SET status = 'inactive', updated_by = ?, updated_at = ?
+          WHERE product_id = ?`,
+        [managerId, now, id],
+      );
+    }
 
     await conn.query(
       `UPDATE products
@@ -660,7 +769,7 @@ export async function PUT(
         action: "UPDATE",
         entityType: "PRODUCT",
         entityId: id,
-        description: `Base product updated. [id=${id}, code=${data.code ?? existingRows[0].code}, name=${data.name}, status=${data.status}, categories=${categoryIds ? categoryIds.length : "unchanged"}, features=${data.features ? data.features.length : "unchanged"}, care=${data.careInstructions ? data.careInstructions.length : "unchanged"}]`,
+        description: `Base product updated. [id=${id}, code=${data.code ?? existingRows[0].code}, name=${data.name}, status=${data.status}, categories=${categoryIds ? categoryIds.length : "unchanged"}, features=${data.features ? data.features.length : "unchanged"}, care=${data.careInstructions ? data.careInstructions.length : "unchanged"}${disabling ? `, disabledVariants=${variantIds.length}, removedImages=${removedImages}` : ""}]`,
       });
     } catch {
       /* audit must never break the response */

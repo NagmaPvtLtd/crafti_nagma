@@ -43,6 +43,10 @@ client components.
   `/collections/all/all/{code}`.
 - `{product}` is the **product code** (`CHAR-P2600-XXXX`), not a database id,
   URL-encoded on build and `decodeURIComponent`-ed in the page.
+- The open variant is carried in `?variant={sku}`. The page opens on the SKU in
+  the URL (falling back to the product's default variant), rewrites the address
+  bar to that SKU on load, and rewrites it again on every option change — so a
+  copied link reopens exactly the variant it was copied from.
 - Category and subcategory pages look products up by **slug**, case-insensitively.
 - The category/subcategory segments in the product URL are decorative for the
   lookup (`?code=` is what matters) — they exist so the breadcrumb matches the
@@ -62,7 +66,8 @@ client components.
                     │  ?category=A&subcategory=B            │
                     └───────────────────────────────────────┘
                                   │  (axios, no auth)
-product page ───────► GET /api/public/collections/product?code=CHAR-P2600-XXXX
+product page ───────► GET /api/public/collections/product
+                       ?code=CHAR-P2600-XXXX&variant=CHAR-P2601-XXXX-RED
 ```
 
 Both endpoints are **public and unauthenticated** — they sit under
@@ -99,32 +104,36 @@ variants), the lowest `compareAtPrice`, summed `totalStock`, one thumbnail, its
 Thumbnail preference: product-level image first, otherwise the first variant
 photo with an active variant preferred.
 
-### `GET /api/public/collections/product?code=…`
+### `GET /api/public/collections/product?code=…&variant=…`
 
 `code` accepts the product code, the slug, or the raw id (first match wins).
-Missing/over-long code → `400`, unknown product → `404`. Both are surfaced by
-the page as a friendly unavailable state.
+`variant` is optional and accepts a variant **SKU** (or its raw id) — it picks
+which variant's data comes back. Missing/over-long code → `400`, unknown
+product → `404`. An unknown `variant` does **not** 404: it falls back to the
+default variant so an old share link still opens the product.
 
-The payload (`CollectionProductDetail`) deliberately ships **everything the
-page can ever need in one response**:
+Only **one variant** is loaded per request. The response has three parts:
 
-- all `options` with their values,
-- every `variant`, each with its own `optionValueIds`, price, compare-at, stock,
-  weight, status, copy and **its own images**,
-- `defaultVariantId`,
-- `features`, `careInstructions`, `giftIncluded` (sorted by `sort_order`),
-- `reviews { average, count }` from approved reviews only,
-- category refs, `processingTime`, `deliveryCharges`, `priceFrom`/`priceTo`.
+- `product` (`CollectionProductDetail`) — the product-level shell that is the
+  same whichever variant is open: name, brief/description, `options` and their
+  values, category refs, `processingTime`, `deliveryCharges`, `features`,
+  `careInstructions`, `giftIncluded` (sorted by `sort_order`), the approved
+  `reviews { average, count }` summary, and the product-level photo fallback.
+- `variant` (`CollectionVariant | null`) — the full row for the resolved SKU:
+  price, compare-at, stock, weight, status, its own copy and **its own images**
+  (falling back to the product gallery when it has none), plus its
+  `optionValueIds`. `null` only when the product has no variants at all.
+- `variants` (`CollectionVariantRef[]`) — the SKU skeleton of every variant:
+  `id`, `sku`, `status` and `optionValueIds`, nothing else. The option chips use
+  it to map a combination to a SKU and to grey out combinations that would leave
+  no active variant.
 
-Because of that, switching option values is instant and local — no round trip,
-no partial page states while a variant loads.
+Variant resolution: matching SKU/id first, then the first active variant with
+`stock > 0`, then the first active variant, then the first variant of any
+status.
 
-Variant photo fallback is resolved **server-side**: a variant with no photos of
-its own receives the product-level gallery, and the same fallback exists again
-on the client as a safety net.
-
-`defaultVariantId` = the first active variant with `stock > 0`, else the first
-active variant, else the first variant of any status.
+Changing an option does not swap anything client-side — the page resolves the
+matching SKU, puts it in `?variant=`, and the backend sends that variant's data.
 
 ### Tables touched
 
@@ -212,8 +221,9 @@ Amazon-style reading order, all of it top-to-bottom in one column:
 4. **Options** — one row per `product_option`, chips per value, the selected one
    rose-tinted with a ring. Values that would leave **no active variant** behind
    are disabled and struck through, so an impossible combination can't be picked.
-   Picking a value re-resolves the variant and swaps image, price, stock,
-   description and availability in place.
+   Picking a value resolves that combination's SKU, writes it to `?variant=` and
+   fetches the variant again, so image, price, stock, description and
+   availability all come from the backend (the panel dims while it loads).
 5. **Two small info pills** — processing time and the variant name, when present.
 6. **Product Description** — fixed heading (no variant name in it); the selected
    variant's values sit as a small muted label on the right. The variant's own

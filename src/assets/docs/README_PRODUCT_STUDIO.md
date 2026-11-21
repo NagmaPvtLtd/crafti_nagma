@@ -21,6 +21,7 @@ product draws from, and the base-product form that turns them into a product.
 | `GET/POST/PUT/DELETE /api/manager/product-studio/options` | Read options with their values nested; create, rename and delete |
 | `POST/PUT/DELETE /api/manager/product-studio/options/values` | Add, rename and delete a value inside an option |
 | `POST /api/manager/product-studio` | Create a base product with its categories, options and values |
+| `POST /api/manager/product-studio/[id]/variants` | Generate variants — always created `inactive`, existing combinations are skipped |
 
 - `api/manager/products` was merged into `api/manager/product-studio` — never
   recreate the old folder, and treat a reference to the old path as a bug.
@@ -91,6 +92,32 @@ Rules enforced in the APIs:
   (`counts.categories.root`), never the total.
 - Do not re-add these removed cards: Options & values, Personalization fields,
   Features & care, Featured & showcase.
+
+## Variants: generate → activate → disable
+
+- Generation creates every variant **inactive**. The generate popup also warns
+  that variants cannot be removed once generated, so the combinations must be
+  chosen carefully.
+- Activating a variant (`inactive → active`) is refused by the API unless it has
+  a name (≥ 3 characters), a short description (≥ 10), a description (≥ 20) and
+  at least one photo — an original upload or a shallow link. The limits live in
+  `VARIANT_ACTIVATION_RULES` (`manager.productDetail.zod.ts`); the variant page
+  prints them in its status hint, so never hardcode a second copy.
+- Disabling a variant asks for confirmation first (`ConfirmDialog`) because it
+  deletes the variant's photos to free space: its original ImageKit uploads,
+  every shallow link it holds, and other variants' links to those uploads. The
+  variant row itself stays, inactive.
+- A variant that appears in any `order_items` row can never be disabled — the
+  API answers 409 with a manager-readable sentence.
+- The variant page has **no delete action**; disabling is the supported way to
+  pull a variant out of the storefront. `DELETE /…/variants/[variantId]` still
+  exists for tooling and keeps its own order guard.
+- Disabling a **base product** asks the same confirmation, then deletes every
+  variant's photos, marks every variant inactive and hides the product from the
+  storefront. It is refused with 409 while any of its variants sits in an order.
+- Product lists are split into **active products** and **disabled products**
+  (each with its own pagination); the product page splits its variants the same
+  way.
 
 ## Before you finish
 
