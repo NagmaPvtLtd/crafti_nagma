@@ -13,7 +13,6 @@ import {
   Maximize2,
   Flower2,
   Package,
-  Sparkles,
   Star,
 } from "lucide-react";
 

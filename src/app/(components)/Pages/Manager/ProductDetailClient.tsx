@@ -7,7 +7,6 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
-  ArrowLeft,
   Boxes,
   Check,
   CheckCircle2,
