@@ -1,0 +1,1 @@
+- refresh button in the add product page for global options

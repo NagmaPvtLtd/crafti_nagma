@@ -1,0 +1,1 @@
+- product public page me product option mese hi show karo, sare global option show mt kro

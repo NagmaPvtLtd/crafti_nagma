@@ -1,0 +1,1 @@
+- ability to edit global options and values too damn bruh how did I forget this:
