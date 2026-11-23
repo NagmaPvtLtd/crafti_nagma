@@ -148,9 +148,8 @@ export default function GlobalTagsClient() {
           Global Tags
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-          One reusable tag master for the whole catalogue. Products and variants
-          point at the same tag, so renaming it here updates every listing and
-          every search result at once.
+          One tag master for the whole catalogue — rename a tag here and every
+          product, variant and search result follows.
         </p>
 
         <SectionDivider className="my-6" size={11} />

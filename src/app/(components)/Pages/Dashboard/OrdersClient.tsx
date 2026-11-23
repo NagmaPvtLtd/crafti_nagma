@@ -100,30 +100,6 @@ function OrderCard({ order }: { order: (typeof MOCK_ORDERS)[0] }) {
   );
 }
 
-function OrderStats() {
-  const counts = {
-    completed: MOCK_ORDERS.filter((o) => o.status === "completed").length,
-    pending: MOCK_ORDERS.filter((o) => o.status === "pending").length,
-    shipped: MOCK_ORDERS.filter((o) => o.status === "shipped").length,
-    cancelled: MOCK_ORDERS.filter((o) => o.status === "cancelled").length,
-  };
-
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {Object.entries(counts).map(([key, value]) => (
-        <div key={key} className="text-center">
-          <p className="text-base font-semibold tracking-tight text-stone-900 sm:text-xl md:text-2xl">
-            {value}
-          </p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-rose-500/80 sm:text-[11px]">
-            {key}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-12">
@@ -158,24 +134,6 @@ function EmptyState() {
   );
 }
 
-function OrderSummary() {
-  const total = MOCK_ORDERS.reduce((sum, o) => sum + o.total, 0);
-  return (
-    <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl sm:p-6">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-rose-500">
-        Order Summary
-      </div>
-      <div className="text-2xl font-bold text-stone-900">
-        Total Amount:
-        <span className="text-rose-600"> {total.toLocaleString()} INR</span>
-      </div>
-      <p className="mt-1 text-xs text-stone-500">
-        Across {MOCK_ORDERS.length} orders
-      </p>
-    </div>
-  );
-}
-
 const visible = MOCK_ORDERS.length > 0;
 
 export default function OrdersPage() {
@@ -188,10 +146,6 @@ export default function OrdersPage() {
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
                   Your Orders
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Track your handmade journey — from order to delivery, all in
-                  one place. Every piece is crafted with care just for you.
-                </p>
               </div>
 
               <button
@@ -207,19 +161,12 @@ export default function OrdersPage() {
             <div className="space-y-8">
               {visible ? (
                 <>
-                  <OrderStats />
-                  <OrderSummary />
-
                   <div>
                     <div className="mb-6 max-w-2xl">
                       <SectionEyebrow>Recent activity</SectionEyebrow>
                       <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
                         Latest orders
                       </h2>
-                      <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                        Your most recent handmade purchases and their current
-                        status.
-                      </p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

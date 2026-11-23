@@ -197,8 +197,7 @@ export default function GlobalOptionsClient() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
               Create the pool of options your products can have — Colour, Size,
-              Material — and fill each one with its values. Yellow, Red and Blue
-              go inside Colour; Small, Medium and Large inside Size.
+              Material — and fill each one with its values.
             </p>
           </div>
 

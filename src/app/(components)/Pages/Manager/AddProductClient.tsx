@@ -346,11 +346,6 @@ export default function AddProductClient() {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
           Add a product
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-          Set up the base product once — its categories, options and copy — and
-          every variant you make from it inherits them.
-        </p>
-
         <SectionDivider className="my-6" size={11} />
 
         {loading && !categories && (

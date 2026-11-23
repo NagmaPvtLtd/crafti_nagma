@@ -103,11 +103,11 @@ export default function CollectionBrowse({
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
               {title}
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              {notFound
-                ? "That category does not exist in the catalogue."
-                : `Every product filed under ${title.toLowerCase()}.`}
-            </p>
+            {notFound && (
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
+                That category does not exist in the catalogue.
+              </p>
+            )}
 
         <SectionDivider className="my-6" size={11} />
 

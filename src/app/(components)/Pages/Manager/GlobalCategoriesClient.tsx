@@ -192,8 +192,6 @@ export default function GlobalCategoriesClient() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
               Create categories &amp; sub categories to assign to your products.
-              Two levels — a main category and the sub categories that sit under
-              it.
             </p>
           </div>
 

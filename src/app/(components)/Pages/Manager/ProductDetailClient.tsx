@@ -276,14 +276,14 @@ function StatsStrip({ stats }: { stats: ProductDetailResponse["stats"] }) {
         >
           <div className="flex items-center gap-1.5">
             <span className="text-stone-900">{item.icon}</span>
-            <p className="truncate text-[10px] font-semibold tracking-wider text-rose-500/80 uppercase">
+            <p className="text-[10px] font-semibold tracking-wider wrap-break-word text-rose-500/80 uppercase">
               {item.label}
             </p>
           </div>
-          <p className="mt-1.5 truncate text-sm font-semibold tabular-nums text-stone-900 sm:text-base">
+          <p className="mt-1.5 text-sm font-semibold wrap-break-word tabular-nums text-stone-900 sm:text-base">
             {item.value}
           </p>
-          <p className="mt-0.5 truncate text-[10px] text-stone-400">
+          <p className="mt-0.5 text-[10px] wrap-break-word text-stone-400">
             {item.hint}
           </p>
         </div>
@@ -356,7 +356,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
                 >
                   <div className="flex items-center gap-1.5 px-2.5 py-1.5">
                     <FolderTree className="h-3 w-3 shrink-0 text-rose-400" />
-                    <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-stone-800">
+                    <span className="min-w-0 flex-1 text-[11.5px] font-semibold wrap-break-word text-stone-800">
                       {root.name}
                     </span>
                     {children.length > 0 && (
@@ -384,7 +384,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
                             aria-hidden
                             className="pointer-events-none absolute top-1/2 left-3 w-2 border-b border-dashed border-stone-300"
                           />
-                          <span className="min-w-0 flex-1 truncate py-0.5 text-[11px] text-stone-600">
+                          <span className="min-w-0 flex-1 py-0.5 text-[11px] wrap-break-word text-stone-600">
                             {sub.name}
                           </span>
                           <span className="ml-2 shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-stone-400 uppercase ring-1 ring-stone-200">
@@ -402,7 +402,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
               <div className="overflow-hidden rounded-xl border border-dashed border-stone-200 bg-white">
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5">
                   <FolderTree className="h-3 w-3 shrink-0 text-stone-300" />
-                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-stone-500">
+                  <span className="min-w-0 flex-1 text-[11px] font-medium wrap-break-word text-stone-500">
                     Sub categories without their main
                   </span>
                 </div>
@@ -412,7 +412,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
                       key={sub.id}
                       className="flex items-center gap-1.5 pl-6"
                     >
-                      <span className="min-w-0 flex-1 truncate py-0.5 text-[11px] text-stone-600">
+                      <span className="min-w-0 flex-1 py-0.5 text-[11px] wrap-break-word text-stone-600">
                         {sub.name}
                       </span>
                       <span className="ml-2 shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-stone-400 uppercase ring-1 ring-stone-200">
@@ -596,11 +596,11 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[10px] font-semibold tracking-wider text-stone-400 uppercase">
+      <dt className="shrink-0 text-[10px] font-semibold tracking-wider text-stone-400 uppercase">
         {label}
       </dt>
       <dd
-        className={`truncate text-right text-[11px] font-medium text-stone-700 ${
+        className={`min-w-0 text-right text-[11px] font-medium wrap-break-word text-stone-700 ${
           capitalize ? "capitalize" : ""
         }`}
       >
@@ -723,7 +723,7 @@ function VariantGroup({
           {empty}
         </p>
       ) : (
-        <ul className="mt-1 divide-y divide-stone-100">
+        <ul className="mt-2 space-y-2.5">
           {variants.map((variant) => (
             <VariantRow
               key={variant.id}
@@ -748,9 +748,9 @@ function VariantRow({
     <li>
       <Link
         href={`/manager/product-studio/products/${productRef}/variants/${variant.sku || variant.id}`}
-        className="group flex items-center gap-3 py-2.5"
+        className="group flex items-start gap-3 rounded-2xl border border-stone-200/70 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:items-center sm:gap-4"
       >
-        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100 sm:h-11 sm:w-11">
           {variant.imageUrl ? (
             <Image
               src={variant.imageUrl}
@@ -767,7 +767,7 @@ function VariantRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-stone-900">
+          <p className="text-xs font-semibold wrap-break-word text-stone-900">
             {variant.name || variant.sku}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-1">
@@ -779,13 +779,33 @@ function VariantRow({
                 {value.value}
               </span>
             ))}
-            <span className="font-mono text-[9px] text-stone-400">
+            <span className="font-mono text-[9px] break-all text-stone-400">
               {variant.sku}
+            </span>
+          </div>
+
+          {/* Mobile: price, stock and status sit under the name, so a long
+              variant name wraps instead of being cut off. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+            <span className="text-[11px] font-semibold tabular-nums text-stone-900">
+              {formatCurrency(variant.price)}
+            </span>
+            <span className="text-[10px] text-stone-500">
+              · {variant.stock} in stock
+            </span>
+            <span
+              className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold capitalize ${
+                variant.status === "active"
+                  ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+                  : "border-stone-200/70 bg-stone-50 text-stone-600"
+              }`}
+            >
+              {variant.status}
             </span>
           </div>
         </div>
 
-        <div className="shrink-0 text-right">
+        <div className="hidden shrink-0 text-right sm:block">
           <p className="text-xs font-semibold tabular-nums text-stone-900">
             {formatCurrency(variant.price)}
           </p>
@@ -1114,7 +1134,7 @@ function GenerateVariantsModal({
                         onChange={() => toggleCombo(combo.key)}
                         className="h-3.5 w-3.5 cursor-pointer accent-rose-500"
                       />
-                      <span className="min-w-0 flex-1 truncate font-medium">
+                      <span className="min-w-0 flex-1 font-medium wrap-break-word">
                         {combo.label}
                       </span>
                     </label>

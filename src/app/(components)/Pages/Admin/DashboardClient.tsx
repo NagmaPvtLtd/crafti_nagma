@@ -177,11 +177,6 @@ export default function AdminDashboardClient() {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  {isSuper
-                    ? "Full analytical view — trends, breakdowns and operational health."
-                    : "Operational snapshot of orders, revenue and inventory."}
-                </p>
               </div>
 
               <div className="flex items-center gap-2">

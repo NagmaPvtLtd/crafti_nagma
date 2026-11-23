@@ -195,8 +195,8 @@ export default function AdminAuditLogsClient() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
               {isSuperAdmin
-                ? "Every action across the platform. Filter by range, action, entity, or search by log id."
-                : "Activity from the last 30 days. You can lookup through log id."}
+                ? "Every action across the platform."
+                : "Activity from the last 30 days."}
             </p>
           </div>
 

@@ -159,10 +159,6 @@ export default function ProductListClient() {
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
               All products
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Every base product in the catalogue. Open one to edit it, manage
-              its media, generate variants and read its reviews.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -240,15 +236,16 @@ export default function ProductListClient() {
               />
             </div>
 
-            {/* Filters */}
+            {/* Filters — one full-width row on mobile, search-first on desktop.
+                Every control is h-10 so the three sit on the same baseline. */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:max-w-xs">
+              <div className="relative w-full sm:min-w-0 sm:flex-1">
                 <Search className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search name, code or slug…"
-                  className={`${inputClass()} py-2 pl-9 text-xs`}
+                  className={`${inputClass()} h-10 w-full pl-9 text-xs`}
                 />
               </div>
 
@@ -259,7 +256,7 @@ export default function ProductListClient() {
                   setActivePage(1);
                   setDisabledPage(1);
                 }}
-                className="cursor-pointer rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-700 transition-colors focus:border-rose-300 focus:ring-1 focus:ring-rose-300 focus:outline-none"
+                className="h-10 w-full cursor-pointer rounded-xl border border-stone-200 bg-white px-3 text-xs text-stone-700 transition-colors focus:border-rose-300 focus:ring-1 focus:ring-rose-300 focus:outline-none sm:w-auto sm:min-w-44"
               >
                 <option value="">All categories</option>
                 {parentCategories.map((category) => (
@@ -272,7 +269,7 @@ export default function ProductListClient() {
               {hasFilters && (
                 <button
                   onClick={resetFilters}
-                  className="inline-flex cursor-pointer items-center gap-1 self-start rounded-full border border-rose-200/70 bg-rose-50/60 px-3 py-1.5 text-xs font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100 sm:self-auto"
+                  className="inline-flex h-10 w-full shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 text-xs font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100 sm:w-auto"
                 >
                   <X className="h-3 w-3" />
                   Clear
@@ -398,11 +395,23 @@ function ProductSection({
 }
 
 function ProductRow({ product }: { product: ProductListItem }) {
+  const priceLabel =
+    product.minPrice === null
+      ? "—"
+      : product.maxPrice !== null && product.maxPrice !== product.minPrice
+        ? `${formatCurrency(product.minPrice)} – ${formatCurrency(product.maxPrice)}`
+        : formatCurrency(product.minPrice);
+
+  const statusClass =
+    product.status === "active"
+      ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+      : "border-stone-200/70 bg-stone-50 text-stone-600";
+
   return (
     <li>
       <Link
         href={`/manager/product-studio/products/${product.code || product.id}`}
-        className="group flex items-center gap-3 rounded-2xl border border-white/60 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:gap-4 sm:rounded-3xl sm:p-4"
+        className="group flex items-start gap-3 rounded-2xl border border-white/60 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:items-center sm:gap-4 sm:rounded-3xl sm:p-4"
       >
         <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-stone-100 sm:h-14 sm:w-14">
           {product.imageUrl ? (
@@ -422,7 +431,7 @@ function ProductRow({ product }: { product: ProductListItem }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-stone-900">
+            <p className="text-sm font-semibold wrap-break-word text-stone-900">
               {product.name}
             </p>
             {product.isFeatured && (
@@ -431,9 +440,18 @@ function ProductRow({ product }: { product: ProductListItem }) {
               </span>
             )}
           </div>
-          <p className="truncate font-mono text-[10px] text-stone-400">
-            {product.code} · /{product.slug}
+          <p className="mt-1 text-[10px] break-all text-stone-400">
+            Code: <span className="font-mono">{product.code}</span>
           </p>
+
+          {/* Mobile: the row's facts stacked inside the card, so a long name
+              wraps instead of being cut off. */}
+          <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-stone-100 pt-2.5 sm:hidden">
+            <MobileStat label="Variants" value={`${product.variantCount}`} />
+            <MobileStat label="In stock" value={`${product.totalStock}`} />
+            <MobileStat label="Price" value={priceLabel} />
+            <MobileStat label="Status" value={product.status} capitalize />
+          </div>
         </div>
 
         <div className="hidden shrink-0 text-right sm:block">
@@ -448,29 +466,46 @@ function ProductRow({ product }: { product: ProductListItem }) {
 
         <div className="hidden shrink-0 text-right md:block">
           <p className="text-xs font-semibold tabular-nums text-stone-900">
-            {product.minPrice === null
-              ? "—"
-              : product.maxPrice !== null &&
-                  product.maxPrice !== product.minPrice
-                ? `${formatCurrency(product.minPrice)} – ${formatCurrency(product.maxPrice)}`
-                : formatCurrency(product.minPrice)}
+            {priceLabel}
           </p>
           <p className="text-[10px] text-stone-500">price</p>
         </div>
 
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
-            product.status === "active"
-              ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-              : "border-stone-200/70 bg-stone-50 text-stone-600"
-          }`}
+          className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline-flex ${statusClass}`}
         >
           {product.status}
         </span>
 
-        <ChevronRight className="h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500" />
+        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500 sm:mt-0" />
       </Link>
     </li>
+  );
+}
+
+/** One label/value pair in the mobile card. Long values wrap, never truncate. */
+function MobileStat({
+  label,
+  value,
+  capitalize = false,
+}: {
+  label: string;
+  value: string;
+  capitalize?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[9px] font-semibold tracking-wider text-stone-400 uppercase">
+        {label}
+      </p>
+      <p
+        className={`text-[11px] leading-tight font-semibold wrap-break-word text-stone-900 tabular-nums ${
+          capitalize ? "capitalize" : ""
+        }`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
 

@@ -9,13 +9,11 @@ import {
   Flower2,
   Gift,
   Heart,
-  IndianRupee,
   KeyRound,
   Moon,
   Rabbit,
   ShoppingBag,
   SlidersHorizontal,
-  Sparkles,
   Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -188,16 +186,6 @@ export default function WishlistClient() {
     return items;
   }, [items, filter]);
 
-  const totalValue = useMemo(
-    () => items.reduce((sum, i) => sum + i.price, 0),
-    [items],
-  );
-
-  const bestSaving = useMemo(
-    () => items.reduce((best, i) => Math.max(best, i.mrp - i.price), 0),
-    [items],
-  );
-
   const removeItem = (item: WishlistItem) => {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
     toast.success(`${item.name} removed from wishlist`);
@@ -206,33 +194,6 @@ export default function WishlistClient() {
   const moveToCart = (item: WishlistItem) => {
     toast.success(`${item.name} moved to cart`);
   };
-
-  const snapshot = [
-    {
-      label: "Saved items",
-      value: items.length.toLocaleString("en-IN"),
-      hint: "Across every category",
-      icon: <Heart className="h-3.5 w-3.5" />,
-    },
-    {
-      label: "Wishlist value",
-      value: formatCurrency(totalValue),
-      hint: "At current prices",
-      icon: <IndianRupee className="h-3.5 w-3.5" />,
-    },
-    {
-      label: "Ready to ship",
-      value: countOf(items, "in-stock").toLocaleString("en-IN"),
-      hint: "In stock right now",
-      icon: <ShoppingBag className="h-3.5 w-3.5" />,
-    },
-    {
-      label: "Best saving",
-      value: formatCurrency(bestSaving),
-      hint: "On a single piece",
-      icon: <Sparkles className="h-3.5 w-3.5" />,
-    },
-  ];
 
   return (
     <PageWrapper variant="content" position="fixed">
@@ -243,10 +204,6 @@ export default function WishlistClient() {
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
                   My Wishlist
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Keep every handmade piece you love in one place — revisit it
-                  anytime and move it to your cart when the moment feels right.
-                </p>
               </div>
 
               <Link
@@ -261,29 +218,6 @@ export default function WishlistClient() {
         <SectionDivider className="my-6" size={11} />
 
             <div className="space-y-8">
-              {/* Snapshot */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {snapshot.map((s) => (
-                  <div
-                    key={s.label}
-                    className="rounded-2xl border border-white/60 bg-white/85 px-3 py-3 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:rounded-3xl sm:px-4 sm:py-3.5"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-stone-900">{s.icon}</span>
-                      <p className="truncate text-[10px] font-semibold tracking-wider text-rose-500/80 uppercase">
-                        {s.label}
-                      </p>
-                    </div>
-                    <p className="mt-1.5 truncate text-base font-semibold tabular-nums text-stone-900 sm:text-lg">
-                      {s.value}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] text-stone-400">
-                      {s.hint}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
               {/* Section heading + filters */}
               <div>
                 <div className="mb-4 max-w-2xl">

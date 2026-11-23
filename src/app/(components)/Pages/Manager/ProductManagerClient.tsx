@@ -8,6 +8,7 @@ import {
   AlertCircle,
   ArrowRight,
   Boxes,
+  ChevronRight,
   FolderTree,
   Layers,
   ListChecks,
@@ -156,14 +157,12 @@ export default function ProductManagerHubClient() {
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <SectionEyebrow>Manager</SectionEyebrow>
+            <SectionEyebrow href="/manager/dashboard">
+              Store Dashboard
+            </SectionEyebrow>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
               Product Studio
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Everything you need to build, arrange, and maintain the catalogue
-              — products, variants, media, and curation.
-            </p>
           </div>
 
           <button
@@ -367,63 +366,76 @@ function RecentlyUpdated({
         </h2>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm sm:rounded-3xl">
-        {items.length === 0 ? (
-          <div className="flex items-center gap-2 px-5 py-6 text-xs text-stone-500">
-            <AlertCircle className="h-3.5 w-3.5 text-stone-900" />
-            No products yet.
-          </div>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {items.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
+      {items.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-white/70 px-4 py-6 text-xs text-stone-500 sm:rounded-3xl">
+          <AlertCircle className="h-3.5 w-3.5 text-stone-900" />
+          No products yet.
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {items.map((p) => (
+            <li key={p.id}>
+              <Link
+                href={`/manager/product-studio/products/${p.code || p.id}`}
+                aria-label={`Open ${p.name}`}
+                className="group flex items-start gap-3 rounded-2xl border border-white/60 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:items-center sm:gap-4 sm:rounded-3xl sm:p-4"
               >
-                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-stone-100">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100 sm:h-11 sm:w-11">
                   {p.imageUrl ? (
                     <Image
                       src={p.imageUrl}
                       alt={p.name}
                       fill
-                      sizes="36px"
+                      sizes="44px"
                       className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-stone-300">
-                      <Package className="h-3.5 w-3.5" />
+                      <Package className="h-4 w-4" />
                     </div>
                   )}
                 </div>
+
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="text-sm font-medium wrap-break-word text-stone-900">
                     {p.name}
                   </p>
-                  <p className="truncate font-mono text-[10px] text-stone-400">
-                    {p.slug}
+                  <p className="text-[10px] break-all text-stone-400">
+                    Code: <span className="font-mono">{p.code}</span>
                   </p>
+
+                  {/* Mobile: status sits under the name instead of squeezing
+                      it, so a long name wraps and is never cut. */}
+                  <div className="mt-2 sm:hidden">
+                    <StatusPill status={p.status} />
+                  </div>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                    p.status === "active"
-                      ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-                      : "border-stone-200/70 bg-stone-50 text-stone-600"
-                  }`}
-                >
-                  {p.status}
-                </span>
-                <Link
-                  href={`/manager/product-studio/products/${p.code || p.id}`}
-                  className="shrink-0 rounded-full border border-rose-200/70 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-                >
-                  Open
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+
+                <div className="hidden shrink-0 sm:block">
+                  <StatusPill status={p.status} />
+                </div>
+
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500 sm:mt-0" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: "active" | "inactive" }) {
+  return (
+    <span
+      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
+        status === "active"
+          ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+          : "border-stone-200/70 bg-stone-50 text-stone-600"
+      }`}
+    >
+      {status}
+    </span>
   );
 }
 
