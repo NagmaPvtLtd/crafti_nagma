@@ -10,6 +10,7 @@ import {
   Boxes,
   ChevronLeft,
   ChevronRight,
+  CornerDownLeft,
   Layers,
   Package,
   Plus,
@@ -22,6 +23,7 @@ import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.u
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import { inputClass } from "../../utils/Form/fieldStyles";
+import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import CustomLoader from "../../CustomLoader";
 import type {
   ProductListItem,
@@ -66,14 +68,17 @@ export default function ProductListClient() {
 
   const [categories, setCategories] = useState<CategoryOption[]>([]);
 
+  /* One request per pause, not per keystroke. */
+  const debouncedSearch = useDebouncedValue(searchInput);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setQuery(searchInput.trim());
+    const apply = () => {
+      setQuery(debouncedSearch.trim());
       setActivePage(1);
       setDisabledPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    };
+    apply();
+  }, [debouncedSearch]);
 
   useEffect(() => {
     let active = true;
@@ -245,8 +250,21 @@ export default function ProductListClient() {
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search name, code or slug…"
-                  className={`${inputClass()} h-10 w-full pl-9 text-xs`}
+                  className={`${inputClass()} h-10 w-full pr-10 pl-9 text-xs`}
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery(searchInput.trim());
+                    setActivePage(1);
+                    setDisabledPage(1);
+                  }}
+                  aria-label="Search"
+                  title="Search (Enter)"
+                  className="absolute top-1/2 right-2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+                >
+                  <CornerDownLeft className="h-3.5 w-3.5" />
+                </button>
               </div>
 
               <select

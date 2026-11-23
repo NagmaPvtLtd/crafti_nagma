@@ -4,6 +4,7 @@ import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  CornerDownLeft,
   Pencil,
   Plus,
   RefreshCw,
@@ -21,6 +22,7 @@ import getAxiosErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util
 import PageWrapper from "../../(components)/utils/PageWrapper";
 import ConfirmDialog from "../../(components)/utils/ConfirmDialog";
 import { SectionDivider, SectionEyebrow } from "../../(components)/utils/SectionDiv";
+import { useDebouncedValue } from "../../(components)/utils/Hooks/useDebouncedValue";
 
 const BASE = "/api/admin/settings";
 
@@ -42,6 +44,7 @@ export default function SettingsClient() {
   const [draftName, setDraftName] = useState<string>("");
 
   const [query, setQuery] = useState<string>("");
+  const debouncedQuery = useDebouncedValue(query);
 
   const markBusy = (key: string, value: boolean) =>
     setBusy((prev) => ({ ...prev, [key]: value }));
@@ -50,10 +53,10 @@ export default function SettingsClient() {
     [...list].sort((a, b) => a.field_name.localeCompare(b.field_name));
 
   const filtered = useMemo<Setting[]>(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => r.field_name.toLowerCase().includes(q));
-  }, [rows, query]);
+  }, [rows, debouncedQuery]);
 
   const stats = useMemo(
     () => ({
@@ -354,8 +357,17 @@ export default function SettingsClient() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search toggles…"
-                className="w-full cursor-text rounded-full border border-stone-200 bg-white py-2 pl-10 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-rose-300 focus:ring-1 focus:ring-rose-300"
+                className="w-full cursor-text rounded-full border border-stone-200 bg-white py-2 pl-10 pr-10 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-rose-300 focus:ring-1 focus:ring-rose-300"
               />
+              <button
+                type="button"
+                onClick={() => setQuery((value) => value.trim())}
+                aria-label="Search"
+                title="Search (Enter)"
+                className="absolute top-1/2 right-2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+              >
+                <CornerDownLeft className="h-4 w-4" />
+              </button>
             </div>
             <button
               onClick={() => void load()}

@@ -9,6 +9,7 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  CornerDownLeft,
   Flower2,
   Search,
   Sparkles,
@@ -18,6 +19,7 @@ import CustomLoader from "../CustomLoader";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import { inputClass } from "../utils/Form/fieldStyles";
+import { useDebouncedValue } from "../utils/Hooks/useDebouncedValue";
 import CollectionCard from "./CollectionCard";
 import type { CollectionsResponse } from "../../../types/Collection.types";
 import { useRouter } from "next/navigation";
@@ -36,6 +38,7 @@ export default function Collections() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query);
   const [visibleCount, setVisibleCount] = useState(GRID_BATCH);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -124,6 +127,13 @@ export default function Collections() {
     const term = query.trim();
     router.push(term ? `/search?q=${encodeURIComponent(term)}` : "/search");
   }
+
+  /* Pausing after typing runs the search too — Enter is never required. */
+  useEffect(() => {
+    const term = debouncedQuery.trim();
+    if (!term) return;
+    router.push(`/search?q=${encodeURIComponent(term)}`);
+  }, [debouncedQuery, router]);
 
   const visibleProducts = products.slice(0, visibleCount);
 
@@ -314,13 +324,15 @@ export default function Collections() {
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search products, tags, categories…"
                   aria-label="Search products"
-                  className={`${inputClass(false)} rounded-full py-3 pr-28 pl-10 text-sm`}
+                  className={`${inputClass(false)} rounded-full py-3 pr-12 pl-10 text-sm`}
                 />
                 <button
                   type="submit"
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+                  aria-label="Search"
+                  title="Search (Enter)"
+                  className="absolute top-1/2 right-2 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
                 >
-                  Search
+                  <CornerDownLeft className="h-4 w-4" />
                 </button>
               </form>
 

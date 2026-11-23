@@ -1,8 +1,5 @@
 # File Tree: crafti_nagma
 
-**Generated:** 11/23/2026, 2:58:56 PM
-**Root Path:** `d:\GitHub\crafti_nagma`
-
 ```
 ├── 📁 .freebuff
 │   ├── ⚙️ .gitignore
@@ -37,6 +34,8 @@
 │   │   │   │   │   ├── 📄 ExistingPhotosModal.tsx
 │   │   │   │   │   ├── 📄 GlobalCategoriesClient.tsx
 │   │   │   │   │   ├── 📄 GlobalOptionsClient.tsx
+│   │   │   │   │   ├── 📄 GlobalTagsClient.tsx
+│   │   │   │   │   ├── 📄 ManagerDashboardClient.tsx
 │   │   │   │   │   ├── 📄 PricingQuizModal.tsx
 │   │   │   │   │   ├── 📄 ProductDetailClient.tsx
 │   │   │   │   │   ├── 📄 ProductListClient.tsx
@@ -49,7 +48,8 @@
 │   │   │   │   ├── 📄 CollectionProduct.tsx
 │   │   │   │   ├── 📄 Collections.tsx
 │   │   │   │   ├── 📄 Landing.tsx
-│   │   │   │   └── 📄 LoginClient.tsx
+│   │   │   │   ├── 📄 LoginClient.tsx
+│   │   │   │   └── 📄 SearchProducts.tsx
 │   │   │   ├── 📁 Policy
 │   │   │   │   └── 📄 PolicyLayout.tsx
 │   │   │   ├── 📁 Providers
@@ -63,6 +63,8 @@
 │   │   │   │   │   ├── 📄 Textarea.tsx
 │   │   │   │   │   ├── 📄 fieldStyles.ts
 │   │   │   │   │   └── 📄 formErrors.ts
+│   │   │   │   ├── 📁 Hooks
+│   │   │   │   │   └── 📄 useDebouncedValue.ts
 │   │   │   │   ├── 📄 ConfirmDialog.tsx
 │   │   │   │   ├── 📄 ErrorState.tsx
 │   │   │   │   ├── 📄 PageWrapper.tsx
@@ -70,6 +72,7 @@
 │   │   │   │   ├── 📄 ScrollToTop.tsx
 │   │   │   │   ├── 📄 SectionDiv.tsx
 │   │   │   │   ├── 📄 SocialIcons.tsx
+│   │   │   │   ├── 📄 TagInput.tsx
 │   │   │   │   ├── 📄 TrendChart.tsx
 │   │   │   │   ├── 📄 WhatsappFloating.tsx
 │   │   │   │   └── 📄 ogImage.tsx
@@ -95,6 +98,7 @@
 │   │   │   │       ├── 📁 [fieldName]
 │   │   │   │       │   └── 📄 route.ts
 │   │   │   │       └── 📄 route.ts
+│   │   │   ├── 📁 admin-super
 │   │   │   ├── 📁 auth
 │   │   │   │   ├── 📁 [...nextauth]
 │   │   │   │   │   └── 📄 route.ts
@@ -126,14 +130,19 @@
 │   │   │   │       │   └── 📄 route.ts
 │   │   │   │       ├── 📁 products
 │   │   │   │       │   └── 📄 route.ts
+│   │   │   │       ├── 📁 tags
+│   │   │   │       │   ├── 📁 [tagId]
+│   │   │   │       │   │   └── 📄 route.ts
+│   │   │   │       │   └── 📄 route.ts
 │   │   │   │       └── 📄 route.ts
-│   │   │   └── 📁 public
-│   │   │       ├── 📁 collections
-│   │   │       │   ├── 📁 product
-│   │   │       │   │   └── 📄 route.ts
-│   │   │       │   └── 📄 route.ts
-│   │   │       └── 📁 heartbeat
-│   │   │           └── 📄 route.ts
+│   │   │   ├── 📁 public
+│   │   │   │   ├── 📁 collections
+│   │   │   │   │   ├── 📁 product
+│   │   │   │   │   │   └── 📄 route.ts
+│   │   │   │   │   └── 📄 route.ts
+│   │   │   │   └── 📁 heartbeat
+│   │   │   │       └── 📄 route.ts
+│   │   │   └── 📁 user
 │   │   ├── 📁 collections
 │   │   │   ├── 📁 [category]
 │   │   │   │   ├── 📁 [subcategory]
@@ -154,6 +163,8 @@
 │   │   │   ├── 📄 opengraph-image.tsx
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 manager
+│   │   │   ├── 📁 dashboard
+│   │   │   │   └── 📄 page.tsx
 │   │   │   └── 📁 product-studio
 │   │   │       ├── 📁 categories
 │   │   │       │   └── 📄 page.tsx
@@ -170,6 +181,8 @@
 │   │   │       │   ├── 📁 new
 │   │   │       │   │   └── 📄 page.tsx
 │   │   │       │   └── 📄 page.tsx
+│   │   │       ├── 📁 tags
+│   │   │       │   └── 📄 page.tsx
 │   │   │       └── 📄 page.tsx
 │   │   ├── 📁 policy
 │   │   │   ├── 📁 cancellation-refund
@@ -181,6 +194,8 @@
 │   │   │   └── 📁 terms-of-service
 │   │   │       ├── 📄 opengraph-image.tsx
 │   │   │       └── 📄 page.tsx
+│   │   ├── 📁 search
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📄 favicon.ico
 │   │   ├── 🎨 globals.css
 │   │   ├── 📄 layout.tsx
@@ -196,6 +211,7 @@
 │   │   │   │   ├── 📝 README_API_STRUCTURE.md
 │   │   │   │   ├── 📝 README_COLLECTIONS.md
 │   │   │   │   ├── 📝 README_PRODUCT_STUDIO.md
+│   │   │   │   ├── 📝 README_THUMBNAILS.md
 │   │   │   │   └── 📝 README_UI_UX.md
 │   │   │   ├── 📝 README.md
 │   │   │   ├── 📝 README_API_DOCUMENTATION.md
@@ -226,7 +242,8 @@
 │   │   │   │   ├── 📄 20261118175244390_imagekit_files_entity.sql
 │   │   │   │   ├── 📄 20261118175253093_product_media_reviews.sql
 │   │   │   │   ├── 📄 20261119191754844_product_variant_image_links.sql
-│   │   │   │   └── 📄 20261123061227512_variant_dimensions_features_care.sql
+│   │   │   │   ├── 📄 20261123061227512_variant_dimensions_features_care.sql
+│   │   │   │   └── 📄 20261123082957485_product_tags.sql
 │   │   │   ├── 📝 README.md
 │   │   │   ├── 📄 connection.db.ts
 │   │   │   ├── 📄 create.index.db.ts
@@ -287,6 +304,8 @@
 │   │   │   └── 📄 productStudio.lookup.util.ts
 │   │   ├── 📁 Slug
 │   │   │   └── 📄 slug.util.ts
+│   │   ├── 📁 Tags
+│   │   │   └── 📄 tag.util.ts
 │   │   ├── 📁 ValueFetcher
 │   │   │   ├── 📄 getDBName.util.ts
 │   │   │   ├── 📄 getDateTime.util.ts
@@ -296,7 +315,8 @@
 │   │   │   │   ├── 📄 manager.category.zod.ts
 │   │   │   │   ├── 📄 manager.option.zod.ts
 │   │   │   │   ├── 📄 manager.product.zod.ts
-│   │   │   │   └── 📄 manager.productDetail.zod.ts
+│   │   │   │   ├── 📄 manager.productDetail.zod.ts
+│   │   │   │   └── 📄 manager.tag.zod.ts
 │   │   │   ├── 📄 auth.credentialsLogin.schemas.zod.ts
 │   │   │   ├── 📄 auth.profile.zod.ts
 │   │   │   ├── 📄 auth.setPassword.zod.ts

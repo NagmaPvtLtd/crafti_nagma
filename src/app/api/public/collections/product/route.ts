@@ -44,6 +44,7 @@ interface VariantRefRow extends RowDataPacket {
   sku: string;
   stock: number | string;
   status: "active" | "inactive";
+  is_featured: number | boolean;
 }
 
 interface VariantRow extends RowDataPacket {
@@ -133,8 +134,9 @@ const ALL_SEGMENT = "all";
  * @function GET
  * @description Public route with no auth check. The product is resolved by code, slug or id.
  *              Only the variant named by `?variant=` (its SKU or id) is loaded in full; without
- *              it the first active variant with stock is chosen, then any active variant, then
- *              the first variant. `variants` ships the SKU skeleton (id, SKU, status and option
+ *              it the featured active variant is chosen (the one the collection card shows),
+ *              then the first active variant with stock, then any active variant, then the first
+ *              variant. `variants` ships the SKU skeleton (id, SKU, status and option
  *              value ids) so changing an option chip can request that SKU instead. A variant with
  *              no photos falls back to the product-level gallery.
  *
@@ -167,8 +169,8 @@ const ALL_SEGMENT = "all";
  *   9. Load approved review count and average
  *   10. Load the product's category links with parent names
  *   11. Build the options list, dropping options without values
- *   12. Choose the variant: requested SKU/id, else first active in stock, else first active,
- *       else the first variant
+ *   12. Choose the variant: requested SKU/id, else the featured active variant, else first active
+ *       in stock, else first active, else the first variant
  *   13. Load that variant in full plus its photos, falling back to the product gallery
  *   14. Build the category and subcategory refs and the product `href`
  *   15. Return 200 response with product, variant and variants
@@ -226,12 +228,15 @@ export async function GET(req: NextRequest) {
       [row.id],
     );
 
-    /* The SKU skeleton for every variant — no copy, no price, no photos. */
+    /* The SKU skeleton for every variant — no copy, no price, no photos.
+       Featured first, because the collection card shows that variant's photo
+       and price, so opening the product must land on the same variant. */
     const [variantRefRows] = await conn.query<VariantRefRow[]>(
-      `SELECT v.id, v.sku, v.stock, v.status
+      `SELECT v.id, v.sku, v.stock, v.status, v.is_featured
          FROM product_variants v
         WHERE v.product_id = ?
-        ORDER BY v.status = 'active' DESC, v.price ASC, v.created_at ASC, v.id ASC`,
+        ORDER BY v.is_featured DESC, v.status = 'active' DESC,
+                 v.created_at ASC, v.id ASC`,
       [row.id],
     );
 
@@ -338,8 +343,15 @@ export async function GET(req: NextRequest) {
         null)
       : null;
 
+    /* The featured variant is the one the storefront advertised, so it wins
+       over the cheapest-in-stock default even when another variant is cheaper. */
+    const featuredVariant = variantRefRows.find(
+      (item) => item.status === "active" && Boolean(item.is_featured),
+    );
+
     const chosen =
       requested ??
+      featuredVariant ??
       variantRefRows.find(
         (item) => item.status === "active" && Number(item.stock) > 0,
       ) ??

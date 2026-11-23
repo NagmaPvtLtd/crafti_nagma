@@ -550,7 +550,8 @@ export async function GET(
  * @body {number} stock - Stock, integer 0-100000
  * @body {number|null} [weight] - Weight, 0-100000
  * @body {string} [status] - `active` or `inactive` (default: "active")
- * @body {boolean} [isFeatured] - Featured flag (default: false)
+ * @body {boolean} [isFeatured] - Featured flag (default: false); featuring one variant clears
+ *                                the flag on its siblings, so a product has at most one
  * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
  * @body {string[]} [tagIds] - Full replacement of the variant's own additional tags (max 15,
  *                            10-40 chars each; inherited base tags are never written here)
@@ -586,14 +587,15 @@ export async function GET(
  *       returning 502 if any deletion fails
  *   13. Begin a transaction
  *   14. On disabling: unlink and hide emptied sibling variants, count and delete the media rows
- *   15. Update `product_variants` (copy, price, compare-at, stock, weight, status, badges,
+ *   15. When featuring: clear `is_featured` on the product's other variants
+ *   16. Update `product_variants` (copy, price, compare-at, stock, weight, status, badges,
  *       `updated_by`, `updated_at`)
- *   16. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
- *   17. Write an UPDATE / VARIANT audit entry with price, stock, status and media effects,
+ *   17. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
+ *   18. Write an UPDATE / VARIANT audit entry with price, stock, status and media effects,
  *       swallowing audit errors
- *   18. Return 200 response with the new price, stock, status and media effects
- *   19. Map `ER_DUP_ENTRY` to a field error; otherwise return 500
- *   20. Release the connection in `finally`
+ *   19. Return 200 response with the new price, stock, status and media effects
+ *   20. Map `ER_DUP_ENTRY` to a field error; otherwise return 500
+ *   21. Release the connection in `finally`
  */
 export async function PUT(
   req: NextRequest,
@@ -792,6 +794,18 @@ export async function PUT(
               AND file_purpose = 'product_variant_image'
               AND entity_id = ?`,
           [variantId],
+        );
+      }
+
+      /* Only one variant per product can be featured. Featuring this one clears
+         the flag on its siblings, so the collection card and the variant the
+         product page opens can never disagree. */
+      if (data.isFeatured) {
+        await conn.query(
+          `UPDATE product_variants
+              SET is_featured = 0, updated_by = ?, updated_at = ?
+            WHERE product_id = ? AND id <> ? AND is_featured = 1`,
+          [managerId, now, productId, variantId],
         );
       }
 

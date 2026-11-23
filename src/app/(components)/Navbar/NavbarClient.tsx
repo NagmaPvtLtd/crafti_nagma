@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import {
   Bell,
   ChevronDown,
+  CornerDownLeft,
   LogOut,
   Menu,
   Search,
@@ -19,6 +20,7 @@ import { SessionUserClient } from "../../../types/User/JWT.types";
 import { getSectionsForRole, type NavLink } from "./navLinks";
 import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
 import { SectionDivider } from "../utils/SectionDiv";
+import { useDebouncedValue } from "../utils/Hooks/useDebouncedValue";
 
 type Props = { user: SessionUserClient | null };
 
@@ -79,6 +81,8 @@ export default function NavbarClient({ user }: Props) {
     };
   }, [mobileOpen]);
 
+  const debouncedSearch = useDebouncedValue(searchValue);
+
   const sections = user ? getSectionsForRole(user.role) : [];
 
   const submitSearch = useCallback(
@@ -92,6 +96,19 @@ export default function NavbarClient({ user }: Props) {
     },
     [router, searchValue],
   );
+
+  /* Pausing after typing searches for them; every keystroke restarts the wait. */
+  useEffect(() => {
+    const term = debouncedSearch.trim();
+    if (!term) return;
+
+    const run = () => {
+      router.push(`/search?q=${encodeURIComponent(term)}`);
+      setSearchValue("");
+      setSearchOpen(false);
+    };
+    run();
+  }, [debouncedSearch, router]);
 
   function handleSignIn() {
     router.push(`/login`);
@@ -135,8 +152,16 @@ export default function NavbarClient({ user }: Props) {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="Search handmade treasures..."
-                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-4 pl-10 text-sm text-stone-900 transition outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
+                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-11 pl-10 text-sm text-stone-900 transition outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
               />
+              <button
+                type="submit"
+                aria-label="Search"
+                title="Search (Enter)"
+                className="absolute top-1/2 right-2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+              >
+                <CornerDownLeft size={15} />
+              </button>
             </div>
           </form>
 
@@ -280,8 +305,16 @@ export default function NavbarClient({ user }: Props) {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="Search..."
-                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-4 pl-10 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
+                className="w-full rounded-full border border-stone-200 bg-stone-50 py-2 pr-11 pl-10 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"
               />
+              <button
+                type="submit"
+                aria-label="Search"
+                title="Search (Enter)"
+                className="absolute top-1/2 right-2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+              >
+                <CornerDownLeft size={15} />
+              </button>
             </div>
           </div>
         </form>

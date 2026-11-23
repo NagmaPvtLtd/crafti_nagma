@@ -65,6 +65,20 @@ project — it only exists to help the next click.
 
 ---
 
+## Search bars & debouncing
+
+Every search bar in the project uses **one** utility — never re-implement a timer per page:
+
+- **Hook:** `useDebouncedValue` in `src\app\(components)\utils\Hooks\useDebouncedValue.ts`
+- **Delay:** `SEARCH_DEBOUNCE_MS = 1500`. The search runs after 1.5 s without a keystroke; every keystroke clears the pending timer and starts a new one (the timer lives in a `useRef`, and is cleared on unmount).
+- **Usage:** `const debounced = useDebouncedValue(input)` then a `useEffect` on `debounced` that either fetches or pushes the URL. Keep the `setState` calls inside an inner function in that effect, per the `react-hooks/set-state-in-effect` note above.
+- **URL-driven bars** (`/collections`, `/search`, navbar search) push `/search?q=…` once the pause settles, so Enter is optional; **state-driven bars** (manager lists, admin tools) set their committed query state after the pause.
+- **Bars already wired:** `/collections`, `/search`, navbar (desktop + mobile), manager products list (`ProductListClient`), manager global tags (`GlobalTagsClient`), admin audit log (`AuditLogClient`), admin settings.
+- **End of every search field:** a bare `CornerDownLeft` (Enter) icon button at `right-2` — no background, no border, `text-stone-400 hover:text-rose-600`. Never a black “Search” pill. Clicking it (or pressing Enter) searches immediately, without waiting for the debounce.
+- If a search bar is added somewhere new, use the same hook, the same icon and the same 1.5 s delay — do not copy a `setTimeout` block from another file.
+
+---
+
 ## Scrollbar
 
 Scrollbars are visible again (they used to be hidden). The styling lives once, globally, in `src/app/globals.css`:

@@ -15,6 +15,7 @@ import CustomLoader from "../CustomLoader";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import { inputClass } from "../utils/Form/fieldStyles";
+import { useDebouncedValue } from "../utils/Hooks/useDebouncedValue";
 import CollectionCard from "./CollectionCard";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type { CollectionsResponse } from "../../../types/Collection.types";
@@ -29,6 +30,7 @@ export default function SearchProducts() {
   const query = (searchParams.get("q") ?? "").trim();
 
   const [input, setInput] = useState(query);
+  const debouncedInput = useDebouncedValue(input);
   const [data, setData] = useState<CollectionsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +132,17 @@ export default function SearchProducts() {
     router.push("/search");
   }
 
+  /* Pausing after typing runs the search; the URL stays the source of truth.
+     The debounced value only counts once it matches what is in the box —
+     otherwise an older term would re-run the search after a clear or an
+     instant Enter. */
+  useEffect(() => {
+    const term = debouncedInput.trim();
+    if (term !== input.trim()) return;
+    if (term === query) return;
+    router.push(term ? `/search?q=${encodeURIComponent(term)}` : "/search");
+  }, [debouncedInput, input, query, router]);
+
   /* A single price across every result leaves nothing to filter on. */
   const showPriceFilter = bounds !== null && bounds.max > bounds.min;
 
@@ -157,7 +170,7 @@ export default function SearchProducts() {
             type="submit"
             aria-label="Search"
             title="Search (Enter)"
-            className="absolute top-1/2 right-1.5 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+            className="absolute top-1/2 right-2 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
           >
             <CornerDownLeft className="h-4 w-4" />
           </button>

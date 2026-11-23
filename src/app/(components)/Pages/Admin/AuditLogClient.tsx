@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  CornerDownLeft,
   RefreshCw,
   ScrollText,
   Search,
@@ -16,6 +17,7 @@ import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.u
 import PageWrapper from "../../utils/PageWrapper";
 import ErrorState from "../../utils/ErrorState";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import {
   type RangeType,
   RANGES,
@@ -134,13 +136,16 @@ export default function AdminAuditLogsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /* One request per pause, not per keystroke. */
+  const debouncedSearch = useDebouncedValue(searchInput);
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(searchInput.trim());
+    const apply = () => {
+      setSearch(debouncedSearch.trim());
       setPage(1);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
+    };
+    apply();
+  }, [debouncedSearch]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -245,17 +250,29 @@ export default function AdminAuditLogsClient() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search description, entity, user… or paste a full 40-char log id"
-                className="w-full rounded-xl border border-stone-200 bg-white py-2 pl-9 pr-9 text-xs text-stone-900 placeholder:text-stone-400 transition-colors focus:border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-300"
+                className="w-full rounded-xl border border-stone-200 bg-white py-2 pr-16 pl-9 text-xs text-stone-900 placeholder:text-stone-400 transition-colors focus:border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-300"
               />
               {searchInput && (
                 <button
                   type="button"
                   onClick={() => setSearchInput("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded p-1 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+                  className="absolute right-8 top-1/2 -translate-y-1/2 cursor-pointer rounded p-1 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch(searchInput.trim());
+                  setPage(1);
+                }}
+                aria-label="Search"
+                title="Search (Enter)"
+                className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+              >
+                <CornerDownLeft className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             <select

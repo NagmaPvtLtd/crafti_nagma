@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   Check,
+  CornerDownLeft,
   Loader2,
   Pencil,
   Plus,
@@ -23,6 +24,7 @@ import CustomLoader from "../../CustomLoader";
 import ConfirmDialog from "../../utils/ConfirmDialog";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import { inputClass } from "../../utils/Form/fieldStyles";
+import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import type {
   TagListItem,
   TagListResponse,
@@ -47,10 +49,13 @@ export default function GlobalTagsClient() {
   const [deleting, setDeleting] = useState<TagListItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  /* One request per pause, not per keystroke. */
+  const debouncedSearch = useDebouncedValue(searchInput);
+
   useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    const apply = () => setSearch(debouncedSearch.trim());
+    apply();
+  }, [debouncedSearch]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -187,18 +192,27 @@ export default function GlobalTagsClient() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search tags"
               aria-label="Search tags"
-              className={`${inputClass(false)} pr-8 pl-9`}
+              className={`${inputClass(false)} pr-16 pl-9`}
             />
             {searchInput && (
               <button
                 type="button"
                 onClick={() => setSearchInput("")}
                 aria-label="Clear search"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer rounded-full p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="absolute top-1/2 right-8 -translate-y-1/2 cursor-pointer rounded-full p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setSearch(searchInput.trim())}
+              aria-label="Search"
+              title="Search (Enter)"
+              className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center text-stone-400 transition-colors hover:text-rose-600"
+            >
+              <CornerDownLeft className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           <button
