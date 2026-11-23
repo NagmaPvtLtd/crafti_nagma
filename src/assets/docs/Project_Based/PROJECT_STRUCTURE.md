@@ -1,5 +1,8 @@
 # File Tree: crafti_nagma
 
+**Generated:** 11/23/2026, 2:58:56 PM
+**Root Path:** `d:\GitHub\crafti_nagma`
+
 ```
 ├── 📁 .freebuff
 │   ├── ⚙️ .gitignore
@@ -188,16 +191,17 @@
 │   │   ├── 📁 TODO
 │   │   │   └── 📝 README.md
 │   │   ├── 📁 docs
-│   │   │   ├── 📝 PROJECT_STRUCTURE.md
+│   │   │   ├── 📁 Project_Based
+│   │   │   │   ├── 📝 PROJECT_STRUCTURE.md
+│   │   │   │   ├── 📝 README_API_STRUCTURE.md
+│   │   │   │   ├── 📝 README_COLLECTIONS.md
+│   │   │   │   ├── 📝 README_PRODUCT_STUDIO.md
+│   │   │   │   └── 📝 README_UI_UX.md
 │   │   │   ├── 📝 README.md
 │   │   │   ├── 📝 README_API_DOCUMENTATION.md
-│   │   │   ├── 📝 README_API_STRUCTURE.md
-│   │   │   ├── 📝 README_COLLECTIONS.md
-│   │   │   ├── 📝 README_PRODUCT_STUDIO.md
 │   │   │   ├── 📝 README_PROJECT_HABIT.md
 │   │   │   ├── 📝 README_PROPER_IMPORT_INSTRUCTION.md
-│   │   │   ├── 📝 README_TYPESAFETY.md
-│   │   │   └── 📝 README_UI_UX.md
+│   │   │   └── 📝 README_TYPESAFETY.md
 │   │   └── 📁 images
 │   │       ├── 🖼️ avatar_png_v1.png
 │   │       ├── 🖼️ avatar_ty_png_v1.png
