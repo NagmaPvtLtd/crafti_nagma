@@ -3,7 +3,7 @@
 - In this TODO folder ( `src\assets\TODO` )
 - There would be some files. I've written todo for this project. So:
 
-0. Choose a random file ( except this one )
+0. Choose file sequentially from top ( except this one )
 1. Read that file
 2. Analyse what needs to be done
 3. Complete that tasks

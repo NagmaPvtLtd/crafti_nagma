@@ -1,0 +1,1 @@
+the audit logo does not show the full description as of now, and its getting truncated. improve so it shows full description or... what you can do is.. that allow us to expand even if it doesn't have meta data and then let us see the full description ?
