@@ -1,8 +1,5 @@
 # File Tree: crafti_nagma
 
-**Generated:** 11/19/2026, 12:12:18 AM
-**Root Path:** `c:\Users\itsmeprince\Documents\GitHub\crafti_nagma`
-
 ```
 ├── 📁 .freebuff
 │   ├── ⚙️ .gitignore
@@ -33,6 +30,8 @@
 │   │   │   │   │   └── 📄 WishlistClient.tsx
 │   │   │   │   ├── 📁 Manager
 │   │   │   │   │   ├── 📄 AddProductClient.tsx
+│   │   │   │   │   ├── 📄 EditProductClient.tsx
+│   │   │   │   │   ├── 📄 ExistingPhotosModal.tsx
 │   │   │   │   │   ├── 📄 GlobalCategoriesClient.tsx
 │   │   │   │   │   ├── 📄 GlobalOptionsClient.tsx
 │   │   │   │   │   ├── 📄 PricingQuizModal.tsx
@@ -42,6 +41,9 @@
 │   │   │   │   │   ├── 📄 ProductMediaManager.tsx
 │   │   │   │   │   ├── 📄 StudioModal.tsx
 │   │   │   │   │   └── 📄 VariantDetailClient.tsx
+│   │   │   │   ├── 📄 CollectionBrowse.tsx
+│   │   │   │   ├── 📄 CollectionCard.tsx
+│   │   │   │   ├── 📄 CollectionProduct.tsx
 │   │   │   │   ├── 📄 Collections.tsx
 │   │   │   │   ├── 📄 Landing.tsx
 │   │   │   │   └── 📄 LoginClient.tsx
@@ -51,12 +53,17 @@
 │   │   │   │   └── 📄 Imagekit.Provider.tsx
 │   │   │   ├── 📁 utils
 │   │   │   │   ├── 📁 Form
+│   │   │   │   │   ├── 📄 DimensionFields.tsx
 │   │   │   │   │   ├── 📄 Field.tsx
 │   │   │   │   │   ├── 📄 PasswordInput.tsx
 │   │   │   │   │   ├── 📄 TextInput.tsx
 │   │   │   │   │   ├── 📄 Textarea.tsx
-│   │   │   │   │   └── 📄 fieldStyles.ts
+│   │   │   │   │   ├── 📄 fieldStyles.ts
+│   │   │   │   │   └── 📄 formErrors.ts
+│   │   │   │   ├── 📄 ConfirmDialog.tsx
+│   │   │   │   ├── 📄 ErrorState.tsx
 │   │   │   │   ├── 📄 PageWrapper.tsx
+│   │   │   │   ├── 📄 PhotoViewer.tsx
 │   │   │   │   ├── 📄 ScrollToTop.tsx
 │   │   │   │   ├── 📄 SectionDiv.tsx
 │   │   │   │   ├── 📄 SocialIcons.tsx
@@ -85,7 +92,6 @@
 │   │   │   │       ├── 📁 [fieldName]
 │   │   │   │       │   └── 📄 route.ts
 │   │   │   │       └── 📄 route.ts
-│   │   │   ├── 📁 admin-super
 │   │   │   ├── 📁 auth
 │   │   │   │   ├── 📁 [...nextauth]
 │   │   │   │   │   └── 📄 route.ts
@@ -98,6 +104,10 @@
 │   │   │   │       ├── 📁 [id]
 │   │   │   │       │   ├── 📁 variants
 │   │   │   │       │   │   ├── 📁 [variantId]
+│   │   │   │       │   │   │   ├── 📁 available-images
+│   │   │   │       │   │   │   │   └── 📄 route.ts
+│   │   │   │       │   │   │   ├── 📁 linked-images
+│   │   │   │       │   │   │   │   └── 📄 route.ts
 │   │   │   │       │   │   │   └── 📄 route.ts
 │   │   │   │       │   │   └── 📄 route.ts
 │   │   │   │       │   └── 📄 route.ts
@@ -114,11 +124,20 @@
 │   │   │   │       ├── 📁 products
 │   │   │   │       │   └── 📄 route.ts
 │   │   │   │       └── 📄 route.ts
-│   │   │   ├── 📁 public
-│   │   │   │   └── 📁 heartbeat
-│   │   │   │       └── 📄 route.ts
-│   │   │   └── 📁 user
+│   │   │   └── 📁 public
+│   │   │       ├── 📁 collections
+│   │   │       │   ├── 📁 product
+│   │   │       │   │   └── 📄 route.ts
+│   │   │       │   └── 📄 route.ts
+│   │   │       └── 📁 heartbeat
+│   │   │           └── 📄 route.ts
 │   │   ├── 📁 collections
+│   │   │   ├── 📁 [category]
+│   │   │   │   ├── 📁 [subcategory]
+│   │   │   │   │   ├── 📁 [product]
+│   │   │   │   │   │   └── 📄 page.tsx
+│   │   │   │   │   └── 📄 page.tsx
+│   │   │   │   └── 📄 page.tsx
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 dashboard
 │   │   │   ├── 📁 orders
@@ -139,6 +158,8 @@
 │   │   │       │   └── 📄 page.tsx
 │   │   │       ├── 📁 products
 │   │   │       │   ├── 📁 [product_id]
+│   │   │       │   │   ├── 📁 edit
+│   │   │       │   │   │   └── 📄 page.tsx
 │   │   │       │   │   ├── 📁 variants
 │   │   │       │   │   │   └── 📁 [variant_id]
 │   │   │       │   │   │       └── 📄 page.tsx
@@ -164,11 +185,16 @@
 │   │   ├── 📄 opengraph-image.tsx
 │   │   └── 📄 page.tsx
 │   ├── 📁 assets
+│   │   ├── 📁 TODO
+│   │   │   └── 📝 README.md
 │   │   ├── 📁 docs
 │   │   │   ├── 📝 PROJECT_STRUCTURE.md
 │   │   │   ├── 📝 README.md
+│   │   │   ├── 📝 README_API_DOCUMENTATION.md
 │   │   │   ├── 📝 README_API_STRUCTURE.md
+│   │   │   ├── 📝 README_COLLECTIONS.md
 │   │   │   ├── 📝 README_PRODUCT_STUDIO.md
+│   │   │   ├── 📝 README_PROJECT_HABIT.md
 │   │   │   ├── 📝 README_PROPER_IMPORT_INSTRUCTION.md
 │   │   │   ├── 📝 README_TYPESAFETY.md
 │   │   │   └── 📝 README_UI_UX.md
@@ -194,7 +220,9 @@
 │   │   │   ├── 📁 Migrations
 │   │   │   │   ├── 📄 20261107161717980_initial_schema.sql
 │   │   │   │   ├── 📄 20261118175244390_imagekit_files_entity.sql
-│   │   │   │   └── 📄 20261118175253093_product_media_reviews.sql
+│   │   │   │   ├── 📄 20261118175253093_product_media_reviews.sql
+│   │   │   │   ├── 📄 20261119191754844_product_variant_image_links.sql
+│   │   │   │   └── 📄 20261123061227512_variant_dimensions_features_care.sql
 │   │   │   ├── 📝 README.md
 │   │   │   ├── 📄 connection.db.ts
 │   │   │   ├── 📄 create.index.db.ts
@@ -223,18 +251,27 @@
 │   │   │   ├── 📄 JWT.types.ts
 │   │   │   ├── 📄 ProfileClient.types.ts
 │   │   │   └── 📄 UserRow.types.ts
+│   │   ├── 📄 Collection.types.ts
 │   │   └── 📄 Heartbeat.types.ts
 │   ├── 📁 utils
 │   │   ├── 📁 AdminRange
 │   │   │   ├── 📄 adminRange.types.ts
 │   │   │   └── 📄 adminRange.utils.ts
+│   │   ├── 📁 Api
+│   │   │   └── 📄 apiResponse.util.ts
 │   │   ├── 📁 Auth
 │   │   │   ├── 📄 Auth.axiosErrorHelper.util.ts
 │   │   │   ├── 📄 Auth.isFromIndia.util.ts
 │   │   │   ├── 📄 Auth.requireRole.util.ts
 │   │   │   └── 📄 AuthErrors.ts
 │   │   ├── 📁 Formator
-│   │   │   └── 📄 formatDateTime.util.ts
+│   │   │   ├── 📄 capitalize.util.ts
+│   │   │   ├── 📄 formatCurrency.util.ts
+│   │   │   ├── 📄 formatDateTime.util.ts
+│   │   │   ├── 📄 plural.util.ts
+│   │   │   ├── 📄 productIdentity.util.ts
+│   │   │   ├── 📄 toNumber.util.ts
+│   │   │   └── 📄 toPascalCase.util.ts
 │   │   ├── 📁 Heartbeat
 │   │   │   ├── 📄 Heartbeat.session.util.ts
 │   │   │   └── 📄 Heartbeat.util.ts
@@ -242,6 +279,8 @@
 │   │   │   └── 📄 imagekit.util.ts
 │   │   ├── 📁 Pricing
 │   │   │   └── 📄 pricing.util.ts
+│   │   ├── 📁 ProductStudio
+│   │   │   └── 📄 productStudio.lookup.util.ts
 │   │   ├── 📁 Slug
 │   │   │   └── 📄 slug.util.ts
 │   │   ├── 📁 ValueFetcher
