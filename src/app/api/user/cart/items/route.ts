@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { RowDataPacket } from "mysql2/promise";
 
 import { getPool } from "../../../../../lib/Database/main.db";
 import type { CartResponse } from "../../../../../types/Cart.types";
@@ -10,20 +9,12 @@ import {
   loadCart,
   resolveUserCart,
   touchCart,
+  type CartQuantityRow,
+  type CartVariantRow,
 } from "../../../../../utils/Cart/cart.util";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
 import { generateULID } from "../../../../../utils/generateULID.util";
 import { cartAddSchema } from "../../../../../utils/zod/cart/cart.zod";
-
-interface VariantRow extends RowDataPacket {
-  id: string;
-  stock: number | string;
-  status: "active" | "inactive";
-}
-
-interface LineRow extends RowDataPacket {
-  quantity: number | string;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  POST /api/user/cart/items                                                 */
@@ -110,7 +101,7 @@ export async function POST(req: NextRequest) {
   try {
     await conn.beginTransaction();
 
-    const [variantRows] = await conn.query<VariantRow[]>(
+    const [variantRows] = await conn.query<CartVariantRow[]>(
       `SELECT id, stock, status
          FROM product_variants
         WHERE id = ?
@@ -150,7 +141,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [lineRows] = await conn.query<LineRow[]>(
+    const [lineRows] = await conn.query<CartQuantityRow[]>(
       `SELECT quantity
          FROM cart_items
         WHERE cart_id = ? AND variant_id = ?

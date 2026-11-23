@@ -1,29 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/Database/main.db";
-import type { CartItemView, CartResponse } from "../../../../types/Cart.types";
+import type { CartResponse } from "../../../../types/Cart.types";
 import { requireAuth } from "../../../../utils/Auth/Auth.requireRole.util";
 import {
   cartTotals,
+  emptyCartPayload,
   loadCart,
   resolveUserCart,
   touchCart,
 } from "../../../../utils/Cart/cart.util";
 import { getCurrentDateTime } from "../../../../utils/ValueFetcher/getDateTime.util";
-
-/**
- * Builds the payload returned when the user has no cart lines.
- *
- * @function emptyCart
- * @description Returns `{ ok: true, items: [], summary }` with zeroed totals, so an
- *              account without an active cart never needs a special client branch.
- *
- * @returns {CartResponse} Empty cart payload
- */
-function emptyCart(): CartResponse {
-  const items: CartItemView[] = [];
-  return { ok: true, items, summary: cartTotals(items) };
-}
 
 /* -------------------------------------------------------------------------- */
 /*  GET /api/user/cart                                                        */
@@ -151,7 +138,7 @@ export async function DELETE() {
   try {
     const cartId = await resolveUserCart(conn, userId, false);
     if (!cartId) {
-      return NextResponse.json(emptyCart(), {
+      return NextResponse.json(emptyCartPayload(), {
         headers: { "Cache-Control": "no-store" },
       });
     }
@@ -159,7 +146,7 @@ export async function DELETE() {
     await conn.execute(`DELETE FROM cart_items WHERE cart_id = ?`, [cartId]);
     await touchCart(conn, cartId, getCurrentDateTime());
 
-    return NextResponse.json(emptyCart(), {
+    return NextResponse.json(emptyCartPayload(), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (err) {

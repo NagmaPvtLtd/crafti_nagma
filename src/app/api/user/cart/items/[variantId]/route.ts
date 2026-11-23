@@ -1,46 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { RowDataPacket } from "mysql2/promise";
 
 import { getPool } from "../../../../../../lib/Database/main.db";
-import type { CartItemView, CartResponse } from "../../../../../../types/Cart.types";
+import type { CartResponse } from "../../../../../../types/Cart.types";
 import { invalidInput } from "../../../../../../utils/Api/apiResponse.util";
 import { requireAuth } from "../../../../../../utils/Auth/Auth.requireRole.util";
 import {
   cartTotals,
+  emptyCartPayload,
   loadCart,
   resolveUserCart,
   touchCart,
+  type CartItemIdRow,
+  type CartVariantRow,
 } from "../../../../../../utils/Cart/cart.util";
 import { getCurrentDateTime } from "../../../../../../utils/ValueFetcher/getDateTime.util";
 import { cartUpdateSchema } from "../../../../../../utils/zod/cart/cart.zod";
 
-interface VariantRow extends RowDataPacket {
-  id: string;
-  stock: number | string;
-  status: "active" | "inactive";
-}
-
-interface LineRow extends RowDataPacket {
-  id: string;
-}
-
 type VariantRouteContext = {
   params: Promise<{ variantId: string }>;
 };
-
-/**
- * Builds the payload returned when the user has no cart lines.
- *
- * @function emptyCart
- * @description Returns `{ ok: true, items: [], summary }` with zeroed totals, so a
- *              missing cart never needs a special client branch.
- *
- * @returns {CartResponse} Empty cart payload
- */
-function emptyCart(): CartResponse {
-  const items: CartItemView[] = [];
-  return { ok: true, items, summary: cartTotals(items) };
-}
 
 /* -------------------------------------------------------------------------- */
 /*  PATCH /api/user/cart/items/[variantId]                                    */
@@ -136,7 +114,7 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
   try {
     const cartId = await resolveUserCart(conn, userId, false);
     if (!cartId) {
-      return NextResponse.json(emptyCart());
+      return NextResponse.json(emptyCartPayload());
     }
 
     /* 0 removes the line — no stock or availability check needed to delete. */
@@ -159,7 +137,7 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
     await conn.beginTransaction();
 
     try {
-      const [variantRows] = await conn.query<VariantRow[]>(
+      const [variantRows] = await conn.query<CartVariantRow[]>(
         `SELECT id, stock, status
            FROM product_variants
           WHERE id = ?
@@ -198,7 +176,7 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
         );
       }
 
-      const [lineRows] = await conn.query<LineRow[]>(
+      const [lineRows] = await conn.query<CartItemIdRow[]>(
         `SELECT id
            FROM cart_items
           WHERE cart_id = ? AND variant_id = ?
@@ -316,7 +294,7 @@ export async function DELETE(_req: NextRequest, ctx: VariantRouteContext) {
   try {
     const cartId = await resolveUserCart(conn, userId, false);
     if (!cartId) {
-      return NextResponse.json(emptyCart());
+      return NextResponse.json(emptyCartPayload());
     }
 
     const now = getCurrentDateTime();

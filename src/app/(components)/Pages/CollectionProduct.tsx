@@ -30,6 +30,7 @@ import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider } from "../utils/SectionDiv";
 import { WhatsAppIcon } from "../utils/SocialIcons";
 import { whatsappNumberLink } from "../../../utils/main.util";
+import getApiErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type {
   CollectionOption,
@@ -286,10 +287,9 @@ export default function CollectionProduct({ code }: { code: string }) {
         window.dispatchEvent(new CustomEvent("cart:updated"));
         toast.success("Added to cart");
       } catch (err) {
-        const message = axios.isAxiosError(err)
-          ? (err.response?.data as { error?: string } | undefined)?.error
-          : null;
-        toast.error(message ?? "Could not add this item to your cart");
+        toast.error(
+          getApiErrorMessage(err, "Could not add this item to your cart"),
+        );
       } finally {
         /* Whatever the product effect put in the URL stays; only the two
            cart params are dropped, so a refresh cannot add twice. */
@@ -561,10 +561,9 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
         return;
       }
 
-      const message = axios.isAxiosError(err)
-        ? (err.response?.data as { error?: string } | undefined)?.error
-        : null;
-      toast.error(message ?? "Could not add this item to your cart");
+      toast.error(
+        getApiErrorMessage(err, "Could not add this item to your cart"),
+      );
     } finally {
       setAdding(false);
     }

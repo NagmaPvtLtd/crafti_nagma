@@ -21,18 +21,11 @@ import CustomLoader from "../CustomLoader";
 import ErrorState from "../utils/ErrorState";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
+import getApiErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type { CartItemView, CartResponse } from "../../../types/Cart.types";
 
 const MAX_QUANTITY = 99;
-
-function errorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { error?: string } | undefined;
-    if (data?.error) return data.error;
-  }
-  return fallback;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  /cart — login-first, so the proxy guarantees a signed-in user here        */
@@ -51,7 +44,9 @@ export default function CartClient() {
       setCart(res.data);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Could not load your cart right now."));
+      setError(
+        getApiErrorMessage(err, "Could not load your cart right now."),
+      );
     } finally {
       setLoading(false);
     }
@@ -68,7 +63,9 @@ export default function CartClient() {
         setError(null);
       } catch (err) {
         if (!cancelled) {
-          setError(errorMessage(err, "Could not load your cart right now."));
+          setError(
+            getApiErrorMessage(err, "Could not load your cart right now."),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -100,7 +97,7 @@ export default function CartClient() {
       setCart(next);
       window.dispatchEvent(new CustomEvent("cart:updated"));
     } catch (err) {
-      toast.error(errorMessage(err, fallback));
+      toast.error(getApiErrorMessage(err, fallback));
     } finally {
       setBusyVariantId(null);
     }
@@ -145,7 +142,7 @@ export default function CartClient() {
       setCart(res.data);
       window.dispatchEvent(new CustomEvent("cart:updated"));
     } catch (err) {
-      toast.error(errorMessage(err, "Could not clear your cart"));
+      toast.error(getApiErrorMessage(err, "Could not clear your cart"));
     } finally {
       setClearing(false);
     }

@@ -1,12 +1,31 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 
-import type { CartItemView, CartSummary } from "../../types/Cart.types";
+import type {
+  CartItemView,
+  CartResponse,
+  CartSummary,
+} from "../../types/Cart.types";
 import { isDuplicateEntry } from "../Api/apiResponse.util";
 import { toNumber } from "../Formator/toNumber.util";
 import { getCurrentDateTime } from "../ValueFetcher/getDateTime.util";
 import { generateULID } from "../generateULID.util";
 
 interface CartRow extends RowDataPacket {
+  id: string;
+}
+
+/* Query rows shared by the cart routes. */
+export interface CartVariantRow extends RowDataPacket {
+  id: string;
+  stock: number | string;
+  status: "active" | "inactive";
+}
+
+export interface CartQuantityRow extends RowDataPacket {
+  quantity: number | string;
+}
+
+export interface CartItemIdRow extends RowDataPacket {
   id: string;
 }
 
@@ -163,6 +182,15 @@ export async function loadCart(
       available: status === "active" && stock > 0,
     };
   });
+}
+
+/**
+ * The single empty cart shape every route returns when the user has no lines.
+ * Used by `GET`, the no-cart branches and `DELETE /api/user/cart`.
+ */
+export function emptyCartPayload(): CartResponse {
+  const items: CartItemView[] = [];
+  return { ok: true, items, summary: cartTotals(items) };
 }
 
 /**
