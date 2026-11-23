@@ -73,6 +73,47 @@ const optionalText = (max: number, message?: string) =>
     .optional()
     .transform((v) => v ?? "");
 
+/** A dimension is optional; an empty string means "not measured" (NULL). */
+export const optionalDimension = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z.coerce
+      .number()
+      .min(0, "Dimensions cannot be negative")
+      .max(100_000)
+      .refine(
+        (v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9,
+        "Use at most two decimal places",
+      ),
+  ])
+  .optional()
+  .transform((v) => (v === "" || v === undefined || v === null ? null : v));
+
+export const optionalDimensionUnit = z
+  .union([z.literal(""), z.null(), z.enum(["cm", "in"])])
+  .optional()
+  .transform((v) =>
+    v === "" || v === undefined || v === null ? null : v,
+  );
+
+export const dimensionFields = {
+  length: optionalDimension,
+  width: optionalDimension,
+  height: optionalDimension,
+  dimensionUnit: optionalDimensionUnit,
+};
+
+/** At least one measurement means a unit must be chosen. */
+export const requireUnitWithDimensions = (data: {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimensionUnit: "cm" | "in" | null;
+}) =>
+  (data.length === null && data.width === null && data.height === null) ||
+  data.dimensionUnit !== null;
+
 /**
  * A base product is not purchasable — it only carries the shared data its
  * variants inherit. At least one category and one option (with at least one
@@ -98,6 +139,8 @@ export const baseProductCreateSchema = z.object({
     .array(z.string().trim().min(10).max(40))
     .min(1, "Pick at least one category"),
 
+  ...dimensionFields,
+
   options: z
     .array(
       z.object({
@@ -108,6 +151,9 @@ export const baseProductCreateSchema = z.object({
       }),
     )
     .min(1, "Pick at least one option"),
+}).refine(requireUnitWithDimensions, {
+  message: "Pick a unit (cm or in) when a dimension is filled in",
+  path: ["dimensionUnit"],
 });
 
 export type BaseProductCreateInput = z.infer<typeof baseProductCreateSchema>;

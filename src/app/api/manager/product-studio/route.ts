@@ -243,9 +243,10 @@ export async function POST(req: NextRequest) {
           brief_description, description,
           meta_title, meta_description,
           delivery_charges, processing_time,
+          length, width, height, dimension_unit,
           is_featured, main_showcase, orders_count, status,
           created_by, updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0, ?, ?, NULL, ?, NULL)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL, ?, NULL)`,
       [
         productId,
         code,
@@ -256,6 +257,10 @@ export async function POST(req: NextRequest) {
         data.metaTitle || null,
         data.metaDescription || null,
         data.deliveryCharges,
+        data.length,
+        data.width,
+        data.height,
+        data.dimensionUnit,
         data.isFeatured ? 1 : 0,
         data.mainShowcase ? 1 : 0,
         data.status,

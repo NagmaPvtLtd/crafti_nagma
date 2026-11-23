@@ -26,6 +26,10 @@ interface ProductRow extends RowDataPacket {
   description: string | null;
   processing_time: string | null;
   delivery_charges: number | string | null;
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
   is_featured: number | boolean;
 }
 
@@ -52,6 +56,10 @@ interface VariantRow extends RowDataPacket {
   compare_at_price: number | string | null;
   stock: number | string;
   weight: number | string | null;
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
   status: "active" | "inactive";
   is_featured: number | boolean;
 }
@@ -191,7 +199,9 @@ export async function GET(req: NextRequest) {
   try {
     const [productRows] = await conn.query<ProductRow[]>(
       `SELECT p.id, p.code, p.name, p.slug, p.brief_description, p.description,
-              p.processing_time, p.delivery_charges, p.is_featured
+              p.processing_time, p.delivery_charges,
+              p.length, p.width, p.height, p.dimension_unit,
+              p.is_featured
          FROM products p
         WHERE p.status = 'active'
           AND (p.code = ? OR p.slug = ? OR p.id = ?)
@@ -228,7 +238,7 @@ export async function GET(req: NextRequest) {
     const [optionRows] = await conn.query<OptionRow[]>(
       `SELECT o.id, o.name
          FROM product_options o
-        WHERE o.product_id = ?
+        WHERE o.product_id = ? AND o.status = 'active'
         ORDER BY o.created_at ASC, o.id ASC`,
       [row.id],
     );
@@ -237,7 +247,7 @@ export async function GET(req: NextRequest) {
       `SELECT v.id, v.option_id, v.value
          FROM product_option_values v
          JOIN product_options o ON o.id = v.option_id
-        WHERE o.product_id = ?
+        WHERE o.product_id = ? AND v.status = 'active' AND o.status = 'active'
         ORDER BY v.created_at ASC, v.id ASC`,
       [row.id],
     );
@@ -294,8 +304,20 @@ export async function GET(req: NextRequest) {
     );
 
     /* ---------------- options ---------------- */
+    /* Only values that a variant of THIS product actually fills are offered,
+       so a product never shows an option or value that was not chosen for it. */
+    const valuesByVariant = new Map<string, string[]>();
+    const usedValueIds = new Set<string>();
+    for (const link of variantValueRows) {
+      const list = valuesByVariant.get(link.variant_id) ?? [];
+      list.push(link.option_value_id);
+      valuesByVariant.set(link.variant_id, list);
+      usedValueIds.add(link.option_value_id);
+    }
+
     const valuesByOption = new Map<string, { id: string; value: string }[]>();
     for (const value of optionValueRows) {
+      if (!usedValueIds.has(value.id)) continue;
       const list = valuesByOption.get(value.option_id) ?? [];
       list.push({ id: value.id, value: value.value });
       valuesByOption.set(value.option_id, list);
@@ -308,13 +330,6 @@ export async function GET(req: NextRequest) {
         values: valuesByOption.get(option.id) ?? [],
       }))
       .filter((option) => option.values.length > 0);
-
-    const valuesByVariant = new Map<string, string[]>();
-    for (const link of variantValueRows) {
-      const list = valuesByVariant.get(link.variant_id) ?? [];
-      list.push(link.option_value_id);
-      valuesByVariant.set(link.variant_id, list);
-    }
 
     /* ---------------- which variant? ---------------- */
     const requested = variantRef
@@ -339,10 +354,27 @@ export async function GET(req: NextRequest) {
       const [fullRows] = await conn.query<VariantRow[]>(
         `SELECT v.id, v.sku, v.name, v.brief_description, v.description,
                 v.price, v.compare_at_price, v.stock, v.weight,
+                v.length, v.width, v.height, v.dimension_unit,
                 v.status, v.is_featured
            FROM product_variants v
           WHERE v.id = ?
           LIMIT 1`,
+        [chosen.id],
+      );
+
+      const [variantFeatureRows] = await conn.query<FeatureRow[]>(
+        `SELECT id, feature
+           FROM product_variant_features
+          WHERE variant_id = ?
+          ORDER BY sort_order ASC, created_at ASC, id ASC`,
+        [chosen.id],
+      );
+
+      const [variantCareRows] = await conn.query<CareRow[]>(
+        `SELECT id, instruction
+           FROM product_variant_care_instructions
+          WHERE variant_id = ?
+          ORDER BY sort_order ASC, created_at ASC, id ASC`,
         [chosen.id],
       );
 
@@ -374,8 +406,34 @@ export async function GET(req: NextRequest) {
           compareAtPrice: toNumber(full.compare_at_price),
           stock: Number(full.stock ?? 0),
           weight: toNumber(full.weight),
+          dimensions: {
+            length: toNumber(full.length),
+            width: toNumber(full.width),
+            height: toNumber(full.height),
+            dimensionUnit: full.dimension_unit ?? null,
+          },
           status: full.status === "inactive" ? "inactive" : "active",
           isFeatured: Boolean(full.is_featured),
+          features:
+            variantFeatureRows.length > 0
+              ? variantFeatureRows.map((feature) => ({
+                  id: feature.id,
+                  text: feature.feature,
+                }))
+              : featureRows.map((feature) => ({
+                  id: feature.id,
+                  text: feature.feature,
+                })),
+          careInstructions:
+            variantCareRows.length > 0
+              ? variantCareRows.map((care) => ({
+                  id: care.id,
+                  text: care.instruction,
+                }))
+              : careRows.map((care) => ({
+                  id: care.id,
+                  text: care.instruction,
+                })),
           images:
             ownImages.length > 0
               ? ownImages
@@ -427,6 +485,12 @@ export async function GET(req: NextRequest) {
       processingTime: row.processing_time,
       deliveryCharges: Number(row.delivery_charges ?? 0),
       isFeatured: Boolean(row.is_featured),
+      dimensions: {
+        length: toNumber(row.length),
+        width: toNumber(row.width),
+        height: toNumber(row.height),
+        dimensionUnit: row.dimension_unit ?? null,
+      },
       images: productImages.map((image) => ({
         id: image.id,
         url: image.url,

@@ -7,7 +7,7 @@
 1. Read that file
 2. Analyse what needs to be done
 3. Complete that tasks
-4. Then come back to that same file
+4. Then come back to that same file & read if there is anything new added after it has last read the file -> do go to step 3 if new tasks exists otherwise go to step 5
 5. Delete only that file.
 6. Repeat until there is only this README.md is left
 

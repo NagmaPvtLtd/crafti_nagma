@@ -30,3 +30,15 @@
   - Dashboard pages: orders, profile, wishlist (already use it)
 - Page routes stay thin: a `page.tsx` that renders one client component; logic lives in the client file or the API.
 - Currency formatting: always use `formatCurrency()` from `src/utils/Formator/formatCurrency.util.ts` — never define a local `inr()` helper in individual files. The utility formats INR with `en-IN` locale and 0 decimal places.
+
+---
+
+## Scrollbar
+
+Scrollbars are visible again (they used to be hidden). The styling lives once, globally, in `src/app/globals.css`:
+
+- **Track:** white (`#ffffff`).
+- **Thumb:** pink (`#fb7185`, i.e. rose-400) with rounded ends and a white border so it reads as a floating pill; it deepens to rose-500 (`#f43f5e`) on hover.
+- **Size:** thin — 10px on Chromium/WebKit (`::-webkit-scrollbar`) and `scrollbar-width: thin` in Firefox.
+
+Both implementations are declared so the same white track + pink thumb shows in Chromium, Safari and Firefox. Do not re-hide the scrollbar and do not restyle it per page — use the global rules above, and keep the pink in step with the rest of the UI (rose-400 thumb, rose-500 hover).

@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+import {
+  dimensionFields,
+  requireUnitWithDimensions,
+} from "./manager.product.zod";
+
+export type ProductDimensions = {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimensionUnit: "cm" | "in" | null;
+};
+
 /* ------------------------------------------------------------------ */
 /*  Shared helpers                                                     */
 /* ------------------------------------------------------------------ */
@@ -61,6 +73,28 @@ export const productBaseUpdateSchema = z.object({
 
   /** Full replacement of the care instructions; omit to leave them untouched. */
   careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
+
+  ...dimensionFields,
+
+  /**
+   * Full replacement of the product's options and their values. Omit to leave
+   * them untouched; removing a value removes the variants that use it (or
+   * disables them when they already have orders).
+   */
+  options: z
+    .array(
+      z.object({
+        optionId: z.string().trim().min(10).max(40),
+        valueIds: z
+          .array(z.string().trim().min(10).max(40))
+          .min(1, "Pick at least one value for this option"),
+      }),
+    )
+    .min(1, "Pick at least one option")
+    .optional(),
+}).refine(requireUnitWithDimensions, {
+  message: "Pick a unit (cm or in) when a dimension is filled in",
+  path: ["dimensionUnit"],
 });
 
 export type ProductBaseUpdateInput = z.infer<typeof productBaseUpdateSchema>;
@@ -115,6 +149,17 @@ export const variantUpdateSchema = z.object({
   status: z.enum(["active", "inactive"]).default("active"),
   isFeatured: z.boolean().default(false),
   mainShowcase: z.boolean().default(false),
+
+  ...dimensionFields,
+
+  /** Full replacement of the variant's own feature bullets; omit to leave them. */
+  features: z.array(z.string().trim().min(1).max(255)).optional(),
+
+  /** Full replacement of the variant's own care instructions; omit to leave them. */
+  careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
+}).refine(requireUnitWithDimensions, {
+  message: "Pick a unit (cm or in) when a dimension is filled in",
+  path: ["dimensionUnit"],
 });
 
 export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
@@ -180,11 +225,15 @@ export interface ProductCategoryRef {
 
 export interface ProductOptionValueRef {
   id: string;
+  /** `global_option_values.id` this value was copied from. */
+  globalOptionValueId: string;
   value: string;
 }
 
 export interface ProductOptionGroup {
   id: string;
+  /** `global_options.id` this option was copied from. */
+  globalOptionId: string;
   name: string;
   description: string;
   values: ProductOptionValueRef[];
@@ -237,6 +286,8 @@ export interface ProductVariantSummary {
   stock: number;
   status: ProductStatus;
   optionValues: { option: string; value: string }[];
+  /** `product_option_values.id` this variant fills — one per option. */
+  optionValueIds: string[];
   imageUrl: string | null;
 }
 
@@ -285,6 +336,7 @@ export interface ProductDetail {
   isFeatured: boolean;
   mainShowcase: boolean;
   status: ProductStatus;
+  dimensions: ProductDimensions;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -322,6 +374,7 @@ export interface VariantDetail {
   status: ProductStatus;
   isFeatured: boolean;
   mainShowcase: boolean;
+  dimensions: ProductDimensions;
   ordersCount: number;
   orderStats: {
     orders: number;
@@ -337,10 +390,16 @@ export interface VariantDetailResponse {
   variant: VariantDetail;
   optionValues: { option: string; value: string }[];
   media: ProductMediaItem[];
+  /** This variant's own snapshot of the base product's lists. */
+  features: ProductLineItem[];
+  careInstructions: ProductLineItem[];
   /** Base product copy — what the sync buttons on the variant form pull from. */
   baseProduct: {
     name: string;
     briefDescription: string;
     description: string;
+    dimensions: ProductDimensions;
+    features: string[];
+    careInstructions: string[];
   };
 }

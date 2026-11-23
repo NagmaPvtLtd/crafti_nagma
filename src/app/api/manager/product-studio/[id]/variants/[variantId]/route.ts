@@ -18,8 +18,10 @@ import {
 import { requireManager } from "../../../../../../../utils/Auth/Auth.requireRole.util";
 import { getPool } from "../../../../../../../lib/Database/main.db";
 import { getCurrentDateTime } from "../../../../../../../utils/ValueFetcher/getDateTime.util";
+import { generateULID } from "../../../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../../../services/AuditLog.service";
 import { ImageKitService } from "../../../../../../../services/Imagekit.service";
+import { capitalizeFirst } from "../../../../../../../utils/Formator/capitalize.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -44,6 +46,10 @@ interface VariantRow extends RowDataPacket {
   compare_at_price: number | string | null;
   stock: number | string;
   weight: number | string | null;
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
   status: "active" | "inactive";
   is_featured: number | boolean;
   main_showcase: number | boolean;
@@ -76,6 +82,19 @@ interface OrderStatsRow extends RowDataPacket {
   revenue: number | string;
 }
 
+interface LineItemRow extends RowDataPacket {
+  id: string;
+  value: string;
+  sort_order: number | string;
+}
+
+interface ProductDimensionsRow extends RowDataPacket {
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -106,6 +125,7 @@ async function loadVariant(
             p.description AS product_description,
             v.name, v.brief_description, v.description, v.sku,
             v.price, v.compare_at_price, v.stock, v.weight,
+            v.length, v.width, v.height, v.dimension_unit,
             v.status, v.is_featured, v.main_showcase, v.orders_count,
             v.created_at, v.updated_at
        FROM product_variants v
@@ -354,6 +374,41 @@ export async function GET(
     const media = await loadMedia(conn, productId, variantId);
     const orderStats = orderStatsRows[0];
 
+    const [featureRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, feature AS value, sort_order
+         FROM product_variant_features
+        WHERE variant_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [variantId],
+    );
+    const [careRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, instruction AS value, sort_order
+         FROM product_variant_care_instructions
+        WHERE variant_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [variantId],
+    );
+    const [baseFeatureRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, feature AS value, sort_order
+         FROM product_features
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [productId],
+    );
+    const [baseCareRows] = await conn.query<LineItemRow[]>(
+      `SELECT id, instruction AS value, sort_order
+         FROM product_care_instructions
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [productId],
+    );
+    const [baseDimensionRows] = await conn.query<ProductDimensionsRow[]>(
+      `SELECT length, width, height, dimension_unit
+         FROM products WHERE id = ? LIMIT 1`,
+      [productId],
+    );
+    const baseDimensions = baseDimensionRows[0];
+
     const payload: VariantDetailResponse = {
       ok: true,
       variant: {
@@ -372,6 +427,14 @@ export async function GET(
             : Number(variant.compare_at_price),
         stock: Number(variant.stock ?? 0),
         weight: variant.weight === null ? null : Number(variant.weight),
+        dimensions: {
+          length:
+            variant.length === null ? null : Number(variant.length),
+          width: variant.width === null ? null : Number(variant.width),
+          height:
+            variant.height === null ? null : Number(variant.height),
+          dimensionUnit: variant.dimension_unit ?? null,
+        },
         status: variant.status,
         isFeatured: Boolean(variant.is_featured),
         mainShowcase: Boolean(variant.main_showcase),
@@ -389,10 +452,39 @@ export async function GET(
         value: row.value,
       })),
       media,
+      features: featureRows.map((row) => ({
+        id: row.id,
+        value: row.value,
+        sortOrder: Number(row.sort_order ?? 0),
+      })),
+      careInstructions: careRows.map((row) => ({
+        id: row.id,
+        value: row.value,
+        sortOrder: Number(row.sort_order ?? 0),
+      })),
       baseProduct: {
         name: variant.product_name,
         briefDescription: variant.product_brief_description ?? "",
         description: variant.product_description ?? "",
+        dimensions: {
+          length:
+            baseDimensions?.length === null ||
+            baseDimensions?.length === undefined
+              ? null
+              : Number(baseDimensions.length),
+          width:
+            baseDimensions?.width === null || baseDimensions?.width === undefined
+              ? null
+              : Number(baseDimensions.width),
+          height:
+            baseDimensions?.height === null ||
+            baseDimensions?.height === undefined
+              ? null
+              : Number(baseDimensions.height),
+          dimensionUnit: baseDimensions?.dimension_unit ?? null,
+        },
+        features: baseFeatureRows.map((row) => row.value),
+        careInstructions: baseCareRows.map((row) => row.value),
       },
     };
 
@@ -675,6 +767,10 @@ export async function PUT(
                 compare_at_price = ?,
                 stock = ?,
                 weight = ?,
+                length = ?,
+                width = ?,
+                height = ?,
+                dimension_unit = ?,
                 status = ?,
                 is_featured = ?,
                 main_showcase = ?,
@@ -689,6 +785,10 @@ export async function PUT(
           data.compareAtPrice ?? null,
           data.stock,
           data.weight ?? null,
+          data.length,
+          data.width,
+          data.height,
+          data.dimensionUnit,
           data.status,
           data.isFeatured ? 1 : 0,
           data.mainShowcase ? 1 : 0,
@@ -698,6 +798,54 @@ export async function PUT(
           productId,
         ],
       );
+
+      if (data.features) {
+        await conn.query(
+          `DELETE FROM product_variant_features WHERE variant_id = ?`,
+          [variantId],
+        );
+        if (data.features.length > 0) {
+          await conn.query(
+            `INSERT INTO product_variant_features
+               (id, variant_id, feature, sort_order, created_by, created_at)
+             VALUES ?`,
+            [
+              data.features.map((feature, index) => [
+                generateULID("vfeat"),
+                variantId,
+                capitalizeFirst(feature),
+                index,
+                managerId,
+                now,
+              ]),
+            ],
+          );
+        }
+      }
+
+      if (data.careInstructions) {
+        await conn.query(
+          `DELETE FROM product_variant_care_instructions WHERE variant_id = ?`,
+          [variantId],
+        );
+        if (data.careInstructions.length > 0) {
+          await conn.query(
+            `INSERT INTO product_variant_care_instructions
+               (id, variant_id, instruction, sort_order, created_by, created_at)
+             VALUES ?`,
+            [
+              data.careInstructions.map((instruction, index) => [
+                generateULID("vcare"),
+                variantId,
+                capitalizeFirst(instruction),
+                index,
+                managerId,
+                now,
+              ]),
+            ],
+          );
+        }
+      }
 
       await conn.query(
         `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,

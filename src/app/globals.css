@@ -26,33 +26,44 @@ body {
 }
 
 /* ==========================================================================
- * Transparent scrollbars — scroll still works, bar is invisible.
+ * Scrollbars — white track with a pink thumb, matching the studio palette.
  * Applies to every element (html, body, divs, dropdowns, drawers, etc.)
  * ========================================================================== */
 
 /* Firefox + modern standards */
 * {
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: #fb7185 #ffffff;
 }
 
 /* IE / legacy Edge */
 * {
-  -ms-overflow-style: none;
+  -ms-overflow-style: auto;
 }
 
 /* Chrome / Safari / Chromium */
 *::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  background: transparent;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
 }
 
 *::-webkit-scrollbar-track {
-  background: transparent;
+  background: #ffffff;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: transparent;
+  background-color: #fb7185;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #f43f5e;
+}
+
+*::-webkit-scrollbar-corner {
+  background: #ffffff;
 }
 
 /* ==========================================================================

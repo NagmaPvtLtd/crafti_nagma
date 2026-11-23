@@ -10,11 +10,14 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Heart,
   Maximize2,
   Flower2,
   Package,
+  Share2,
   Star,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 import CustomLoader from "../CustomLoader";
 import PhotoViewer from "../utils/PhotoViewer";
@@ -278,6 +281,61 @@ export default function CollectionProduct({ code }: { code: string }) {
   const brief =
     variant?.briefDescription?.trim() || product?.briefDescription || null;
 
+  /** A variant may carry its own features / care instructions. */
+  const features =
+    variant && variant.features.length > 0
+      ? variant.features
+      : (product?.features ?? []);
+  const careInstructions =
+    variant && variant.careInstructions.length > 0
+      ? variant.careInstructions
+      : (product?.careInstructions ?? []);
+  /* Only the selected variant's own snapshot is shown. No fallback to the
+     base product — when the variant has no measurements the label is hidden. */
+  const dimensions = variant?.dimensions ?? null;
+
+  const dimensionLabel = dimensions
+    ? [
+        dimensions.length !== null ? `L ${dimensions.length}` : null,
+        dimensions.width !== null ? `W ${dimensions.width}` : null,
+        dimensions.height !== null ? `H ${dimensions.height}` : null,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join(" × ")
+    : "";
+
+  const dimensionUnit = dimensions?.dimensionUnit ?? "";
+
+  /**
+   * Uses the device's own share sheet (Android / iOS / supported desktop
+   * browsers) for the current product + variant link, and falls back to copying
+   * the link when the browser has no Web Share support.
+   */
+  async function shareProduct() {
+    if (!product) return;
+
+    const url = window.location.href;
+    const shareData = {
+      title: product.name,
+      text: product.briefDescription ?? undefined,
+      url,
+    };
+
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share(shareData);
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied — share it anywhere");
+    } catch (err) {
+      /* Closing the native share sheet is not an error. */
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      toast.error("Could not share this link");
+    }
+  }
+
   /** Values that would leave no active variant behind are greyed out. */
   function isValueAvailable(optionId: string, valueId: string): boolean {
     if (!product) return false;
@@ -493,9 +551,34 @@ export default function CollectionProduct({ code }: { code: string }) {
                   switching ? "opacity-70" : ""
                 }`}
               >
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                  {product.name}
-                </h1>
+                <div className="mt-2 flex items-start justify-between gap-3">
+                  <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                    {product.name}
+                  </h1>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void shareProduct()}
+                      aria-label="Share this product"
+                      title="Share this product"
+                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toast("Wishlist feature coming soon")
+                      }
+                      aria-label="Add to wishlist"
+                      title="Add to wishlist"
+                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600"
+                    >
+                      <Heart className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
 
                 <ReviewStars
                   average={product.reviews.average}
@@ -658,19 +741,19 @@ export default function CollectionProduct({ code }: { code: string }) {
             )}
 
             {/* ---------------- Features / care / gift / specs ---------------- */}
-            {(product.features.length > 0 ||
-              product.careInstructions.length > 0 ||
+            {(features.length > 0 ||
+              careInstructions.length > 0 ||
               product.giftIncluded.length > 0) && (
               <>
                 <SectionDivider className="mx-auto max-w-7xl py-8" />
                 <div className="space-y-3">
                   <DetailList
                     title="Product Features"
-                    items={product.features.map((feature) => feature.text)}
+                    items={features.map((feature) => feature.text)}
                   />
                   <DetailList
                     title="Product Care Instructions"
-                    items={product.careInstructions.map((care) => care.text)}
+                    items={careInstructions.map((care) => care.text)}
                   />
                   <DetailList
                     title="Gift Includes"
@@ -709,6 +792,12 @@ export default function CollectionProduct({ code }: { code: string }) {
                       : "—"
                   }
                 />
+                {dimensionLabel && (
+                  <SpecRow
+                    label="Dimensions (L × W × H)"
+                    value={`${dimensionLabel} ${dimensionUnit}`.trim()}
+                  />
+                )}
                 <SpecRow
                   label="Processing time"
                   value={product.processingTime ?? "—"}

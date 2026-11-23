@@ -14,6 +14,8 @@ import {
   productBaseUpdateSchema,
   ProductDetailResponse,
 } from "../../../../../utils/zod/product/manager.productDetail.zod";
+import type { PoolConnection } from "mysql2/promise";
+import { capitalizeFirst } from "../../../../../utils/Formator/capitalize.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -30,6 +32,10 @@ interface ProductRow extends RowDataPacket {
   meta_description: string | null;
   delivery_charges: number | string;
   processing_time: string | null;
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
   is_featured: number | boolean;
   main_showcase: number | boolean;
   status: "active" | "inactive";
@@ -65,6 +71,7 @@ interface LineItemRow extends RowDataPacket {
 
 interface OptionRow extends RowDataPacket {
   id: string;
+  global_option_id: string;
   name: string;
   description: string | null;
 }
@@ -72,6 +79,7 @@ interface OptionRow extends RowDataPacket {
 interface OptionValueRow extends RowDataPacket {
   id: string;
   option_id: string;
+  global_option_value_id: string;
   value: string;
 }
 
@@ -88,6 +96,7 @@ interface VariantRow extends RowDataPacket {
 
 interface VariantValueRow extends RowDataPacket {
   variant_id: string;
+  option_value_id: string;
   option_name: string;
   value: string;
 }
@@ -123,6 +132,38 @@ interface ReviewRow extends RowDataPacket {
   created_at: string;
 }
 
+interface ProductOptionRow extends RowDataPacket {
+  id: string;
+  global_option_id: string;
+  name: string;
+  description: string | null;
+  status: "active" | "inactive";
+}
+
+interface ProductValueRow extends RowDataPacket {
+  id: string;
+  option_id: string;
+  global_option_value_id: string;
+  value: string;
+  status: "active" | "inactive";
+}
+
+interface VariantLinkRow extends RowDataPacket {
+  variant_id: string;
+}
+
+interface VariantOrderRow extends RowDataPacket {
+  variant_id: string;
+  total: number | string;
+}
+
+interface VariantImageRow extends RowDataPacket {
+  id: string;
+  variant_id: string;
+  file_id: string | null;
+  source_image_id: string | null;
+}
+
 interface MediaRow extends RowDataPacket {
   id: string;
   file_id: string | null;
@@ -140,6 +181,52 @@ interface MediaRow extends RowDataPacket {
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
+
+type OptionsPlan = {
+  requested: Map<string, Set<string>>;
+  globalOptions: Map<
+    string,
+    { id: string; name: string; description: string | null }
+  >;
+  globalValues: Map<
+    string,
+    { id: string; option_id: string; value: string }
+  >;
+  deleteVariantIds: string[];
+  disableVariantIds: string[];
+  removedValueIds: string[];
+  removedOptionIds: string[];
+  originalImageIds: string[];
+};
+
+/**
+ * Rewrites the `sort_order` of a variant's photos to 0..n-1 after a photo was
+ * deleted or unlinked, so the gallery never keeps gaps in its ordering.
+ */
+async function normalizeMediaSortOrder(
+  conn: PoolConnection,
+  variantIds: string[],
+) {
+  for (const variantId of variantIds) {
+    const [rows] = await conn.query<IdRow[]>(
+      `SELECT id
+         FROM imagekit_files
+        WHERE entity_type = 'product_variant'
+          AND file_purpose = 'product_variant_image'
+          AND entity_id = ?
+        ORDER BY sort_order ASC, created_at ASC, id ASC`,
+      [variantId],
+    );
+
+    for (let index = 0; index < rows.length; index += 1) {
+      if (rows[index].id === undefined) continue;
+      await conn.query(
+        `UPDATE imagekit_files SET sort_order = ? WHERE id = ?`,
+        [index, rows[index].id],
+      );
+    }
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /*  GET /api/manager/product-studio/[id]                                      */
@@ -239,6 +326,7 @@ export async function GET(
               brief_description, description,
               meta_title, meta_description,
               delivery_charges, processing_time,
+              length, width, height, dimension_unit,
               is_featured, main_showcase, status,
               created_at, updated_at
          FROM products
@@ -277,18 +365,18 @@ export async function GET(
     );
 
     const [optionRows] = await conn.query<OptionRow[]>(
-      `SELECT id, name, description
+      `SELECT id, global_option_id, name, description
          FROM product_options
-        WHERE product_id = ?
+        WHERE product_id = ? AND status = 'active'
         ORDER BY created_at ASC, id ASC`,
       [id],
     );
 
     const [optionValueRows] = await conn.query<OptionValueRow[]>(
-      `SELECT v.id, v.option_id, v.value
+      `SELECT v.id, v.option_id, v.global_option_value_id, v.value
          FROM product_option_values v
          JOIN product_options o ON o.id = v.option_id
-        WHERE o.product_id = ?
+        WHERE o.product_id = ? AND v.status = 'active' AND o.status = 'active'
         ORDER BY v.created_at ASC, v.id ASC`,
       [id],
     );
@@ -310,7 +398,8 @@ export async function GET(
     );
 
     const [variantValueRows] = await conn.query<VariantValueRow[]>(
-      `SELECT vov.variant_id, po.name AS option_name, pov.value
+      `SELECT vov.variant_id, vov.option_value_id,
+              po.name AS option_name, pov.value
          FROM variant_option_values vov
          JOIN product_option_values pov ON pov.id = vov.option_value_id
          JOIN product_options po       ON po.id = pov.option_id
@@ -387,22 +476,33 @@ export async function GET(
 
     /* ---- group the joined rows ---- */
 
-    const valuesByOption = new Map<string, { id: string; value: string }[]>();
+    const valuesByOption = new Map<
+      string,
+      { id: string; globalOptionValueId: string; value: string }[]
+    >();
     for (const row of optionValueRows) {
       const list = valuesByOption.get(row.option_id) ?? [];
-      list.push({ id: row.id, value: row.value });
+      list.push({
+        id: row.id,
+        globalOptionValueId: row.global_option_value_id,
+        value: row.value,
+      });
       valuesByOption.set(row.option_id, list);
     }
 
     const variantsById = new Map(variantRows.map((v) => [v.id, v]));
     const valuesByVariant = new Map<
       string,
-      { option: string; value: string }[]
+      { option: string; value: string; id: string }[]
     >();
     for (const row of variantValueRows) {
       if (!variantsById.has(row.variant_id)) continue;
       const list = valuesByVariant.get(row.variant_id) ?? [];
-      list.push({ option: row.option_name, value: row.value });
+      list.push({
+        id: row.option_value_id,
+        option: row.option_name,
+        value: row.value,
+      });
       valuesByVariant.set(row.variant_id, list);
     }
 
@@ -426,6 +526,14 @@ export async function GET(
         isFeatured: Boolean(product.is_featured),
         mainShowcase: Boolean(product.main_showcase),
         status: product.status,
+        dimensions: {
+          length:
+            product.length === null ? null : Number(product.length),
+          width: product.width === null ? null : Number(product.width),
+          height:
+            product.height === null ? null : Number(product.height),
+          dimensionUnit: product.dimension_unit ?? null,
+        },
         createdAt: product.created_at,
         updatedAt: product.updated_at,
       },
@@ -447,6 +555,7 @@ export async function GET(
       })),
       options: optionRows.map((o) => ({
         id: o.id,
+        globalOptionId: o.global_option_id,
         name: o.name,
         description: o.description ?? "",
         values: valuesByOption.get(o.id) ?? [],
@@ -460,7 +569,13 @@ export async function GET(
           v.compare_at_price === null ? null : Number(v.compare_at_price),
         stock: Number(v.stock ?? 0),
         status: v.status,
-        optionValues: valuesByVariant.get(v.id) ?? [],
+        optionValues: (valuesByVariant.get(v.id) ?? []).map((value) => ({
+          option: value.option,
+          value: value.value,
+        })),
+        optionValueIds: (valuesByVariant.get(v.id) ?? []).map(
+          (value) => value.id,
+        ),
         imageUrl: v.image_url ?? null,
       })),
       media: mediaRows.map((m) => ({
@@ -691,6 +806,184 @@ export async function PUT(
     const disabling =
       existingRows[0].status === "active" && data.status === "inactive";
 
+    /* ---- options & values replacement plan ---- */
+    let optionsPlan: OptionsPlan | null = null;
+
+    if (data.options) {
+      const requested = new Map<string, Set<string>>();
+      for (const option of data.options) {
+        const set = requested.get(option.optionId) ?? new Set<string>();
+        for (const valueId of option.valueIds) set.add(valueId);
+        requested.set(option.optionId, set);
+      }
+
+      const requestedOptionIds = [...requested.keys()];
+      const requestedValueIds = [
+        ...new Set([...requested.values()].flatMap((set) => [...set])),
+      ];
+
+      const [globalOptionRows] = await conn.query<
+        (OptionRow & { description: string | null })[]
+      >(
+        `SELECT id, name, description FROM global_options WHERE id IN (?)`,
+        [requestedOptionIds],
+      );
+      if (globalOptionRows.length !== requestedOptionIds.length) {
+        return invalidInput({
+          options: ["One or more options no longer exist"],
+        });
+      }
+
+      const [globalValueRows] = await conn.query<OptionValueRow[]>(
+        `SELECT id, option_id, value FROM global_option_values WHERE id IN (?)`,
+        [requestedValueIds],
+      );
+      const globalValueById = new Map(
+        globalValueRows.map((row) => [row.id, row]),
+      );
+
+      for (const [optionId, valueIds] of requested) {
+        for (const valueId of valueIds) {
+          const value = globalValueById.get(valueId);
+          if (!value || value.option_id !== optionId) {
+            return invalidInput({
+              options: ["A selected value does not belong to its option"],
+            });
+          }
+        }
+      }
+
+      const [currentOptionRows] = await conn.query<ProductOptionRow[]>(
+        `SELECT id, global_option_id, name, description, status
+           FROM product_options
+          WHERE product_id = ?`,
+        [id],
+      );
+      const [currentValueRows] = await conn.query<ProductValueRow[]>(
+        `SELECT v.id, v.option_id, v.global_option_value_id, v.value, v.status
+           FROM product_option_values v
+           JOIN product_options o ON o.id = v.option_id
+          WHERE o.product_id = ?`,
+        [id],
+      );
+
+      const optionById = new Map(currentOptionRows.map((row) => [row.id, row]));
+      const requestedKeys = new Set(
+        [...requested.entries()].flatMap(([optionId, valueIds]) =>
+          [...valueIds].map((valueId) => `${optionId}:${valueId}`),
+        ),
+      );
+
+      const removedValueRows = currentValueRows.filter((row) => {
+        const option = optionById.get(row.option_id);
+        if (!option) return false;
+        return !requestedKeys.has(
+          `${option.global_option_id}:${row.global_option_value_id}`,
+        );
+      });
+      const removedValueIds = removedValueRows.map((row) => row.id);
+      const removedOptionIds = currentOptionRows
+        .filter((row) => !requested.has(row.global_option_id))
+        .map((row) => row.id);
+
+      let deleteVariantIds: string[] = [];
+      let disableVariantIds: string[] = [];
+      let originalImageIds: string[] = [];
+
+      if (removedValueIds.length > 0) {
+        const [linkRows] = await conn.query<VariantLinkRow[]>(
+          `SELECT DISTINCT variant_id
+             FROM variant_option_values
+            WHERE option_value_id IN (?)`,
+          [removedValueIds],
+        );
+        const affectedVariantIds = linkRows.map((row) => row.variant_id);
+
+        if (affectedVariantIds.length > 0) {
+          const [orderRows] = await conn.query<VariantOrderRow[]>(
+            `SELECT variant_id, COUNT(*) AS total
+               FROM order_items
+              WHERE variant_id IN (?)
+              GROUP BY variant_id`,
+            [affectedVariantIds],
+          );
+          const ordered = new Set(
+            orderRows
+              .filter((row) => Number(row.total) > 0)
+              .map((row) => row.variant_id),
+          );
+
+          /* A variant that already sold is disabled; one that never sold is
+             removed together with its photos. */
+          disableVariantIds = affectedVariantIds.filter((variantId) =>
+            ordered.has(variantId),
+          );
+          deleteVariantIds = affectedVariantIds.filter(
+            (variantId) => !ordered.has(variantId),
+          );
+
+          /* A product being disabled already removes every variant's photos
+             and disables all of them, so nothing is deleted twice here. */
+          if (disabling) {
+            deleteVariantIds = [];
+            disableVariantIds = [];
+          }
+
+          if (deleteVariantIds.length > 0) {
+            const [imageRows] = await conn.query<VariantImageRow[]>(
+              `SELECT id, entity_id AS variant_id, file_id, source_image_id
+                 FROM imagekit_files
+                WHERE entity_type = 'product_variant'
+                  AND file_purpose = 'product_variant_image'
+                  AND entity_id IN (?)`,
+              [deleteVariantIds],
+            );
+            const ownedFiles = imageRows.filter(
+              (row) => row.source_image_id === null,
+            );
+            originalImageIds = ownedFiles.map((row) => row.id);
+
+            /* ImageKit first — never leave an orphan object behind. */
+            for (const file of ownedFiles) {
+              if (!file.file_id) continue;
+              const removed = await ImageKitService.deleteFileStrict(
+                file.file_id,
+              );
+              if (!removed) {
+                return NextResponse.json(
+                  {
+                    error:
+                      "Could not delete the photos of the variants this change removes. Nothing was changed — try again.",
+                  },
+                  { status: 502 },
+                );
+              }
+            }
+          }
+        }
+      }
+
+      optionsPlan = {
+        requested,
+        globalOptions: new Map(
+          globalOptionRows.map((row) => [
+            row.id,
+            {
+              id: row.id,
+              name: row.name,
+              description: row.description,
+            },
+          ]),
+        ),
+        globalValues: globalValueById,
+        deleteVariantIds,
+        disableVariantIds,
+        removedValueIds,
+        removedOptionIds,
+        originalImageIds,
+      };
+    }
+
     const now = getCurrentDateTime();
     let ownedFiles: OwnedFileRow[] = [];
     let variantIds: string[] = [];
@@ -797,6 +1090,10 @@ export async function PUT(
               meta_description = ?,
               delivery_charges = ?,
               processing_time = ?,
+              length = ?,
+              width = ?,
+              height = ?,
+              dimension_unit = ?,
               is_featured = ?,
               main_showcase = ?,
               status = ?,
@@ -812,6 +1109,10 @@ export async function PUT(
         data.metaDescription || null,
         data.deliveryCharges,
         data.processingTime || null,
+        data.length,
+        data.width,
+        data.height,
+        data.dimensionUnit,
         data.isFeatured ? 1 : 0,
         data.mainShowcase ? 1 : 0,
         data.status,
@@ -844,7 +1145,7 @@ export async function PUT(
             data.features.map((feature, index) => [
               generateULID("feat"),
               id,
-              feature,
+              capitalizeFirst(feature),
               index,
               managerId,
               now,
@@ -868,13 +1169,220 @@ export async function PUT(
             data.careInstructions.map((instruction, index) => [
               generateULID("care"),
               id,
-              instruction,
+              capitalizeFirst(instruction),
               index,
               managerId,
               now,
             ]),
           ],
         );
+      }
+    }
+
+    /* ---- apply the option replacement plan ---- */
+    if (optionsPlan) {
+      const {
+        requested,
+        globalOptions,
+        globalValues,
+        deleteVariantIds,
+        disableVariantIds,
+        removedValueIds,
+        removedOptionIds,
+        originalImageIds,
+      } = optionsPlan;
+
+      if (deleteVariantIds.length > 0) {
+        let affectedSiblings: string[] = [];
+
+        if (originalImageIds.length > 0) {
+          const [linkRows] = await conn.query<IdRow[]>(
+            `SELECT DISTINCT entity_id AS id
+               FROM imagekit_files
+              WHERE source_image_id IN (?)
+                AND entity_type = 'product_variant'
+                AND file_purpose = 'product_variant_image'
+                AND entity_id NOT IN (?)`,
+            [originalImageIds, deleteVariantIds],
+          );
+          affectedSiblings = linkRows.map((row) => row.id);
+
+          await conn.query(
+            `DELETE FROM imagekit_files WHERE source_image_id IN (?)`,
+            [originalImageIds],
+          );
+        }
+
+        await conn.query(
+          `DELETE FROM imagekit_files
+            WHERE entity_type = 'product_variant'
+              AND file_purpose = 'product_variant_image'
+              AND entity_id IN (?)`,
+          [deleteVariantIds],
+        );
+
+        await conn.query(
+          `DELETE FROM product_variants WHERE product_id = ? AND id IN (?)`,
+          [id, deleteVariantIds],
+        );
+
+        /* Domino effect: a sibling that borrowed these photos may now have
+           none left, and a variant without photos cannot be presented. */
+        for (const siblingId of affectedSiblings) {
+          const [countRows] = await conn.query<TotalRow[]>(
+            `SELECT COUNT(*) AS total
+               FROM imagekit_files
+              WHERE entity_type = 'product_variant'
+                AND file_purpose = 'product_variant_image'
+                AND entity_id = ?`,
+            [siblingId],
+          );
+          if (Number(countRows[0]?.total ?? 0) > 0) continue;
+
+          await conn.query(
+            `UPDATE product_variants
+                SET status = 'inactive', updated_by = ?, updated_at = ?
+              WHERE id = ? AND status = 'active'`,
+            [managerId, now, siblingId],
+          );
+        }
+
+        await normalizeMediaSortOrder(conn, affectedSiblings);
+      }
+
+      if (disableVariantIds.length > 0) {
+        await conn.query(
+          `UPDATE product_variants
+              SET status = 'inactive', updated_by = ?, updated_at = ?
+            WHERE product_id = ? AND id IN (?)`,
+          [managerId, now, id, disableVariantIds],
+        );
+      }
+
+      /* Removed values disappear when nothing refers to them any more; a value
+         still pinned by a disabled (ordered) variant is only disabled. */
+      for (const valueId of removedValueIds) {
+        const [refRows] = await conn.query<TotalRow[]>(
+          `SELECT COUNT(*) AS total
+             FROM variant_option_values
+            WHERE option_value_id = ?`,
+          [valueId],
+        );
+        if (Number(refRows[0]?.total ?? 0) === 0) {
+          await conn.query(`DELETE FROM product_option_values WHERE id = ?`, [
+            valueId,
+          ]);
+        } else {
+          await conn.query(
+            `UPDATE product_option_values
+                SET status = 'inactive', updated_by = ?, updated_at = ?
+              WHERE id = ?`,
+            [managerId, now, valueId],
+          );
+        }
+      }
+
+      for (const optionId of removedOptionIds) {
+        const [valueRows] = await conn.query<TotalRow[]>(
+          `SELECT COUNT(*) AS total
+             FROM product_option_values
+            WHERE option_id = ?`,
+          [optionId],
+        );
+        if (Number(valueRows[0]?.total ?? 0) === 0) {
+          await conn.query(`DELETE FROM product_options WHERE id = ?`, [
+            optionId,
+          ]);
+        } else {
+          await conn.query(
+            `UPDATE product_options
+                SET status = 'inactive', updated_by = ?, updated_at = ?
+              WHERE id = ?`,
+            [managerId, now, optionId],
+          );
+        }
+      }
+
+      for (const [globalOptionId, valueIds] of requested) {
+        const globalOption = globalOptions.get(globalOptionId)!;
+
+        const [existingOptions] = await conn.query<ProductOptionRow[]>(
+          `SELECT id, global_option_id, name, description, status
+             FROM product_options
+            WHERE product_id = ? AND global_option_id = ?
+            LIMIT 1`,
+          [id, globalOptionId],
+        );
+
+        let productOptionId: string;
+        if (existingOptions[0]) {
+          productOptionId = existingOptions[0].id;
+          await conn.query(
+            `UPDATE product_options
+                SET name = ?, description = ?, status = 'active',
+                    updated_by = ?, updated_at = ?
+              WHERE id = ?`,
+            [
+              globalOption.name,
+              globalOption.description,
+              managerId,
+              now,
+              productOptionId,
+            ],
+          );
+        } else {
+          productOptionId = generateULID("po");
+          await conn.query(
+            `INSERT INTO product_options
+               (id, product_id, global_option_id, name, description, status,
+                created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
+            [
+              productOptionId,
+              id,
+              globalOption.id,
+              globalOption.name,
+              globalOption.description,
+              managerId,
+              now,
+            ],
+          );
+        }
+
+        for (const globalValueId of valueIds) {
+          const globalValue = globalValues.get(globalValueId)!;
+          const [existingValues] = await conn.query<ProductValueRow[]>(
+            `SELECT id, option_id, global_option_value_id, value, status
+               FROM product_option_values
+              WHERE option_id = ? AND global_option_value_id = ?
+              LIMIT 1`,
+            [productOptionId, globalValueId],
+          );
+
+          if (existingValues[0]) {
+            await conn.query(
+              `UPDATE product_option_values
+                  SET value = ?, status = 'active', updated_by = ?, updated_at = ?
+                WHERE id = ?`,
+              [globalValue.value, managerId, now, existingValues[0].id],
+            );
+          } else {
+            await conn.query(
+              `INSERT INTO product_option_values
+                 (id, option_id, global_option_value_id, value, status,
+                  created_by, created_at)
+               VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+              [
+                generateULID("pov"),
+                productOptionId,
+                globalValueId,
+                globalValue.value,
+                managerId,
+                now,
+              ],
+            );
+          }
+        }
       }
     }
 

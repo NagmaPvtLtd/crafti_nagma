@@ -809,12 +809,12 @@ function ConfirmDelete({
     }
     if (target.option.productCount > 0) {
       warnings.push(
-        `It is used by ${plural(target.option.productCount, "product")} — deletion will be refused.`,
+        `Used by ${plural(target.option.productCount, "product")}, cannot delete.`,
       );
     }
   } else if (target.option.productCount > 0) {
     warnings.push(
-      `Products using ${target.option.name} may reference this value — deletion is refused while it is in use.`,
+      `Used by ${plural(target.option.productCount, "product")}, cannot delete while it is in use.`,
     );
   }
 
@@ -824,13 +824,15 @@ function ConfirmDelete({
     <Overlay onClose={busy ? undefined : onCancel}>
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl shadow-stone-900/20 sm:rounded-3xl">
         <div className="px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600">
-            <Trash2 className="h-4 w-4" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600">
+              <Trash2 className="h-4 w-4" />
+            </div>
+            <h2 className="min-w-0 text-lg font-semibold tracking-tight text-stone-900">
+              Delete “{label}”?
+            </h2>
           </div>
-          <h2 className="mt-3 text-lg font-semibold tracking-tight text-stone-900">
-            Delete “{label}”?
-          </h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-stone-600">
+          <p className="mt-3 text-sm leading-relaxed text-stone-600">
             {isOption
               ? "This removes the option pool and everything inside it."
               : `This removes the value from ${target.option.name}.`}

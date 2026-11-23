@@ -8,6 +8,7 @@ import { suggestPrice } from "../../../../../../utils/Pricing/pricing.util";
 import { getCurrentDateTime } from "../../../../../../utils/ValueFetcher/getDateTime.util";
 import { generateULID } from "../../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../../services/AuditLog.service";
+import { capitalizeFirst } from "../../../../../../utils/Formator/capitalize.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -20,6 +21,14 @@ interface ProductRow extends RowDataPacket {
   brief_description: string | null;
   description: string | null;
   status: "active" | "inactive";
+  length: number | string | null;
+  width: number | string | null;
+  height: number | string | null;
+  dimension_unit: "cm" | "in" | null;
+}
+
+interface LineItemRow extends RowDataPacket {
+  value: string;
 }
 
 interface OptionRow extends RowDataPacket {
@@ -181,7 +190,8 @@ export async function POST(
 
   try {
     const [productRows] = await conn.query<ProductRow[]>(
-      `SELECT id, code, name, brief_description, description, status
+      `SELECT id, code, name, brief_description, description, status,
+              length, width, height, dimension_unit
          FROM products WHERE id = ? LIMIT 1`,
       [id],
     );
@@ -191,7 +201,9 @@ export async function POST(
     }
 
     const [optionRows] = await conn.query<OptionRow[]>(
-      `SELECT id, name FROM product_options WHERE product_id = ? ORDER BY created_at ASC, id ASC`,
+      `SELECT id, name FROM product_options
+        WHERE product_id = ? AND status = 'active'
+        ORDER BY created_at ASC, id ASC`,
       [id],
     );
 
@@ -199,7 +211,7 @@ export async function POST(
       `SELECT v.id, v.option_id, v.value
          FROM product_option_values v
          JOIN product_options o ON o.id = v.option_id
-        WHERE o.product_id = ?
+        WHERE o.product_id = ? AND v.status = 'active' AND o.status = 'active'
         ORDER BY v.created_at ASC, v.id ASC`,
       [id],
     );
@@ -392,6 +404,23 @@ export async function POST(
     );
     let variantSequence = Number(existingCountRows[0]?.total ?? 0);
 
+    /* Feature bullets and care instructions are snapshotted onto every new
+       variant so a material or colour can carry its own copy later. */
+    const [featureRows] = await conn.query<LineItemRow[]>(
+      `SELECT feature AS value
+         FROM product_features
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [id],
+    );
+    const [careRows] = await conn.query<LineItemRow[]>(
+      `SELECT instruction AS value
+         FROM product_care_instructions
+        WHERE product_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [id],
+    );
+
     const price = data.startingPrice || suggestPrice();
     const now = getCurrentDateTime();
 
@@ -433,10 +462,12 @@ export async function POST(
       await conn.query(
         `INSERT INTO product_variants
            (id, product_id, name, description, brief_description, sku,
-            price, compare_at_price, stock, weight, status,
+            price, compare_at_price, stock, weight,
+            length, width, height, dimension_unit, status,
             is_featured, main_showcase, orders_count,
             created_by, updated_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'inactive', 0, 0, 0, ?, NULL, ?, NULL)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'inactive',
+                 0, 0, 0, ?, NULL, ?, NULL)`,
         [
           variantId,
           id,
@@ -447,10 +478,50 @@ export async function POST(
           price,
           data.compareAtPrice ?? null,
           data.stock,
+          product.length,
+          product.width,
+          product.height,
+          product.dimension_unit,
           managerId,
           now,
         ],
       );
+
+      if (featureRows.length > 0) {
+        await conn.query(
+          `INSERT INTO product_variant_features
+             (id, variant_id, feature, sort_order, created_by, created_at)
+           VALUES ?`,
+          [
+            featureRows.map((row, index) => [
+              generateULID("vfeat"),
+              variantId,
+              capitalizeFirst(row.value),
+              index,
+              managerId,
+              now,
+            ]),
+          ],
+        );
+      }
+
+      if (careRows.length > 0) {
+        await conn.query(
+          `INSERT INTO product_variant_care_instructions
+             (id, variant_id, instruction, sort_order, created_by, created_at)
+           VALUES ?`,
+          [
+            careRows.map((row, index) => [
+              generateULID("vcare"),
+              variantId,
+              capitalizeFirst(row.value),
+              index,
+              managerId,
+              now,
+            ]),
+          ],
+        );
+      }
 
       const comboValueIds = combo.map((part) => part.valueId);
 

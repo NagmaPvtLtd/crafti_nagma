@@ -15,6 +15,7 @@ import {
   Package,
   RefreshCw,
   TrendingUp,
+  X,
 } from "lucide-react";
 
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
@@ -24,6 +25,10 @@ import CustomLoader from "../../CustomLoader";
 import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
 import Textarea from "../../utils/Form/Textarea";
+import DimensionFields, {
+  emptyDimensions,
+  type DimensionFormValue,
+} from "../../utils/Form/DimensionFields";
 import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
 import ExistingPhotosModal from "./ExistingPhotosModal";
@@ -68,6 +73,10 @@ export default function VariantDetailClient({
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState | null>(null);
+  const [dimensions, setDimensions] =
+    useState<DimensionFormValue>(emptyDimensions);
+  const [features, setFeatures] = useState<string[]>([]);
+  const [careInstructions, setCareInstructions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -101,6 +110,25 @@ export default function VariantDetailClient({
         isFeatured: res.data.variant.isFeatured,
         mainShowcase: res.data.variant.mainShowcase,
       });
+      setDimensions({
+        length:
+          res.data.variant.dimensions.length === null
+            ? ""
+            : String(res.data.variant.dimensions.length),
+        width:
+          res.data.variant.dimensions.width === null
+            ? ""
+            : String(res.data.variant.dimensions.width),
+        height:
+          res.data.variant.dimensions.height === null
+            ? ""
+            : String(res.data.variant.dimensions.height),
+        unit: res.data.variant.dimensions.dimensionUnit ?? "cm",
+      });
+      setFeatures(res.data.features.map((item) => item.value));
+      setCareInstructions(
+        res.data.careInstructions.map((item) => item.value),
+      );
     } catch (err) {
       /* A failed refresh must never blank a variant that is already on screen —
          the photos and edits stay visible while the banner explains the miss. */
@@ -138,6 +166,14 @@ export default function VariantDetailClient({
               : Number(form.compareAtPrice),
           stock: Number(form.stock || 0),
           weight: form.weight.trim() === "" ? null : Number(form.weight),
+          length: dimensions.length,
+          width: dimensions.width,
+          height: dimensions.height,
+          dimensionUnit: dimensions.unit,
+          features: features.map((item) => item.trim()).filter(Boolean),
+          careInstructions: careInstructions
+            .map((item) => item.trim())
+            .filter(Boolean),
           status,
           isFeatured: form.isFeatured,
           mainShowcase: form.mainShowcase,
@@ -467,6 +503,102 @@ export default function VariantDetailClient({
                       </Field>
                     </div>
 
+                    <div className="rounded-xl border border-stone-200 bg-white p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                          Product dimensions
+                        </p>
+                        <SyncButton
+                          title="Copy the base product's dimensions into this variant"
+                          disabled={
+                            data.baseProduct.dimensions.length === null &&
+                            data.baseProduct.dimensions.width === null &&
+                            data.baseProduct.dimensions.height === null
+                          }
+                          onClick={() =>
+                            setDimensions({
+                              length:
+                                data.baseProduct.dimensions.length === null
+                                  ? ""
+                                  : String(
+                                      data.baseProduct.dimensions.length,
+                                    ),
+                              width:
+                                data.baseProduct.dimensions.width === null
+                                  ? ""
+                                  : String(data.baseProduct.dimensions.width),
+                              height:
+                                data.baseProduct.dimensions.height === null
+                                  ? ""
+                                  : String(data.baseProduct.dimensions.height),
+                              unit: data.baseProduct.dimensions.dimensionUnit ?? "cm",
+                            })
+                          }
+                        />
+                      </div>
+                      <DimensionFields
+                        value={dimensions}
+                        onChange={setDimensions}
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-stone-200 bg-white p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                            Features
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-stone-400">
+                            This variant&apos;s own snapshot — edit it freely.
+                          </p>
+                        </div>
+                        <SyncButton
+                          title="Sync the feature list back to the base product's features"
+                          disabled={false}
+                          onClick={() =>
+                            setFeatures([...data.baseProduct.features])
+                          }
+                        />
+                      </div>
+                      <LineListEditor
+                        items={features}
+                        onChange={setFeatures}
+                        placeholder="Hand-stitched with soft cotton yarn"
+                        addLabel="Add a feature"
+                        emptyLabel="No features yet — sync the base product's list or add your own."
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-stone-200 bg-white p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                            Care instructions
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-stone-400">
+                            A different material or colour can need different
+                            care.
+                          </p>
+                        </div>
+                        <SyncButton
+                          title="Sync the care list back to the base product's care instructions"
+                          disabled={false}
+                          onClick={() =>
+                            setCareInstructions([
+                              ...data.baseProduct.careInstructions,
+                            ])
+                          }
+                        />
+                      </div>
+                      <LineListEditor
+                        items={careInstructions}
+                        onChange={setCareInstructions}
+                        placeholder="Gentle hand wash, dry flat in shade"
+                        addLabel="Add an instruction"
+                        emptyLabel="No care instructions yet — sync the base product's list or add your own."
+                      />
+                    </div>
+
                     <Field label="Status">
                       <select
                         value={form.status}
@@ -639,6 +771,73 @@ function SyncButton({
       <RefreshCw className="h-2.5 w-2.5" />
       Sync
     </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Line list editor — features / care instructions                    */
+/* ------------------------------------------------------------------ */
+
+function LineListEditor({
+  items,
+  onChange,
+  placeholder,
+  addLabel,
+  emptyLabel,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder: string;
+  addLabel: string;
+  emptyLabel: string;
+}) {
+  const canAdd = items.length === 0 || (items[items.length - 1] ?? "").trim().length > 0;
+
+  return (
+    <div className="space-y-2">
+      {items.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-stone-200 px-3 py-2.5 text-[11px] leading-relaxed text-stone-500">
+          {emptyLabel}
+        </p>
+      ) : (
+        items.map((value, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <span className="mt-2.5 w-4 shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-400">
+              {index + 1}
+            </span>
+            <TextInput
+              value={value}
+              onChange={(e) =>
+                onChange(
+                  items.map((item, i) =>
+                    i === index ? e.target.value : item,
+                  ),
+                )
+              }
+              placeholder={placeholder}
+              maxLength={255}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, i) => i !== index))}
+              aria-label="Remove this line"
+              className="mt-1.5 inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-400 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))
+      )}
+
+      <button
+        type="button"
+        onClick={() => onChange([...items, ""])}
+        disabled={!canAdd}
+        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        + {addLabel}
+      </button>
+    </div>
   );
 }
 

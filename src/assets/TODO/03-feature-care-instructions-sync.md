@@ -1,1 +1,0 @@
-- separate feature and care instructions as optional & sync back to original base product

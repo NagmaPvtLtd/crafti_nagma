@@ -24,6 +24,10 @@ import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
 import Textarea from "../../utils/Form/Textarea";
 import { inputClass } from "../../utils/Form/fieldStyles";
+import DimensionFields, {
+  emptyDimensions,
+  type DimensionFormValue,
+} from "../../utils/Form/DimensionFields";
 import CustomLoader from "../../CustomLoader";
 import { baseProductCreateSchema } from "../../../../utils/zod/product/manager.product.zod";
 import type {
@@ -97,6 +101,8 @@ export default function AddProductClient() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [dimensions, setDimensions] =
+    useState<DimensionFormValue>(emptyDimensions);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   /** optionId → selected value ids */
   const [selectedValues, setSelectedValues] = useState<
@@ -266,6 +272,10 @@ export default function AddProductClient() {
       mainShowcase: form.mainShowcase,
       status: form.status,
       categoryIds: selectedCategoryIds,
+      length: dimensions.length,
+      width: dimensions.width,
+      height: dimensions.height,
+      dimensionUnit: dimensions.unit,
       options: Object.entries(selectedValues).map(([optionId, valueIds]) => ({
         optionId,
         valueIds,
@@ -550,9 +560,16 @@ export default function AddProductClient() {
             <SectionCard
               step="4"
               eyebrow="Choices"
-              title="Options & values"
+              title="Options & Values"
               hint="Options are the pools a variant is built from — Colour, Size, Material. Tick a pool, then pick its values. The first value is selected for you as the default."
               error={errors.options}
+              action={
+                <RefreshButton
+                  onClick={reloadPools}
+                  busy={refreshing}
+                  disabled={loading || refreshing}
+                />
+              }
             >
               {availableOptions.length === 0 ? (
                 <PoolHint
@@ -636,6 +653,19 @@ export default function AddProductClient() {
 
             <SectionCard
               step="5"
+              eyebrow="Measurements"
+              title="Product dimensions"
+              hint="Optional. When the base product has dimensions, every generated variant takes a snapshot of them and can be edited on its own."
+              error={errors.dimensionUnit}
+            >
+              <DimensionFields
+                value={dimensions}
+                onChange={setDimensions}
+              />
+            </SectionCard>
+
+            <SectionCard
+              step="6"
               eyebrow="Money & visibility"
               title="Delivery and status"
             >
@@ -686,7 +716,7 @@ export default function AddProductClient() {
             </SectionCard>
 
             <SectionCard
-              step="6"
+              step="7"
               eyebrow="Showcase"
               title="Where this product is featured"
               hint="Both are optional. They decide whether this product is pushed forward on the website."

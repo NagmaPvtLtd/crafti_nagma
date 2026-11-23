@@ -25,6 +25,10 @@ import Field from "../../utils/Form/Field";
 import TextInput from "../../utils/Form/TextInput";
 import Textarea from "../../utils/Form/Textarea";
 import { inputClass } from "../../utils/Form/fieldStyles";
+import DimensionFields, {
+  emptyDimensions,
+  type DimensionFormValue,
+} from "../../utils/Form/DimensionFields";
 import CustomLoader from "../../CustomLoader";
 import ConfirmDialog from "../../utils/ConfirmDialog";
 import { productBaseUpdateSchema } from "../../../../utils/zod/product/manager.productDetail.zod";
@@ -36,12 +40,17 @@ import type {
   GlobalCategoriesResponse,
   GlobalCategory,
 } from "../../../../utils/zod/product/manager.category.zod";
+import type {
+  GlobalOption,
+  GlobalOptionsResponse,
+} from "../../../../utils/zod/product/manager.option.zod";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 const CATEGORIES_URL = "/api/manager/product-studio/categories";
+const OPTIONS_URL = "/api/manager/product-studio/options";
 
 type FormState = {
   name: string;
@@ -86,18 +95,26 @@ export default function EditProductClient({
 
   const [product, setProduct] = useState<ProductDetailResponse | null>(null);
   const [categories, setCategories] = useState<GlobalCategory[] | null>(null);
+  const [options, setOptions] = useState<GlobalOption[] | null>(null);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  /** global option id → selected global value ids */
+  const [selectedValues, setSelectedValues] = useState<
+    Record<string, string[]>
+  >({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [dimensions, setDimensions] =
+    useState<DimensionFormValue>(emptyDimensions);
   const [features, setFeatures] = useState<string[]>([]);
   const [careInstructions, setCareInstructions] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [pendingSave, setPendingSave] = useState<ProductBaseUpdateInput | null>(
     null,
   );
@@ -106,7 +123,7 @@ export default function EditProductClient({
     setLoading(true);
     setLoadError(null);
     try {
-      const [productRes, categoryRes] = await Promise.all([
+      const [productRes, categoryRes, optionRes] = await Promise.all([
         axios.get<ProductDetailResponse>(
           `/api/manager/product-studio/${productId}`,
           { withCredentials: true },
@@ -114,12 +131,40 @@ export default function EditProductClient({
         axios.get<GlobalCategoriesResponse>(CATEGORIES_URL, {
           withCredentials: true,
         }),
+        axios.get<GlobalOptionsResponse>(OPTIONS_URL, {
+          withCredentials: true,
+        }),
       ]);
 
       const data = productRes.data;
       setProduct(data);
       setCategories(categoryRes.data.categories);
+      setOptions(optionRes.data.options);
       setSelectedCategoryIds(data.categories.map((c) => c.id));
+
+      const preselected: Record<string, string[]> = {};
+      for (const option of data.options) {
+        preselected[option.globalOptionId] = option.values.map(
+          (value) => value.globalOptionValueId,
+        );
+      }
+      setSelectedValues(preselected);
+
+      setDimensions({
+        length:
+          data.product.dimensions.length === null
+            ? ""
+            : String(data.product.dimensions.length),
+        width:
+          data.product.dimensions.width === null
+            ? ""
+            : String(data.product.dimensions.width),
+        height:
+          data.product.dimensions.height === null
+            ? ""
+            : String(data.product.dimensions.height),
+        unit: data.product.dimensions.dimensionUnit ?? "cm",
+      });
       setForm({
         name: data.product.name,
         code: data.product.code,
@@ -149,21 +194,68 @@ export default function EditProductClient({
     run();
   }, [load]);
 
-  const reloadCategories = useCallback(async () => {
+  const reloadPools = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res = await axios.get<GlobalCategoriesResponse>(CATEGORIES_URL, {
-        withCredentials: true,
-      });
-      setCategories(res.data.categories);
+      const [categoryRes, optionRes] = await Promise.all([
+        axios.get<GlobalCategoriesResponse>(CATEGORIES_URL, {
+          withCredentials: true,
+        }),
+        axios.get<GlobalOptionsResponse>(OPTIONS_URL, {
+          withCredentials: true,
+        }),
+      ]);
+      setCategories(categoryRes.data.categories);
+      setOptions(optionRes.data.options);
     } catch (err) {
       toast.error(
-        getAxiosErrorMessage(err, "Could not refresh the categories"),
+        getAxiosErrorMessage(err, "Could not refresh categories and options"),
       );
     } finally {
       setRefreshing(false);
     }
   }, []);
+
+  const toggleOption = (option: GlobalOption) => {
+    setSelectedValues((prev) => {
+      if (option.id in prev) {
+        const next = { ...prev };
+        delete next[option.id];
+        return next;
+      }
+      return {
+        ...prev,
+        [option.id]: option.values[0] ? [option.values[0].id] : [],
+      };
+    });
+  };
+
+  const toggleValue = (optionId: string, valueId: string) => {
+    setSelectedValues((prev) => {
+      const current = prev[optionId] ?? [];
+      return {
+        ...prev,
+        [optionId]: current.includes(valueId)
+          ? current.filter((value) => value !== valueId)
+          : [...current, valueId],
+      };
+    });
+  };
+
+  /** Choices that exist on the product today but are no longer ticked. */
+  const removedChoices = useMemo(() => {
+    if (!product) return [] as string[];
+    const list: string[] = [];
+    for (const option of product.options) {
+      const next = selectedValues[option.globalOptionId] ?? [];
+      for (const value of option.values) {
+        if (!next.includes(value.globalOptionValueId)) {
+          list.push(`${option.name}: ${value.value}`);
+        }
+      }
+    }
+    return list;
+  }, [product, selectedValues]);
 
   /* ---- derived ---- */
 
@@ -227,6 +319,14 @@ export default function EditProductClient({
       mainShowcase: form.mainShowcase,
       status: form.status,
       categoryIds: selectedCategoryIds,
+      length: dimensions.length,
+      width: dimensions.width,
+      height: dimensions.height,
+      dimensionUnit: dimensions.unit,
+      options: Object.entries(selectedValues).map(([optionId, valueIds]) => ({
+        optionId,
+        valueIds,
+      })),
       features: features.map((item) => item.trim()).filter(Boolean),
       careInstructions: careInstructions
         .map((item) => item.trim())
@@ -248,6 +348,14 @@ export default function EditProductClient({
     if (form.status === "inactive" && product?.product.status === "active") {
       setPendingSave(parsed.data);
       setDisableOpen(true);
+      return;
+    }
+
+    /* Removing a choice never silently deletes data — the dialog explains
+       which variants will be disabled or removed. */
+    if (removedChoices.length > 0) {
+      setPendingSave(parsed.data);
+      setRemoveOpen(true);
       return;
     }
 
@@ -473,7 +581,7 @@ export default function EditProductClient({
               error={errors.categoryIds}
               action={
                 <RefreshButton
-                  onClick={() => void reloadCategories()}
+                  onClick={() => void reloadPools()}
                   busy={refreshing}
                   disabled={refreshing}
                 />
@@ -535,6 +643,110 @@ export default function EditProductClient({
 
             <SectionCard
               step="4"
+              eyebrow="Choices"
+              title="Options & Values"
+              hint="Options are the pools this product's variants are built from. Removing a value disables the variants that use it — or deletes them when they never sold."
+              error={errors.options}
+              action={
+                <RefreshButton
+                  onClick={() => void reloadPools()}
+                  busy={refreshing}
+                  disabled={refreshing}
+                />
+              }
+            >
+              {(options ?? []).length === 0 ? (
+                <PoolHint
+                  href="/manager/product-studio/options"
+                  label="Create an option pool"
+                  text="No options exist yet — a product needs at least one option with a value."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {(options ?? []).map((option) => {
+                    const chosen = selectedValues[option.id];
+                    const included = chosen !== undefined;
+
+                    return (
+                      <div
+                        key={option.id}
+                        className="rounded-xl border border-stone-200 bg-white p-3"
+                      >
+                        <label className="flex cursor-pointer items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={included}
+                            onChange={() => toggleOption(option)}
+                            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-rose-500"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-stone-800">
+                              {option.name}
+                              <span className="text-[10px] font-normal text-stone-400">
+                                {option.valueCount} value
+                                {option.valueCount === 1 ? "" : "s"}
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-stone-500">
+                              {option.description || "No description yet"}
+                            </span>
+                          </span>
+                          {included && (
+                            <span className="shrink-0 rounded-full border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 text-[10px] font-medium text-rose-600">
+                              {chosen.length} picked
+                            </span>
+                          )}
+                        </label>
+
+                        {included && (
+                          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-dashed border-stone-100 pt-2">
+                            {option.values.length === 0 ? (
+                              <p className="text-[11px] text-amber-700">
+                                This pool has no values yet — add them in Global
+                                Options.
+                              </p>
+                            ) : (
+                              option.values.map((value) => {
+                                const active = chosen.includes(value.id);
+                                return (
+                                  <button
+                                    key={value.id}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() =>
+                                      toggleValue(option.id, value.id)
+                                    }
+                                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                      active
+                                        ? "border-rose-300 bg-rose-50 text-rose-700"
+                                        : "border-stone-200 bg-white text-stone-600 hover:border-rose-200 hover:text-stone-900"
+                                    }`}
+                                  >
+                                    {active && <Check className="h-3 w-3" />}
+                                    {value.value}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {removedChoices.length > 0 && (
+                    <p className="pt-1 text-[11px] font-medium text-rose-600">
+                      {removedChoices.length} choice
+                      {removedChoices.length === 1 ? "" : "s"} will be removed
+                      when you save: {removedChoices.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              step="5"
               eyebrow="Money & fulfilment"
               title="Delivery, processing and status"
             >
@@ -595,10 +807,23 @@ export default function EditProductClient({
             </SectionCard>
 
             <SectionCard
-              step="5"
+              step="6"
+              eyebrow="Measurements"
+              title="Product dimensions"
+              hint="Optional. Existing variants keep their own snapshot; new variants copy these values when generated."
+              error={errors.dimensionUnit}
+            >
+              <DimensionFields
+                value={dimensions}
+                onChange={setDimensions}
+              />
+            </SectionCard>
+
+            <SectionCard
+              step="7"
               eyebrow="What shoppers read"
               title="Features & care instructions"
-              hint="Bullet lists shared by every variant of this product — they are not set per variant."
+              hint="The base lists. Each variant starts from these and can be edited on its own variant page."
             >
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
@@ -630,7 +855,7 @@ export default function EditProductClient({
             </SectionCard>
 
             <SectionCard
-              step="6"
+              step="8"
               eyebrow="Showcase"
               title="Where this product is featured"
               hint="Both are optional. They decide whether this product is pushed forward on the website."
@@ -693,6 +918,34 @@ export default function EditProductClient({
           </form>
         )}
       </div>
+
+      <ConfirmDialog
+        open={removeOpen}
+        title="Remove these choices?"
+        description={
+          <>
+            <span className="font-semibold">
+              {removedChoices.length} choice
+              {removedChoices.length === 1 ? "" : "s"}
+            </span>{" "}
+            will be removed: {removedChoices.join(", ")}. Variants that never sold
+            are deleted together with their photos (linked photos are unlinked
+            and any variant left without photos is disabled). Variants that
+            already have orders are only disabled, and their value is disabled
+            instead of deleted. Photo sort order is renumbered automatically.
+          </>
+        }
+        confirmLabel="Remove choices"
+        loading={saving}
+        onConfirm={() => {
+          setRemoveOpen(false);
+          if (pendingSave) void submit(pendingSave);
+        }}
+        onClose={() => {
+          setRemoveOpen(false);
+          setPendingSave(null);
+        }}
+      />
 
       <ConfirmDialog
         open={disableOpen}

@@ -74,6 +74,14 @@ export type CollectionOption = {
   values: { id: string; value: string }[];
 };
 
+/** Optional physical dimensions, all sharing one unit. */
+export type CollectionDimensions = {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimensionUnit: "cm" | "in" | null;
+};
+
 export type CollectionVariant = {
   id: string;
   sku: string;
@@ -85,8 +93,14 @@ export type CollectionVariant = {
   stock: number;
   /** Grams, as entered in the studio. */
   weight: number | null;
+  /** This variant's own snapshot of the product dimensions. */
+  dimensions: CollectionDimensions;
   status: "active" | "inactive";
   isFeatured: boolean;
+  /** This variant's own feature bullets (falls back to the product's). */
+  features: CollectionFeature[];
+  /** This variant's own care instructions (falls back to the product's). */
+  careInstructions: CollectionCareInstruction[];
   /** This variant's own photos, in display order. */
   images: CollectionProductImage[];
   /** `product_option_values.id` this variant fills — one per option. */
@@ -132,6 +146,7 @@ export type CollectionProductDetail = {
   processingTime: string | null;
   deliveryCharges: number;
   isFeatured: boolean;
+  dimensions: CollectionDimensions;
   /** Product-level photos, used only when a variant has none of its own. */
   images: CollectionProductImage[];
   options: CollectionOption[];

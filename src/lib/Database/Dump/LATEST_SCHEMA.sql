@@ -90,6 +90,10 @@ CREATE TABLE products (
     meta_description VARCHAR(500) DEFAULT NULL,
     delivery_charges DECIMAL(10, 2) DEFAULT 0,
     processing_time VARCHAR(100) DEFAULT NULL,
+    length DECIMAL(10, 2) DEFAULT NULL,
+    width DECIMAL(10, 2) DEFAULT NULL,
+    height DECIMAL(10, 2) DEFAULT NULL,
+    dimension_unit ENUM('cm', 'in') DEFAULT NULL,
     is_featured BOOLEAN DEFAULT FALSE,
     main_showcase BOOLEAN DEFAULT FALSE,
     orders_count INT DEFAULT 0,
@@ -118,6 +122,7 @@ CREATE TABLE product_options (
     global_option_id CHAR(40) NOT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -133,6 +138,7 @@ CREATE TABLE product_option_values (
     option_id CHAR(40) NOT NULL,
     global_option_value_id CHAR(40) NOT NULL,
     value VARCHAR(100) NOT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -154,6 +160,10 @@ CREATE TABLE product_variants (
     compare_at_price DECIMAL(10, 2) DEFAULT NULL,
     stock INT NOT NULL DEFAULT 0,
     weight DECIMAL(10, 2) DEFAULT NULL,
+    length DECIMAL(10, 2) DEFAULT NULL,
+    width DECIMAL(10, 2) DEFAULT NULL,
+    height DECIMAL(10, 2) DEFAULT NULL,
+    dimension_unit ENUM('cm', 'in') DEFAULT NULL,
     status ENUM('active', 'inactive') DEFAULT 'active',
     is_featured BOOLEAN DEFAULT FALSE,
     main_showcase BOOLEAN DEFAULT FALSE,
@@ -219,6 +229,34 @@ CREATE TABLE product_care_instructions (
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+-- ===========================================================
+-- Variant Features (snapshot of the base product's feature list)
+-- ===========================================================
+CREATE TABLE product_variant_features (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    variant_id CHAR(40) NOT NULL,
+    feature VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
+);
+-- ===========================================================
+-- Variant Care Instructions (snapshot of the base product's list)
+-- ===========================================================
+CREATE TABLE product_variant_care_instructions (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    variant_id CHAR(40) NOT NULL,
+    instruction VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
 );
 -- ===========================================================
 -- Product Gift Included

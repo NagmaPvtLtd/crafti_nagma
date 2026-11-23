@@ -508,6 +508,10 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
             value={formatCurrency(product.deliveryCharges)}
           />
           <DetailRow label="Processing" value={product.processingTime || "—"} />
+          <DetailRow
+            label="Dimensions"
+            value={formatDimensions(product.dimensions)}
+          />
         </dl>
 
         <dl className="space-y-2 text-xs">
@@ -544,6 +548,20 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       )}
     </div>
   );
+}
+
+export function formatDimensions(dimensions: {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimensionUnit: "cm" | "in" | null;
+}): string {
+  const parts: string[] = [];
+  if (dimensions.length !== null) parts.push(`L ${dimensions.length}`);
+  if (dimensions.width !== null) parts.push(`W ${dimensions.width}`);
+  if (dimensions.height !== null) parts.push(`H ${dimensions.height}`);
+  if (parts.length === 0) return "—";
+  return `${parts.join(" × ")} ${dimensions.dimensionUnit ?? ""}`.trim();
 }
 
 function DetailRow({
@@ -895,11 +913,11 @@ function buildGenerateCombos(product: ProductDetailResponse): GenerateCombo[] {
     combos = next;
   }
 
-  return combos.map((combo) => ({
-    key: combo.valueIds.join("|"),
-    label: combo.labels.join(" / "),
-    valueIds: combo.valueIds,
-  }));
+      return combos.map((combo) => ({
+      key: [...combo.valueIds].sort().join("|"),
+      label: combo.labels.join(" / "),
+      valueIds: combo.valueIds,
+    }));
 }
 
 function GenerateVariantsModal({
@@ -916,8 +934,20 @@ function GenerateVariantsModal({
   onGenerated: () => void;
 }) {
   const combos = useMemo(() => buildGenerateCombos(product), [product]);
+  /** Combinations already covered by a variant are not ticked by default. */
+  const existingKeys = useMemo(
+    () =>
+      new Set(
+        product.variants.map((variant) =>
+          [...variant.optionValueIds].sort().join("|"),
+        ),
+      ),
+    [product.variants],
+  );
   const [selected, setSelected] = useState<string[]>(() =>
-    combos.map((combo) => combo.key),
+    combos
+      .filter((combo) => !existingKeys.has(combo.key))
+      .map((combo) => combo.key),
   );
   const [startingPrice, setStartingPrice] = useState(String(suggestPrice()));
   const [stock, setStock] = useState("0");
