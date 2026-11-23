@@ -70,7 +70,7 @@ export default function LoginForm() {
 
   return (
     <PageWrapper variant="form">
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
+      <div className="mx-auto w-full max-w-md  px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
         <div className="min-w-0">
           <SectionEyebrow>Account</SectionEyebrow>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
@@ -83,95 +83,90 @@ export default function LoginForm() {
 
         <SectionDivider className="my-6" size={11} />
 
-        <div className="flex justify-center">
-          <div className="w-full max-w-md">
-            <div className="rounded-3xl bg-white/60 p-6 backdrop-blur-md shadow-sm shadow-stone-900/5 sm:p-8">
-
-            {message && (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
-              >
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <div className="space-y-1.5">
-                  <p>{message}</p>
-                </div>
+        <div className="w-full rounded-3xl backdrop-blur-md">
+          {message && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
+            >
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <div className="space-y-1.5">
+                <p>{message}</p>
               </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={isBusy}
+            className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:border-rose-200 hover:bg-rose-50/40 disabled:opacity-60"
+          >
+            {busy === "google" ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <GoogleIcon />
             )}
+            Continue with Google
+          </button>
 
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={isBusy}
-              className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-800 transition hover:border-rose-200 hover:bg-rose-50/40 disabled:opacity-60"
-            >
-              {busy === "google" ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
-              Continue with Google
-            </button>
-
-            <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-stone-200" />
-              <span className="text-[11px] font-medium tracking-wider text-stone-400 uppercase">
-                or
-              </span>
-              <span className="h-px flex-1 bg-stone-200" />
-            </div>
-
-            <form onSubmit={handleCredentials} className="space-y-3" noValidate>
-              <Field label="Email" required>
-                <TextInput
-                  type="email"
-                  required
-                  autoFocus
-                  autoComplete="email"
-                  inputMode="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="user@craftinagma.com"
-                />
-              </Field>
-
-              <Field label="Password" required>
-                <PasswordInput
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </Field>
-
-              <button
-                type="submit"
-                disabled={isBusy}
-                className="mt-1 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 disabled:opacity-60 active:scale-[0.98]"
-              >
-                {busy === "credentials" && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                Login
-              </button>
-            </form>
-
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={isBusy}
-              className="mt-5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-center text-xs font-medium text-stone-600 transition-colors hover:bg-rose-50/60 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy === "google" && (
-                <Loader2 size={14} className="animate-spin" />
-              )}
-              <span className="text-rose-600">New User?</span> Signup with
-              Google today!
-            </button>
-            </div>
+          <div className="my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-stone-200" />
+            <span className="text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+              or
+            </span>
+            <span className="h-px flex-1 bg-stone-200" />
           </div>
+
+          <form onSubmit={handleCredentials} className="space-y-3" noValidate>
+            <Field label="Email" required>
+              <TextInput
+                type="email"
+                required
+                autoFocus
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@craftinagma.com"
+              />
+            </Field>
+
+            <Field label="Password" required>
+              <PasswordInput
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </Field>
+
+            <button
+              type="submit"
+              disabled={isBusy}
+              className="mt-1 flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 disabled:opacity-60 active:scale-[0.98]"
+            >
+              {busy === "credentials" && (
+                <Loader2 size={16} className="animate-spin" />
+              )}
+              Login
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={isBusy}
+            className="mt-5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-center text-xs font-medium text-stone-600 transition-colors  hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy === "google" && (
+              <Loader2 size={14} className="animate-spin" />
+            )}
+            <span className="text-rose-600">New User?</span> Signup with Google
+            today!
+          </button>
         </div>
       </div>
     </PageWrapper>
