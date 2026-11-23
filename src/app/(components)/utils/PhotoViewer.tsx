@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import useEmblaCarousel from "embla-carousel-react";
 import { X } from "lucide-react";
@@ -23,6 +23,8 @@ type Props = {
   title?: string;
 };
 
+type PanelProps = Omit<Props, "open">;
+
 /**
  * Full-screen photo viewer on a white canvas, driven by an Embla carousel:
  * swipe or drag to change photos (no arrow buttons), click a thumbnail to jump,
@@ -38,19 +40,62 @@ export default function PhotoViewer({
   onIndexChange,
   title,
 }: Props) {
-  const total = images.length;
-  const safeIndex = total === 0 ? 0 : Math.min(Math.max(index, 0), total - 1);
+  useEffect(() => {
+    if (!open) return;
 
-  /* `duration` is Embla's snap transition in frames-ish units (default 25).
-     A longer tween plus a lower drag threshold makes the full-screen swipe feel
-     like a smooth glide instead of a hard snap. */
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  if (!open || images.length === 0 || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <ViewerPanel
+      onClose={onClose}
+      images={images}
+      index={index}
+      onIndexChange={onIndexChange}
+      title={title}
+    />,
+    document.body,
+  );
+}
+
+/**
+ * The open viewer. It mounts with the portal, so Embla initialises once per
+ * opening with the real viewport size and the photo the page asked for — and its
+ * options never change while it is open (a changing `startIndex` makes
+ * embla-carousel-react re-initialise the carousel mid-glide, which is what made
+ * the full-screen swipe snap instead of gliding).
+ */
+function ViewerPanel({
+  onClose,
+  images,
+  index,
+  onIndexChange,
+  title,
+}: PanelProps) {
+  const total = images.length;
+  const safeIndex = Math.min(Math.max(index, 0), total - 1);
+
+  /* Read once, on mount: Embla only uses `startIndex` when it initialises. */
+  const [startIndex] = useState(safeIndex);
+
+  /* `duration` is Embla's tween length (default 25): a longer one glides
+     instead of snapping, which a viewport-sized photo needs. Drag threshold and
+     skipSnaps stay at their defaults — 6px was twitchy, and a snap-less release
+     is what made the full-screen slider feel abrupt. */
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: total > 1,
-    startIndex: safeIndex,
+    startIndex,
     align: "start",
     duration: 45,
-    dragThreshold: 6,
-    skipSnaps: false,
     containScroll: false,
   });
 
@@ -117,27 +162,17 @@ export default function PhotoViewer({
   }, [emblaApi, total]);
 
   useEffect(() => {
-    if (!open || total === 0) return;
-
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
       else if (event.key === "ArrowLeft") step(-1);
       else if (event.key === "ArrowRight") step(1);
     }
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, step]);
 
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, total, onClose, step]);
-
-  if (!open || total === 0 || typeof document === "undefined") return null;
-
-  return createPortal(
+  return (
     <div
       role="dialog"
       aria-modal="true"
@@ -164,28 +199,33 @@ export default function PhotoViewer({
       </div>
 
       <div className="relative min-h-0 flex-1 bg-white">
-        {/* Swipe or drag to change photos — the arrows were removed on purpose. */}
-        <div className="h-full cursor-grab overflow-hidden px-2 py-3 active:cursor-grabbing" ref={emblaRef}>
+        {/* Swipe or drag to change photos — the arrows were removed on purpose.
+            Padding lives on the slides, never on this viewport: padding here
+            offsets Embla's width measurement and breaks the loop/alignment. */}
+        <div
+          className="h-full cursor-grab overflow-hidden active:cursor-grabbing"
+          ref={emblaRef}
+        >
           <div className="flex h-full touch-pan-y select-none">
             {images.map((image) => (
               <div
                 key={image.id}
-                className="relative h-full min-w-0 shrink-0 grow-0 basis-full"
+                className="h-full min-w-0 shrink-0 grow-0 basis-full px-2 py-3"
               >
-                <Image
-                  src={image.url}
-                  alt={image.altText || title || "Photo"}
-                  fill
-                  draggable={false}
-                  sizes="100vw"
-                  className="object-contain"
-                />
+                <div className="relative h-full w-full">
+                  <Image
+                    src={image.url}
+                    alt={image.altText || title || "Photo"}
+                    fill
+                    draggable={false}
+                    sizes="100vw"
+                    className="object-contain"
+                  />
+                </div>
               </div>
             ))}
           </div>
         </div>
-
-
       </div>
 
       {total > 1 && (
@@ -214,7 +254,6 @@ export default function PhotoViewer({
           ))}
         </div>
       )}
-    </div>,
-    document.body,
+    </div>
   );
 }

@@ -10,9 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flower2,
-  Layers,
   Search,
-  ShoppingBag,
   Sparkles,
 } from "lucide-react";
 
@@ -134,30 +132,8 @@ export default function Collections() {
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
         <SectionEyebrow>Browse our Collection</SectionEyebrow>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-          Everything on the shelf.
+          Our collection
         </h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base">
-          Featured pieces first, then browse by category or search for exactly
-          what you have in mind.
-        </p>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
-            <ShoppingBag className="h-3 w-3 text-rose-400" />
-            {data?.totalProducts ?? 0} products
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 backdrop-blur-sm">
-            <Layers className="h-3 w-3 text-rose-400" />
-            {categories.length} categories
-          </span>
-          <Link
-            href="#all-products"
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:bg-white"
-          >
-            All products
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        </div>
 
         <SectionDivider className="my-6" size={11} />
 

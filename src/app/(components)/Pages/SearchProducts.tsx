@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Flower2, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  CornerDownLeft,
+  Flower2,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
 import CustomLoader from "../CustomLoader";
 import PageWrapper from "../utils/PageWrapper";
@@ -64,9 +70,27 @@ export default function SearchProducts() {
       .then((res) => {
         if (cancelled) return;
         setData(res.data);
-        setBounds(res.data.priceRange);
-        setPriceMin(res.data.priceRange.min);
-        setPriceMax(res.data.priceRange.max);
+
+        /*
+         * Bound the slider to the prices actually on screen, not the whole
+         * catalogue: a search that returns only ₹100 products leaves no range
+         * to drag, and that filter is hidden below.
+         */
+        const priced = res.data.products
+          .map((product) => product.priceFrom)
+          .filter((price): price is number => price !== null);
+
+        if (priced.length > 0) {
+          const min = Math.floor(Math.min(...priced));
+          const max = Math.ceil(Math.max(...priced));
+          setBounds({ min, max });
+          setPriceMin(min);
+          setPriceMax(max);
+        } else {
+          setBounds(null);
+          setPriceMin(0);
+          setPriceMax(0);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Could not run that search right now.");
@@ -106,6 +130,9 @@ export default function SearchProducts() {
     router.push("/search");
   }
 
+  /* A single price across every result leaves nothing to filter on. */
+  const showPriceFilter = bounds !== null && bounds.max > bounds.min;
+
   const filtersActive =
     bounds !== null && (priceMin > bounds.min || priceMax < bounds.max);
 
@@ -124,18 +151,20 @@ export default function SearchProducts() {
             onChange={(event) => setInput(event.target.value)}
             placeholder="Search products, tags, categories…"
             aria-label="Search products"
-            className={`${inputClass(false)} rounded-full py-2.5 pr-24 pl-10 text-sm`}
+            className={`${inputClass(false)} rounded-full py-2.5 pr-12 pl-10 text-sm`}
           />
           <button
             type="submit"
-            className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-full bg-stone-900 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+            aria-label="Search"
+            title="Search (Enter)"
+            className="absolute top-1/2 right-1.5 inline-flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
           >
-            Search
+            <CornerDownLeft className="h-4 w-4" />
           </button>
         </form>
 
         {/* Mobile filters — horizontally scrollable, above the query line. */}
-        {query && bounds && (
+        {query && showPriceFilter && bounds && (
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
             <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600">
               <SlidersHorizontal className="h-3 w-3 text-rose-400" />
@@ -231,9 +260,13 @@ export default function SearchProducts() {
             {error}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_1fr]">
+          <div
+            className={`grid grid-cols-1 gap-5 ${
+              showPriceFilter ? "lg:grid-cols-[240px_1fr]" : ""
+            }`}
+          >
             {/* Desktop price filter */}
-            {bounds && (
+            {showPriceFilter && bounds && (
               <aside className="hidden lg:block">
                 <div className="sticky top-24 rounded-2xl border border-rose-100 bg-white/85 p-4 backdrop-blur-sm">
                   <div className="flex items-center gap-1.5">

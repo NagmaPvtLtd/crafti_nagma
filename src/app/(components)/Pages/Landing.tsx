@@ -65,7 +65,7 @@ const LANDING_CONTENT = {
       description:
         "Curated gift sets for birthdays, anniversaries, and baby showers — beautifully wrapped and ready to give.",
       cta: "Explore gifts",
-      href: "/collections?category=Bouquets",
+      href: "/search?q=gift",
     },
   ] as const,
 
@@ -131,7 +131,7 @@ const LANDING_CONTENT = {
   finalCta: {
     heading: "Ready to bring handmade home?",
     body: "Explore the collection or tell us your idea — either way, something special is about to begin.",
-    primaryCta: { label: "View collections", href: "/products" },
+    primaryCta: { label: "View collections", href: "/collections" },
     secondaryCta: { label: "Start a custom order", href: "/custom" },
     footnote: "Free shipping on special occassions! · Ships India-wide",
   },

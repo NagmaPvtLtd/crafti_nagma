@@ -9,6 +9,38 @@
 
 ---
 
+## Rule #0 — the shopper comes first
+
+Before you add **anything** to a screen (a sentence, a heading, a statistic, a badge,
+an extra section), stop and ask the user's question:
+
+> *“Is this worth the time the user spends reading it?”*
+
+If the answer is not an obvious yes, do not ship it. A UI is not a report about the
+project — it only exists to help the next click.
+
+- **Never explain the page to itself.** Copy like “Featured pieces first, then
+  browse by category or search…” is noise; the sections below already say that.
+  Keep a page heading human and short (“Our collection”), not a table of contents.
+- **Do not surface internal statistics** — `N products`, `N categories`, `N tags`,
+  counts, ids, slugs, “3 products · 3 categories”. A number earns its place only
+  if it changes what the user does next (e.g. price, stock, delivery time, a
+  savings amount).
+- **One idea per block.** If a block does not lead to the next action, delete it
+  instead of restyling it. Fewer sections with real content beat more sections
+  with labels.
+- **Show, don't announce.** A product photo, a category card and a price tell the
+  story; a paragraph describing them does not.
+- **No badge spam.** One meaningful badge per surface. Repeating the same label on
+  every chip (e.g. “Inherited” on each tag) is mess — label the group once.
+- **Applies to manager screens too.** A manager is a user with a task; show the
+  task and its result, not a dashboard of everything the database holds.
+- Existing examples to keep as precedent: the `/collections` header kept a single
+  heading and dropped its stat pills; the product page shows the discount in the
+  price block only, never stamped on the photo.
+
+---
+
 ## Checklist (point-wise)
 
 - Form controls: `Field` + `TextInput` from `src\app\(components)\utils\Form` with `inputClass()` — do not invent new input styling.
@@ -19,7 +51,7 @@
 - Page shell: `PageWrapper` + `SectionDivider` / `SectionEyebrow` + `mx-auto max-w-7xl px-4 sm:px-6`, same rhythm as the landing page.
 - **STRICT RULE — every page container is `max-w-7xl`. No exceptions.** The outermost content div of any page is always:
   `mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16`
-  placed directly inside `PageWrapper`. Inside it: page heading block (`SectionEyebrow` → `h1` → description), then `<SectionDivider className="my-6" size={11} />`, then the page content.
+  placed directly inside `PageWrapper`. Inside it: page heading block (`SectionEyebrow` → `h1` → description *only when it adds something*, see Rule #0), then `<SectionDivider className="my-6" size={11} />`, then the page content.
   - Never use `max-w-5xl`, `max-w-6xl`, `max-w-3xl` or any other width for a page container, and never split a page into multiple `max-w-*` containers — one container encloses the whole page.
   - Narrow widths (`max-w-md`, `max-w-xl`, `max-w-2xl`, …) are only allowed *inside* the page for content blocks: cards, forms, modals, descriptions, empty states.
   - Reference implementations to copy: `src\app\admin\settings\page.tsx` and `src\app\(components)\Pages\Dashboard\ProfileClient.tsx`.

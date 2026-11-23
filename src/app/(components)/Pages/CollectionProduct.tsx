@@ -553,12 +553,6 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                     </div>
                   )}
 
-                  {discount !== null && (
-                    <span className="absolute top-3 left-3 z-10 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      {discount}% off
-                    </span>
-                  )}
-
                   {activeImage && (
                     <button
                       type="button"

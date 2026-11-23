@@ -47,6 +47,8 @@ export default function TagInput({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldRefocusRef = useRef(false);
 
   const selectedIds = useMemo(
     () => new Set(value.map((tag) => tag.id)),
@@ -74,6 +76,17 @@ export default function TagInput({
     };
     run();
   }, [loadPool]);
+
+  /*
+   * Creating a tag disables the input for the request, which drops focus.
+   * Put the caret back in the same field so typing can continue.
+   */
+  useEffect(() => {
+    if (creating || !shouldRefocusRef.current) return;
+    shouldRefocusRef.current = false;
+    if (disabled || atLimit) return;
+    inputRef.current?.focus();
+  }, [creating, disabled, atLimit]);
 
   useEffect(() => {
     function onDown(event: MouseEvent) {
@@ -142,6 +155,7 @@ export default function TagInput({
       return;
     }
 
+    shouldRefocusRef.current = inputRef.current === document.activeElement;
     setCreating(true);
     try {
       const res = await axios.post<{
@@ -201,6 +215,7 @@ export default function TagInput({
           </span>
         ) : (
           <input
+            ref={inputRef}
             value={input}
             onChange={(event) => {
               setInput(event.target.value.slice(0, MAX_TAG_LENGTH));

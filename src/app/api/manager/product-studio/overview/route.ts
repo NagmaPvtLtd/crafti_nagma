@@ -36,6 +36,8 @@ interface RecentProductRow extends RowDataPacket {
   slug: string;
   status: "active" | "inactive";
   updated_at: string;
+  product_image: string | null;
+  variant_image: string | null;
 }
 
 interface TopProductRow extends RowDataPacket {
@@ -67,6 +69,7 @@ interface TopProductRow extends RowDataPacket {
  *             `lowStock`, `outOfStock`), `categories` (`total`, `root`), `options` (`total`)
  *   - quickStats: `topProduct` (`id`, `name`, `units`) or `null`
  *   - recentlyUpdated: up to 5 products with `id`, `code`, `name`, `slug`, `status`, `updatedAt`
+ *     and `imageUrl` (product-level cover first, else the first variant photo)
  *
  * @throws {401} Unauthorized - No session
  * @throws {403} Forbidden - Account not active, no role, or role below manager
@@ -80,7 +83,9 @@ interface TopProductRow extends RowDataPacket {
  *   4. Count variants, low stock and out of stock
  *   5. Count categories and root categories
  *   6. Count global options
- *   7. Select the 5 most recently updated products
+ *   7. Select the 5 most recently updated products with their cover image — the product-level
+ *      image first, else the first variant photo (active variants preferred), the same
+ *      preference the "All products" list and the storefront cards use
  *   8. Select the top product by units from the last 30 days, cancelled orders excluded
  *   9. Normalize MySQL aggregates with `Number`
  *   10. Return 200 response with counts, `quickStats` and `recentlyUpdated`
@@ -130,9 +135,21 @@ export async function GET() {
 
     /* ---- recently updated (for hub footer) ---- */
     const [recentRows] = await conn.query<RecentProductRow[]>(
-      `SELECT id, code, name, slug, status, updated_at
-         FROM products
-        ORDER BY COALESCE(updated_at, created_at) DESC
+      `SELECT p.id, p.code, p.name, p.slug, p.status, p.updated_at,
+              (SELECT f.url FROM imagekit_files f
+                WHERE f.entity_type = 'product' AND f.entity_id = p.id
+                ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC
+                LIMIT 1)                                          AS product_image,
+              (SELECT f.url FROM imagekit_files f
+                 JOIN product_variants v ON v.id = f.entity_id
+                WHERE f.entity_type = 'product_variant'
+                  AND f.file_purpose = 'product_variant_image'
+                  AND v.product_id = p.id
+                ORDER BY v.status = 'active' DESC,
+                         f.sort_order ASC, f.created_at ASC, f.id ASC
+                LIMIT 1)                                          AS variant_image
+         FROM products p
+        ORDER BY COALESCE(p.updated_at, p.created_at) DESC
         LIMIT 5`,
     );
 
@@ -196,6 +213,7 @@ export async function GET() {
         slug: r.slug,
         status: r.status,
         updatedAt: r.updated_at,
+        imageUrl: r.product_image ?? r.variant_image ?? null,
       })),
     });
   } catch (err) {

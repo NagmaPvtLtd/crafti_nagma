@@ -607,27 +607,27 @@ export default function VariantDetailClient({
                         Product tags
                       </p>
 
-                      <p className="mt-1.5 text-[10px] font-medium tracking-wide text-stone-400 uppercase">
-                        Inherited from {data.variant.productName}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-2 rounded-lg border border-stone-200/80 bg-stone-50/70 p-2.5">
+                        <p className="text-[10px] font-semibold tracking-wide text-stone-400 uppercase">
+                          Inherited from {data.variant.productName}
+                        </p>
+
                         {data.tags.inherited.length === 0 ? (
-                          <span className="text-[11px] text-stone-400">
+                          <p className="mt-1 text-[11px] text-stone-400">
                             No inherited tags yet — add them on the base
                             product.
-                          </span>
+                          </p>
                         ) : (
-                          data.tags.inherited.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-medium text-stone-600"
-                            >
-                              {tag.name}
-                              <span className="rounded-full bg-white px-1 py-px text-[8px] font-semibold tracking-wide text-stone-400 uppercase ring-1 ring-stone-200">
-                                Inherited
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            {data.tags.inherited.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-medium text-stone-600"
+                              >
+                                {tag.name}
                               </span>
-                            </span>
-                          ))
+                            ))}
+                          </div>
                         )}
                       </div>
 

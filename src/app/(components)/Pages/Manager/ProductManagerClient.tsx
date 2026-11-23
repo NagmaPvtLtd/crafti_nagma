@@ -3,6 +3,7 @@
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   AlertCircle,
   ArrowRight,
@@ -52,6 +53,8 @@ type OverviewPayload = {
     slug: string;
     status: "active" | "inactive";
     updatedAt: string;
+    /** Product-level cover first, else the first variant photo. */
+    imageUrl: string | null;
   }[];
 };
 
@@ -377,6 +380,21 @@ function RecentlyUpdated({
                 key={p.id}
                 className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
               >
+                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-stone-100">
+                  {p.imageUrl ? (
+                    <Image
+                      src={p.imageUrl}
+                      alt={p.name}
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-stone-300">
+                      <Package className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-stone-900">
                     {p.name}
