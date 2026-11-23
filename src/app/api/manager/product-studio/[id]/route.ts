@@ -16,6 +16,13 @@ import {
 } from "../../../../../utils/zod/product/manager.productDetail.zod";
 import type { PoolConnection } from "mysql2/promise";
 import { capitalizeFirst } from "../../../../../utils/Formator/capitalize.util";
+import {
+  loadProductTags,
+  loadTagsByIds,
+  pruneUnusedTags,
+  replaceTagMappings,
+  uniqueTagIds,
+} from "../../../../../utils/Tags/tag.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -188,10 +195,7 @@ type OptionsPlan = {
     string,
     { id: string; name: string; description: string | null }
   >;
-  globalValues: Map<
-    string,
-    { id: string; option_id: string; value: string }
-  >;
+  globalValues: Map<string, { id: string; option_id: string; value: string }>;
   deleteVariantIds: string[];
   disableVariantIds: string[];
   removedValueIds: string[];
@@ -253,6 +257,7 @@ async function normalizeMediaSortOrder(
  *   - ok: `true`
  *   - product: base copy plus `deliveryCharges`, `processingTime`, `isFeatured`, `mainShowcase`,
  *              `status`, `createdAt` and `updatedAt`
+ *   - tags: the base product's tags `{ id, name, slug }` in name order (inherited by every variant)
  *   - features, careInstructions: `{ id, value, sortOrder }` rows in sort order
  *   - categories: `{ id, name, slug, parentId }`, ordered by name
  *   - options: `{ id, name, description, values }`
@@ -474,6 +479,8 @@ export async function GET(
       [id],
     );
 
+    const productTags = await loadProductTags(conn, id);
+
     /* ---- group the joined rows ---- */
 
     const valuesByOption = new Map<
@@ -527,16 +534,15 @@ export async function GET(
         mainShowcase: Boolean(product.main_showcase),
         status: product.status,
         dimensions: {
-          length:
-            product.length === null ? null : Number(product.length),
+          length: product.length === null ? null : Number(product.length),
           width: product.width === null ? null : Number(product.width),
-          height:
-            product.height === null ? null : Number(product.height),
+          height: product.height === null ? null : Number(product.height),
           dimensionUnit: product.dimension_unit ?? null,
         },
         createdAt: product.created_at,
         updatedAt: product.updated_at,
       },
+      tags: productTags,
       features: featureRows.map((row) => ({
         id: row.id,
         value: row.value,
@@ -681,6 +687,8 @@ export async function GET(
  * @body {string[]} [categoryIds] - Full replacement of the category set (10-40 chars each)
  * @body {string[]} [features] - Full replacement of the feature bullets (1-255 chars each)
  * @body {string[]} [careInstructions] - Full replacement of the care list (1-255 chars each)
+ * @body {string[]} [tagIds] - Full replacement of the base product's tags (max 15, 10-40 chars each;
+ *                            omitted leaves them untouched)
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
@@ -800,6 +808,21 @@ export async function PUT(
       }
     }
 
+    /* Tags are a full replacement too. Every id must still exist; the mapping
+       rows are rewritten inside the transaction below. */
+    let tagIds: string[] | null = null;
+    if (data.tagIds) {
+      tagIds = uniqueTagIds(data.tagIds);
+      if (tagIds.length > 0) {
+        const tags = await loadTagsByIds(conn, tagIds);
+        if (tags.size !== tagIds.length) {
+          return invalidInput({
+            tagIds: ["One or more tags no longer exist"],
+          });
+        }
+      }
+    }
+
     /* Disabling the base product hides everything under it: every variant is
        disabled and all of their photos are removed to free up space. It is
        refused as soon as any variant of this product sits in an order. */
@@ -824,10 +847,9 @@ export async function PUT(
 
       const [globalOptionRows] = await conn.query<
         (OptionRow & { description: string | null })[]
-      >(
-        `SELECT id, name, description FROM global_options WHERE id IN (?)`,
-        [requestedOptionIds],
-      );
+      >(`SELECT id, name, description FROM global_options WHERE id IN (?)`, [
+        requestedOptionIds,
+      ]);
       if (globalOptionRows.length !== requestedOptionIds.length) {
         return invalidInput({
           options: ["One or more options no longer exist"],
@@ -1179,6 +1201,17 @@ export async function PUT(
       }
     }
 
+    if (tagIds) {
+      await replaceTagMappings(
+        conn,
+        "product_tag_mappings",
+        "product_id",
+        id,
+        tagIds,
+        now,
+      );
+    }
+
     /* ---- apply the option replacement plan ---- */
     if (optionsPlan) {
       const {
@@ -1387,6 +1420,10 @@ export async function PUT(
     }
 
     await conn.commit();
+
+    if (tagIds) {
+      await pruneUnusedTags(pool).catch(() => {});
+    }
 
     try {
       await auditLog.log(pool, {

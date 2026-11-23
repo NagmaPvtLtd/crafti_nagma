@@ -29,6 +29,8 @@ import DimensionFields, {
   type DimensionFormValue,
 } from "../../utils/Form/DimensionFields";
 import CustomLoader from "../../CustomLoader";
+import TagInput from "../../utils/TagInput";
+import type { TagRef } from "../../../../utils/Tags/tag.util";
 import { baseProductCreateSchema } from "../../../../utils/zod/product/manager.product.zod";
 import type {
   GlobalCategoriesResponse,
@@ -104,6 +106,7 @@ export default function AddProductClient() {
   const [dimensions, setDimensions] =
     useState<DimensionFormValue>(emptyDimensions);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<TagRef[]>([]);
   /** optionId → selected value ids */
   const [selectedValues, setSelectedValues] = useState<
     Record<string, string[]>
@@ -272,6 +275,7 @@ export default function AddProductClient() {
       mainShowcase: form.mainShowcase,
       status: form.status,
       categoryIds: selectedCategoryIds,
+      tagIds: selectedTags.map((tag) => tag.id),
       length: dimensions.length,
       width: dimensions.width,
       height: dimensions.height,
@@ -559,6 +563,21 @@ export default function AddProductClient() {
 
             <SectionCard
               step="4"
+              eyebrow="Discovery"
+              title="Product Tags"
+              hint="Add relevant keywords to help customers discover this product through search. Every variant inherits these tags automatically."
+              error={errors.tagIds}
+            >
+              <TagInput value={selectedTags} onChange={setSelectedTags} />
+              <p className="mt-2 text-[11px] text-stone-500">
+                Optional. Tags are shared across the whole catalogue — reuse an
+                existing one instead of creating a duplicate. Maximum 15 per
+                product.
+              </p>
+            </SectionCard>
+
+            <SectionCard
+              step="5"
               eyebrow="Choices"
               title="Options & Values"
               hint="Options are the pools a variant is built from — Colour, Size, Material. Tick a pool, then pick its values. The first value is selected for you as the default."
@@ -652,7 +671,7 @@ export default function AddProductClient() {
             </SectionCard>
 
             <SectionCard
-              step="5"
+              step="6"
               eyebrow="Measurements"
               title="Product dimensions"
               hint="Optional. When the base product has dimensions, every generated variant takes a snapshot of them and can be edited on its own."
@@ -665,7 +684,7 @@ export default function AddProductClient() {
             </SectionCard>
 
             <SectionCard
-              step="6"
+              step="7"
               eyebrow="Money & visibility"
               title="Delivery and status"
             >
@@ -716,7 +735,7 @@ export default function AddProductClient() {
             </SectionCard>
 
             <SectionCard
-              step="7"
+              step="8"
               eyebrow="Showcase"
               title="Where this product is featured"
               hint="Both are optional. They decide whether this product is pushed forward on the website."
@@ -752,7 +771,8 @@ export default function AddProductClient() {
                   {selectedCategoryIds.length} categor
                   {selectedCategoryIds.length === 1 ? "y" : "ies"} ·{" "}
                   {includedOptions.length} option
-                  {includedOptions.length === 1 ? "" : "s"} · {form.status}
+                  {includedOptions.length === 1 ? "" : "s"} · {selectedTags.length}{" "}
+                  tag{selectedTags.length === 1 ? "" : "s"} · {form.status}
                 </p>
 
                 <div className="flex items-center gap-2">

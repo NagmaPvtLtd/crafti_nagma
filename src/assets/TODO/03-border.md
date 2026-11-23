@@ -1,1 +1,0 @@
-1. also use `border border-rose-100` inside src\app\(components)\Pages\CollectionProduct.tsx because why would you use border-white/60 ?? when the div itself is white? it shows no value in the project, in such div replace border-white/60 with border-rose-100 so it actually shows that this is the border.

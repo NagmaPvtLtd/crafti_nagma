@@ -22,6 +22,14 @@ import { generateULID } from "../../../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../../../services/AuditLog.service";
 import { ImageKitService } from "../../../../../../../services/Imagekit.service";
 import { capitalizeFirst } from "../../../../../../../utils/Formator/capitalize.util";
+import {
+  loadProductTags,
+  loadTagsByIds,
+  loadVariantTags,
+  pruneUnusedTags,
+  replaceTagMappings,
+  uniqueTagIds,
+} from "../../../../../../../utils/Tags/tag.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -285,10 +293,13 @@ async function unlinkAndHideEmptyVariants(
  *   - variant: `id`, `productId`, `productName`, `productCode`, `name`, `briefDescription`,
  *              `description`, `sku`, `price`, `compareAtPrice`, `stock`, `weight`, `status`,
  *              `isFeatured`, `mainShowcase`, `ordersCount`, `orderStats`, `createdAt`, `updatedAt`
+ *   - tags: `{ inherited, additional }` — the base product's tags and this variant's own tags,
+ *           each `{ id, name, slug }` in name order
  *   - optionValues: `{ option, value }` pairs
  *   - media: media items with `isLinked`, `sourceImageId`, `ownerVariantName`, `ownerSku` and
  *            `linkedVariantCount`
- *   - baseProduct: `name`, `briefDescription`, `description`
+ *   - baseProduct: `name`, `briefDescription`, `description`, `dimensions`, `features`,
+ *                  `careInstructions` and `tags`
  *
  * @throws {400} "Invalid product reference" or "Invalid variant reference"
  * @throws {401} Unauthorized - No session
@@ -409,6 +420,11 @@ export async function GET(
     );
     const baseDimensions = baseDimensionRows[0];
 
+    /* Inherited tags come from the base product; additional tags are this
+       variant's own mappings. They are never merged in the database. */
+    const inheritedTags = await loadProductTags(conn, productId);
+    const additionalTags = await loadVariantTags(conn, variantId);
+
     const payload: VariantDetailResponse = {
       ok: true,
       variant: {
@@ -428,11 +444,9 @@ export async function GET(
         stock: Number(variant.stock ?? 0),
         weight: variant.weight === null ? null : Number(variant.weight),
         dimensions: {
-          length:
-            variant.length === null ? null : Number(variant.length),
+          length: variant.length === null ? null : Number(variant.length),
           width: variant.width === null ? null : Number(variant.width),
-          height:
-            variant.height === null ? null : Number(variant.height),
+          height: variant.height === null ? null : Number(variant.height),
           dimensionUnit: variant.dimension_unit ?? null,
         },
         status: variant.status,
@@ -446,6 +460,10 @@ export async function GET(
         },
         createdAt: variant.created_at,
         updatedAt: variant.updated_at,
+      },
+      tags: {
+        inherited: inheritedTags,
+        additional: additionalTags,
       },
       optionValues: optionValueRows.map((row) => ({
         option: row.option_name,
@@ -473,7 +491,8 @@ export async function GET(
               ? null
               : Number(baseDimensions.length),
           width:
-            baseDimensions?.width === null || baseDimensions?.width === undefined
+            baseDimensions?.width === null ||
+            baseDimensions?.width === undefined
               ? null
               : Number(baseDimensions.width),
           height:
@@ -485,6 +504,7 @@ export async function GET(
         },
         features: baseFeatureRows.map((row) => row.value),
         careInstructions: baseCareRows.map((row) => row.value),
+        tags: inheritedTags,
       },
     };
 
@@ -532,6 +552,8 @@ export async function GET(
  * @body {string} [status] - `active` or `inactive` (default: "active")
  * @body {boolean} [isFeatured] - Featured flag (default: false)
  * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
+ * @body {string[]} [tagIds] - Full replacement of the variant's own additional tags (max 15,
+ *                            10-40 chars each; inherited base tags are never written here)
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
@@ -624,6 +646,21 @@ export async function PUT(
     const variant = await loadVariant(conn, productId, variantId);
     if (!variant) {
       return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+    }
+
+    /* Variant-specific tags are a full replacement of this variant's own
+       mappings; inherited base tags are never written here. */
+    let tagIds: string[] | null = null;
+    if (data.tagIds) {
+      tagIds = uniqueTagIds(data.tagIds);
+      if (tagIds.length > 0) {
+        const tags = await loadTagsByIds(conn, tagIds);
+        if (tags.size !== tagIds.length) {
+          return invalidInput({
+            tagIds: ["One or more tags no longer exist"],
+          });
+        }
+      }
     }
 
     const now = getCurrentDateTime();
@@ -847,6 +884,17 @@ export async function PUT(
         }
       }
 
+      if (tagIds) {
+        await replaceTagMappings(
+          conn,
+          "product_variant_tag_mappings",
+          "variant_id",
+          variantId,
+          tagIds,
+          now,
+        );
+      }
+
       await conn.query(
         `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,
         [managerId, now, productId],
@@ -856,6 +904,10 @@ export async function PUT(
     } catch (err) {
       await conn.rollback().catch(() => {});
       throw err;
+    }
+
+    if (tagIds) {
+      await pruneUnusedTags(pool).catch(() => {});
     }
 
     try {

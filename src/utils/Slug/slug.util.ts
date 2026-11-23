@@ -23,6 +23,7 @@ export const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const SLUG_SOURCES = {
   categories: { table: "categories", column: "slug", maxLength: 120 },
   products: { table: "products", column: "slug", maxLength: 255 },
+  global_tags: { table: "global_tags", column: "slug", maxLength: 120 },
 } as const;
 
 export type SlugSource = keyof typeof SLUG_SOURCES;

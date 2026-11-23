@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
+import useEmblaCarousel from "embla-carousel-react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -13,8 +15,10 @@ import {
   Heart,
   Maximize2,
   Flower2,
-  Package,
+  Minus,
+  Plus,
   Share2,
+  ShoppingBag,
   Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -23,6 +27,8 @@ import CustomLoader from "../CustomLoader";
 import PhotoViewer from "../utils/PhotoViewer";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider } from "../utils/SectionDiv";
+import { WhatsAppIcon } from "../utils/SocialIcons";
+import { whatsappNumberLink } from "../../../utils/main.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type {
   CollectionOption,
@@ -88,7 +94,7 @@ function DetailList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+    <div className="rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
       <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
         {title}
       </h2>
@@ -174,6 +180,8 @@ export default function CollectionProduct({ code }: { code: string }) {
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [bulkNotice, setBulkNotice] = useState(false);
 
   /** `code|sku` already on screen — keeps the URL normalisation from refetching. */
   const loadedKeyRef = useRef<string | null>(null);
@@ -268,6 +276,44 @@ export default function CollectionProduct({ code }: { code: string }) {
     if (variant && variant.images.length > 0) return variant.images;
     return product.images;
   }, [product, variant]);
+
+  /* Main slider + its thumbnail strip, both Embla. Dragging the main slider
+     updates the active thumbnail; tapping a thumbnail scrolls the main one. */
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: gallery.length > 1,
+    align: "start",
+  });
+  const [thumbsRef, thumbsApi] = useEmblaCarousel({
+    containScroll: "keepSnaps",
+    dragFree: true,
+    align: "start",
+  });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    const onSelect = () => {
+      const next = emblaApi.selectedScrollSnap();
+      setImageIndex(next);
+      thumbsApi?.scrollTo(next);
+    };
+
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, thumbsApi]);
+
+  /* The gallery is replaced when the variant changes, so re-measure and go
+     back to the first photo. */
+  useEffect(() => {
+    const reset = () => {
+      emblaApi?.reInit();
+      thumbsApi?.reInit();
+      emblaApi?.scrollTo(0, true);
+    };
+    reset();
+  }, [gallery, emblaApi, thumbsApi]);
 
   const activeImage = gallery[imageIndex] ?? gallery[0] ?? null;
 
@@ -385,6 +431,31 @@ export default function CollectionProduct({ code }: { code: string }) {
       ? Math.round((1 - price / compareAt) * 100)
       : null;
 
+  const displayName = variant?.name?.trim() || product?.name || code;
+
+  const whatsappMessage = `Hello, crafti nagma. I am interest in this product of yours!
+
+Product Name: ${displayName}
+Product ID: ${variant?.sku ?? product?.code ?? code}`;
+
+  const whatsappUrl = `${whatsappNumberLink}?text=${encodeURIComponent(
+    whatsappMessage,
+  )}`;
+
+  /** Quantity is capped at 99; past that the shopper sees a bulk-order note. */
+  function changeQuantity(delta: -1 | 1) {
+    setQuantity((current) => {
+      const next = current + delta;
+      if (next > 99) {
+        setBulkNotice(true);
+        return 99;
+      }
+      if (next < 1) return 1;
+      if (next < 99) setBulkNotice(false);
+      return next;
+    });
+  }
+
   return (
     <PageWrapper variant="hero" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
@@ -419,9 +490,7 @@ export default function CollectionProduct({ code }: { code: string }) {
             </>
           )}
           <ChevronRight className="h-3 w-3 text-stone-300" />
-          <span className="font-semibold text-stone-700">
-            {product?.name ?? code}
-          </span>
+          <span className="font-semibold text-stone-700">{displayName}</span>
         </nav>
         <SectionDivider className="my-6" size={11} />
 
@@ -449,27 +518,43 @@ export default function CollectionProduct({ code }: { code: string }) {
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               {/* ---------------- Gallery — selected variant's photos ---------------- */}
               <div>
-                <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden rounded-2xl border border-white/60 bg-linear-to-br from-rose-100 via-rose-50 to-amber-50 sm:rounded-3xl">
-                  {activeImage ? (
-                    <button
-                      type="button"
-                      onClick={() => setViewerOpen(true)}
-                      aria-label="View photo full screen"
-                      className="h-full w-full cursor-zoom-in"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={activeImage.url}
-                        alt={activeImage.altText ?? product.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
+                <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-linear-to-br from-rose-100 via-rose-50 to-amber-50 sm:rounded-3xl">
+                  {gallery.length === 0 ? (
+                    <div className="flex aspect-4/3 items-center justify-center">
+                      <Flower2 className="h-14 w-14 text-rose-300" />
+                    </div>
                   ) : (
-                    <Flower2 className="h-14 w-14 text-rose-300" />
+                    <div className="overflow-hidden" ref={emblaRef}>
+                      <div className="flex touch-pan-y select-none">
+                        {gallery.map((image, index) => (
+                          <div
+                            key={image.id}
+                            className="relative aspect-4/3 min-w-0 shrink-0 grow-0 basis-full"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setViewerOpen(true)}
+                              aria-label={`View photo ${index + 1} full screen`}
+                              className="absolute inset-0 cursor-zoom-in"
+                            >
+                              <Image
+                                src={image.url}
+                                alt={image.altText ?? product.name}
+                                fill
+                                sizes="(max-width: 1024px) 100vw, 50vw"
+                                className="object-cover"
+                                draggable={false}
+                                priority={index === 0}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {discount !== null && (
-                    <span className="absolute top-3 left-3 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="absolute top-3 left-3 z-10 rounded-full bg-stone-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
                       {discount}% off
                     </span>
                   )}
@@ -479,7 +564,7 @@ export default function CollectionProduct({ code }: { code: string }) {
                       type="button"
                       onClick={() => setViewerOpen(true)}
                       aria-label="View photo full screen"
-                      className="absolute top-3 right-3 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
+                      className="absolute top-3 right-3 z-10 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md ring-1 ring-stone-200/60 transition-colors hover:bg-white"
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
                     </button>
@@ -490,27 +575,20 @@ export default function CollectionProduct({ code }: { code: string }) {
                       <button
                         type="button"
                         aria-label="Previous image"
-                        onClick={() =>
-                          setImageIndex(
-                            (index) =>
-                              (index - 1 + gallery.length) % gallery.length,
-                          )
-                        }
-                        className="absolute top-1/2 left-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                        onClick={() => emblaApi?.scrollPrev()}
+                        className="absolute top-1/2 left-2 z-10 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         aria-label="Next image"
-                        onClick={() =>
-                          setImageIndex((index) => (index + 1) % gallery.length)
-                        }
-                        className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
+                        onClick={() => emblaApi?.scrollNext()}
+                        className="absolute top-1/2 right-2 z-10 -translate-y-1/2 cursor-pointer rounded-full bg-white/90 p-1.5 text-stone-700 shadow-md transition-colors hover:bg-white"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
-                      <span className="absolute right-2 bottom-2 rounded-full bg-stone-900/70 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <span className="absolute right-2 bottom-2 z-10 rounded-full bg-stone-900/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                         {imageIndex + 1} / {gallery.length}
                       </span>
                     </>
@@ -518,28 +596,34 @@ export default function CollectionProduct({ code }: { code: string }) {
                 </div>
 
                 {gallery.length > 1 && (
-                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                    {gallery.map((image, index) => (
-                      <button
-                        key={image.id}
-                        type="button"
-                        onClick={() => setImageIndex(index)}
-                        aria-label={`Show photo ${index + 1}`}
-                        className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
-                          index === imageIndex
-                            ? "border-rose-400"
-                            : "border-transparent hover:border-rose-200"
-                        }`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={image.url}
-                          alt={image.altText ?? product.name}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                    ))}
+                  <div className="mt-2 overflow-hidden" ref={thumbsRef}>
+                    <div className="flex touch-pan-y gap-2 pb-1">
+                      {gallery.map((image, index) => (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => {
+                            emblaApi?.scrollTo(index);
+                            thumbsApi?.scrollTo(index);
+                          }}
+                          aria-label={`Show photo ${index + 1}`}
+                          aria-pressed={index === imageIndex}
+                          className={`relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-colors ${
+                            index === imageIndex
+                              ? "border-rose-400"
+                              : "border-transparent hover:border-rose-200"
+                          }`}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={image.altText ?? product.name}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -547,13 +631,13 @@ export default function CollectionProduct({ code }: { code: string }) {
               {/* ---------------- Details ---------------- */}
               <div
                 aria-busy={switching}
-                className={`rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm transition-opacity sm:rounded-3xl ${
+                className={`rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm transition-opacity sm:rounded-3xl ${
                   switching ? "opacity-70" : ""
                 }`}
               >
                 <div className="mt-2 flex items-start justify-between gap-3">
                   <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                    {product.name}
+                    {displayName}
                   </h1>
 
                   <div className="flex shrink-0 items-center gap-1.5">
@@ -568,9 +652,7 @@ export default function CollectionProduct({ code }: { code: string }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        toast("Wishlist feature coming soon")
-                      }
+                      onClick={() => toast("Wishlist feature coming soon")}
                       aria-label="Add to wishlist"
                       title="Add to wishlist"
                       className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600"
@@ -690,17 +772,58 @@ export default function CollectionProduct({ code }: { code: string }) {
                   </div>
                 )}
 
-                <div className="mt-4">
-                  {variant?.name && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
-                        You are currently viewing:
-                      </p>
-                      <span className="inline-flex items-center gap-1.5 rounded-xl w-full border border-stone-100 bg-stone-50 px-3 py-2 text-[11px] text-stone-600">
-                        <Package className="h-3.5 w-3.5 text-rose-400" />
-                        {variant.name}
+                <div className="mt-4 border-t border-stone-100 pt-4">
+                  <div className="flex items-stretch gap-2">
+                    <div className="inline-flex shrink-0 items-center rounded-xl border border-stone-200 bg-white">
+                      <button
+                        type="button"
+                        onClick={() => changeQuantity(-1)}
+                        disabled={quantity <= 1}
+                        aria-label="Decrease quantity"
+                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="inline-flex h-10 w-9 items-center justify-center border-x border-stone-100 text-sm font-semibold tabular-nums text-stone-900">
+                        {quantity}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => changeQuantity(1)}
+                        aria-label="Increase quantity"
+                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => toast("Add to Cart is coming soon")}
+                      className="inline-flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
+                    >
+                      <ShoppingBag className="h-4 w-4 shrink-0" />
+                      <span className="truncate">Add to Cart</span>
+                    </button>
+
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Ask about this product on WhatsApp"
+                      title="Ask about this product on WhatsApp"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-stretch rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 transition-colors hover:border-emerald-300 hover:bg-emerald-100"
+                    >
+                      <WhatsAppIcon className="h-4 w-4" />
+                    </a>
+                  </div>
+
+                  {bulkNotice && (
+                    <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      Bulk orders above 99 pieces are subject to terms and
+                      conditions and take longer to deliver.
+                    </p>
                   )}
                 </div>
               </div>
@@ -709,7 +832,7 @@ export default function CollectionProduct({ code }: { code: string }) {
             {(description || variant) && (
               <>
                 <SectionDivider className="mx-auto max-w-7xl py-8" />
-                <div className="rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+                <div className="rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
                       Product Description
@@ -764,7 +887,7 @@ export default function CollectionProduct({ code }: { code: string }) {
             )}
 
             {/* ---------------- Specifications ---------------- */}
-            <div className="mt-3 rounded-2xl border border-white/60 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
+            <div className="mt-3 rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
               <h2 className="text-lg font-semibold tracking-tight text-stone-900 sm:text-xl">
                 Specifications
               </h2>
@@ -844,7 +967,7 @@ export default function CollectionProduct({ code }: { code: string }) {
               </div>
             </section>
 
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-rose-100 bg-white/80 px-4 py-3 text-[11px] text-stone-500 backdrop-blur-sm">
               <Link
                 href={
                   product.category
@@ -871,7 +994,10 @@ export default function CollectionProduct({ code }: { code: string }) {
           onClose={() => setViewerOpen(false)}
           images={gallery}
           index={imageIndex}
-          onIndexChange={setImageIndex}
+          onIndexChange={(next) => {
+            setImageIndex(next);
+            emblaApi?.scrollTo(next);
+          }}
           title={product?.name}
         />
       </div>

@@ -13,6 +13,12 @@ import { auditLog } from "../../../../services/AuditLog.service";
 import { baseProductCreateSchema } from "../../../../utils/zod/product/manager.product.zod";
 import { buildUniqueSlug, slugify } from "../../../../utils/Slug/slug.util";
 import { buildProductCode } from "../../../../utils/Formator/productIdentity.util";
+import {
+  loadTagsByIds,
+  pruneUnusedTags,
+  replaceTagMappings,
+  uniqueTagIds,
+} from "../../../../utils/Tags/tag.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types — must extend RowDataPacket for mysql2's generic query()        */
@@ -95,6 +101,8 @@ export async function GET() {
  * @body {string} options[].optionId - Global option id (10-40 chars)
  * @body {string[]} options[].valueIds - Selected value ids for that option (at least one,
  *                                      10-40 chars each)
+ * @body {string[]} [tagIds] - Existing `global_tags` ids to attach to the base product
+ *                            (max 15, 10-40 chars each, default: [])
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
@@ -164,6 +172,7 @@ export async function POST(req: NextRequest) {
     }),
   );
   const optionIds = optionRequests.map((o) => o.optionId);
+  const tagIds = uniqueTagIds(data.tagIds ?? []);
 
   const pool = await getPool();
   const conn = await pool.getConnection();
@@ -210,6 +219,17 @@ export async function POST(req: NextRequest) {
             options: ["A selected value does not belong to its option"],
           });
         }
+      }
+    }
+
+    /* ---- every requested tag must exist ---- */
+    if (tagIds.length > 0) {
+      const tags = await loadTagsByIds(conn, tagIds);
+      if (tags.size !== tagIds.length) {
+        await conn.rollback();
+        return invalidInput({
+          tagIds: ["One or more tags no longer exist"],
+        });
       }
     }
 
@@ -313,7 +333,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    /* ---- base product tags (inherited by every variant) ---- */
+    await replaceTagMappings(
+      conn,
+      "product_tag_mappings",
+      "product_id",
+      productId,
+      tagIds,
+      now,
+    );
+
     await conn.commit();
+
+    /* Tags left unused by this edit are removed in the same operation. */
+    await pruneUnusedTags(pool).catch(() => {});
 
     try {
       await auditLog.log(pool, {
@@ -321,7 +354,7 @@ export async function POST(req: NextRequest) {
         action: "CREATE",
         entityType: "PRODUCT",
         entityId: productId,
-        description: `Base product created. [id=${productId}, code=${code}, name=${data.name}, categories=${categoryIds.length}, options=${optionRequests.length}]`,
+        description: `Base product created. [id=${productId}, code=${code}, name=${data.name}, categories=${categoryIds.length}, options=${optionRequests.length}, tags=${tagIds.length}]`,
       });
     } catch {
       /* audit must never break the response */

@@ -93,9 +93,7 @@ export const optionalDimension = z
 export const optionalDimensionUnit = z
   .union([z.literal(""), z.null(), z.enum(["cm", "in"])])
   .optional()
-  .transform((v) =>
-    v === "" || v === undefined || v === null ? null : v,
-  );
+  .transform((v) => (v === "" || v === undefined || v === null ? null : v));
 
 export const dimensionFields = {
   length: optionalDimension,
@@ -119,41 +117,53 @@ export const requireUnitWithDimensions = (data: {
  * variants inherit. At least one category and one option (with at least one
  * value) are required so the base is always usable.
  */
-export const baseProductCreateSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(255),
+export const baseProductCreateSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters")
+      .max(255),
 
-  briefDescription: optionalText(500),
-  description: optionalText(20000),
+    briefDescription: optionalText(500),
+    description: optionalText(20000),
 
-  metaTitle: optionalText(255),
-  metaDescription: optionalText(500),
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
 
-  deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
+    deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
 
-  isFeatured: z.boolean().default(false),
-  mainShowcase: z.boolean().default(false),
+    isFeatured: z.boolean().default(false),
+    mainShowcase: z.boolean().default(false),
 
-  status: z.enum(["active", "inactive"]).default("active"),
+    status: z.enum(["active", "inactive"]).default("active"),
 
-  categoryIds: z
-    .array(z.string().trim().min(10).max(40))
-    .min(1, "Pick at least one category"),
+    categoryIds: z
+      .array(z.string().trim().min(10).max(40))
+      .min(1, "Pick at least one category"),
 
-  ...dimensionFields,
+    ...dimensionFields,
 
-  options: z
-    .array(
-      z.object({
-        optionId: z.string().trim().min(10).max(40),
-        valueIds: z
-          .array(z.string().trim().min(10).max(40))
-          .min(1, "Pick at least one value for this option"),
-      }),
-    )
-    .min(1, "Pick at least one option"),
-}).refine(requireUnitWithDimensions, {
-  message: "Pick a unit (cm or in) when a dimension is filled in",
-  path: ["dimensionUnit"],
-});
+    options: z
+      .array(
+        z.object({
+          optionId: z.string().trim().min(10).max(40),
+          valueIds: z
+            .array(z.string().trim().min(10).max(40))
+            .min(1, "Pick at least one value for this option"),
+        }),
+      )
+      .min(1, "Pick at least one option"),
+
+    /** Optional tags — inherited automatically by every variant. */
+    tagIds: z
+      .array(z.string().trim().min(10).max(40))
+      .max(15, "A product can carry at most 15 tags")
+      .default([]),
+  })
+  .refine(requireUnitWithDimensions, {
+    message: "Pick a unit (cm or in) when a dimension is filled in",
+    path: ["dimensionUnit"],
+  });
 
 export type BaseProductCreateInput = z.infer<typeof baseProductCreateSchema>;

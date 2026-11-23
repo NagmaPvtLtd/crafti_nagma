@@ -108,6 +108,13 @@ const GLOBAL_ITEMS: MenuItem[] = [
         ? `${d.counts.options.total} option${d.counts.options.total === 1 ? "" : "s"}`
         : null,
   },
+  {
+    title: "Global Tags",
+    description:
+      "One reusable tag master for search — rename or clean up tags in one place.",
+    href: "/manager/product-studio/tags",
+    icon: <Tag className="h-5 w-5" />,
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -144,61 +151,65 @@ export default function ProductManagerHubClient() {
   return (
     <PageWrapper variant="content" position="fixed">
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <SectionEyebrow>Manager</SectionEyebrow>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                  Product Studio
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Everything you need to build, arrange, and maintain the
-                  catalogue — products, variants, media, and curation.
-                </p>
-              </div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <SectionEyebrow>Manager</SectionEyebrow>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+              Product Studio
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
+              Everything you need to build, arrange, and maintain the catalogue
+              — products, variants, media, and curation.
+            </p>
+          </div>
 
-              <button
-                onClick={() => void load()}
-                disabled={loading}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            </div>
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
 
         <SectionDivider className="my-6" size={11} />
 
-            {loading && !data && <HubSkeleton />}
+        {loading && !data && <HubSkeleton />}
 
-            {error && !loading && (
-              <ErrorState title="Couldn't load the product overview" message={error} onRetry={() => void load()} />
-            )}
+        {error && !loading && (
+          <ErrorState
+            title="Couldn't load the product overview"
+            message={error}
+            onRetry={() => void load()}
+          />
+        )}
 
-            {data && !error && (
-              <div className="space-y-8">
-                <SnapshotStrip data={data} />
+        {data && !error && (
+          <div className="space-y-8">
+            <SnapshotStrip data={data} />
 
-                <MenuSection
-                  eyebrow="Build & maintain"
-                  title="Manage products"
-                  subtitle="The day-to-day work of keeping the catalogue healthy."
-                  items={MANAGE_ITEMS}
-                  data={data}
-                />
+            <MenuSection
+              eyebrow="Build & maintain"
+              title="Manage products"
+              subtitle="The day-to-day work of keeping the catalogue healthy."
+              items={MANAGE_ITEMS}
+              data={data}
+            />
 
-                <MenuSection
-                  eyebrow="Shape the catalogue"
-                  title="Organise & curate"
-                  subtitle="The shared pools every product draws from — categories and options."
-                  items={GLOBAL_ITEMS}
-                  data={data}
-                />
+            <MenuSection
+              eyebrow="Shape the catalogue"
+              title="Organise & curate"
+              subtitle="The shared pools every product draws from — categories and options."
+              items={GLOBAL_ITEMS}
+              data={data}
+            />
 
-                <RecentlyUpdated items={data.recentlyUpdated} />
-              </div>
-            )}
+            <RecentlyUpdated items={data.recentlyUpdated} />
+          </div>
+        )}
       </div>
     </PageWrapper>
   );
@@ -429,4 +440,3 @@ function HubSkeleton() {
     </div>
   );
 }
-

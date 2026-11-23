@@ -36,66 +36,78 @@ const price = z.coerce.number().min(0).max(10_000_000);
  * keep working. `code` may be edited, but the route refuses one that is
  * already taken by another product.
  */
-export const productBaseUpdateSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(255),
+export const productBaseUpdateSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters")
+      .max(255),
 
-  /** Omit to leave the stored code untouched. */
-  code: z
-    .string()
-    .trim()
-    .min(2, "Code must be at least 2 characters")
-    .max(50, "Code must be at most 50 characters")
-    .regex(
-      /^[A-Z0-9-_]+$/,
-      "Use uppercase letters, digits, dash or underscore",
-    )
-    .optional(),
+    /** Omit to leave the stored code untouched. */
+    code: z
+      .string()
+      .trim()
+      .min(2, "Code must be at least 2 characters")
+      .max(50, "Code must be at most 50 characters")
+      .regex(
+        /^[A-Z0-9-_]+$/,
+        "Use uppercase letters, digits, dash or underscore",
+      )
+      .optional(),
 
-  briefDescription: optionalText(500),
-  description: optionalText(20000),
+    briefDescription: optionalText(500),
+    description: optionalText(20000),
 
-  metaTitle: optionalText(255),
-  metaDescription: optionalText(500),
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
 
-  deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
-  processingTime: optionalText(100),
+    deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
+    processingTime: optionalText(100),
 
-  isFeatured: z.boolean().default(false),
-  mainShowcase: z.boolean().default(false),
+    isFeatured: z.boolean().default(false),
+    mainShowcase: z.boolean().default(false),
 
-  status: z.enum(["active", "inactive"]).default("active"),
+    status: z.enum(["active", "inactive"]).default("active"),
 
-  /** When present the category set is replaced; omit to leave it untouched. */
-  categoryIds: z.array(id).optional(),
+    /** When present the category set is replaced; omit to leave it untouched. */
+    categoryIds: z.array(id).optional(),
 
-  /** Full replacement of the feature bullets; omit to leave them untouched. */
-  features: z.array(z.string().trim().min(1).max(255)).optional(),
+    /** Full replacement of the feature bullets; omit to leave them untouched. */
+    features: z.array(z.string().trim().min(1).max(255)).optional(),
 
-  /** Full replacement of the care instructions; omit to leave them untouched. */
-  careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
+    /** Full replacement of the care instructions; omit to leave them untouched. */
+    careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
 
-  ...dimensionFields,
+    /** Full replacement of the base product's tags; omit to leave them untouched. */
+    tagIds: z
+      .array(z.string().trim().min(10).max(40))
+      .max(15, "A product can carry at most 15 tags")
+      .optional(),
 
-  /**
-   * Full replacement of the product's options and their values. Omit to leave
-   * them untouched; removing a value removes the variants that use it (or
-   * disables them when they already have orders).
-   */
-  options: z
-    .array(
-      z.object({
-        optionId: z.string().trim().min(10).max(40),
-        valueIds: z
-          .array(z.string().trim().min(10).max(40))
-          .min(1, "Pick at least one value for this option"),
-      }),
-    )
-    .min(1, "Pick at least one option")
-    .optional(),
-}).refine(requireUnitWithDimensions, {
-  message: "Pick a unit (cm or in) when a dimension is filled in",
-  path: ["dimensionUnit"],
-});
+    ...dimensionFields,
+
+    /**
+     * Full replacement of the product's options and their values. Omit to leave
+     * them untouched; removing a value removes the variants that use it (or
+     * disables them when they already have orders).
+     */
+    options: z
+      .array(
+        z.object({
+          optionId: z.string().trim().min(10).max(40),
+          valueIds: z
+            .array(z.string().trim().min(10).max(40))
+            .min(1, "Pick at least one value for this option"),
+        }),
+      )
+      .min(1, "Pick at least one option")
+      .optional(),
+  })
+  .refine(requireUnitWithDimensions, {
+    message: "Pick a unit (cm or in) when a dimension is filled in",
+    path: ["dimensionUnit"],
+  });
 
 export type ProductBaseUpdateInput = z.infer<typeof productBaseUpdateSchema>;
 
@@ -136,31 +148,43 @@ export const VARIANT_ACTIVATION_RULES = {
   description: 20,
 } as const;
 
-export const variantUpdateSchema = z.object({
-  name: optionalText(150),
-  briefDescription: optionalText(500),
-  description: optionalText(500),
+export const variantUpdateSchema = z
+  .object({
+    name: optionalText(150),
+    briefDescription: optionalText(500),
+    description: optionalText(500),
 
-  price,
-  compareAtPrice: price.nullish(),
-  stock: z.coerce.number().int().min(0).max(100_000),
-  weight: z.coerce.number().min(0).max(100_000).nullish(),
+    price,
+    compareAtPrice: price.nullish(),
+    stock: z.coerce.number().int().min(0).max(100_000),
+    weight: z.coerce.number().min(0).max(100_000).nullish(),
 
-  status: z.enum(["active", "inactive"]).default("active"),
-  isFeatured: z.boolean().default(false),
-  mainShowcase: z.boolean().default(false),
+    status: z.enum(["active", "inactive"]).default("active"),
+    isFeatured: z.boolean().default(false),
+    mainShowcase: z.boolean().default(false),
 
-  ...dimensionFields,
+    ...dimensionFields,
 
-  /** Full replacement of the variant's own feature bullets; omit to leave them. */
-  features: z.array(z.string().trim().min(1).max(255)).optional(),
+    /** Full replacement of the variant's own feature bullets; omit to leave them. */
+    features: z.array(z.string().trim().min(1).max(255)).optional(),
 
-  /** Full replacement of the variant's own care instructions; omit to leave them. */
-  careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
-}).refine(requireUnitWithDimensions, {
-  message: "Pick a unit (cm or in) when a dimension is filled in",
-  path: ["dimensionUnit"],
-});
+    /** Full replacement of the variant's own care instructions; omit to leave them. */
+    careInstructions: z.array(z.string().trim().min(1).max(255)).optional(),
+
+    /**
+     * Full replacement of the variant's own (additional) tags; omit to leave
+     * them. Inherited base-product tags live in their own mapping table and are
+     * never written here.
+     */
+    tagIds: z
+      .array(z.string().trim().min(10).max(40))
+      .max(15, "A variant can carry at most 15 additional tags")
+      .optional(),
+  })
+  .refine(requireUnitWithDimensions, {
+    message: "Pick a unit (cm or in) when a dimension is filled in",
+    path: ["dimensionUnit"],
+  });
 
 export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
 
@@ -344,6 +368,8 @@ export interface ProductDetail {
 export interface ProductDetailResponse {
   ok: true;
   product: ProductDetail;
+  /** Base product tags — inherited by every variant. */
+  tags: ProductTagRef[];
   features: ProductLineItem[];
   careInstructions: ProductLineItem[];
   categories: ProductCategoryRef[];
@@ -388,6 +414,11 @@ export interface VariantDetail {
 export interface VariantDetailResponse {
   ok: true;
   variant: VariantDetail;
+  /** Inherited base tags and the variant's own additional tags. */
+  tags: {
+    inherited: ProductTagRef[];
+    additional: ProductTagRef[];
+  };
   optionValues: { option: string; value: string }[];
   media: ProductMediaItem[];
   /** This variant's own snapshot of the base product's lists. */
@@ -401,5 +432,12 @@ export interface VariantDetailResponse {
     dimensions: ProductDimensions;
     features: string[];
     careInstructions: string[];
+    tags: ProductTagRef[];
   };
+}
+
+export interface ProductTagRef {
+  id: string;
+  name: string;
+  slug: string;
 }

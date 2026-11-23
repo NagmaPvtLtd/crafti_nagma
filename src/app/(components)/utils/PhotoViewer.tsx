@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import Image from "next/image";
+
+import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
+import { X } from "lucide-react";
 
 export type PhotoViewerImage = {
   id: string;
@@ -21,9 +24,11 @@ type Props = {
 };
 
 /**
- * Full-screen photo viewer on a white canvas. Left/right arrows and a
- * thumbnail strip for desktop, swipe for touch, arrow keys and Esc on a
- * keyboard. Rendered through a portal so fixed page chrome cannot cover it.
+ * Full-screen photo viewer on a white canvas, driven by an Embla carousel:
+ * swipe or drag to change photos (no arrow buttons), click a thumbnail to jump,
+ * arrow keys and Esc on a keyboard. Rendered through a portal so fixed page
+ * chrome cannot cover it. The `index` prop stays the single source of truth, so
+ * closing returns to the photo the page was on.
  */
 export default function PhotoViewer({
   open,
@@ -33,20 +38,91 @@ export default function PhotoViewer({
   onIndexChange,
   title,
 }: Props) {
-  const touchX = useRef<number | null>(null);
-
   const total = images.length;
   const safeIndex = total === 0 ? 0 : Math.min(Math.max(index, 0), total - 1);
-  const active = images[safeIndex];
+
+  /* `duration` is Embla's snap transition in frames-ish units (default 25).
+     A longer tween plus a lower drag threshold makes the full-screen swipe feel
+     like a smooth glide instead of a hard snap. */
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: total > 1,
+    startIndex: safeIndex,
+    align: "start",
+    duration: 45,
+    dragThreshold: 6,
+    skipSnaps: false,
+    containScroll: false,
+  });
+
+  const scrollTo = useCallback(
+    (target: number) => {
+      if (emblaApi) emblaApi.scrollTo(target);
+      onIndexChange(target);
+    },
+    [emblaApi, onIndexChange],
+  );
+
+  const step = useCallback(
+    (delta: number) => {
+      if (total < 2) return;
+      if (emblaApi) {
+        if (delta < 0) emblaApi.scrollPrev();
+        else emblaApi.scrollNext();
+        return;
+      }
+      onIndexChange((safeIndex + delta + total) % total);
+    },
+    [emblaApi, onIndexChange, safeIndex, total],
+  );
+
+  /* The page's index (a thumbnail, an external update) drives the carousel. */
+  useEffect(() => {
+    if (!emblaApi) return;
+    const sync = () => {
+      if (emblaApi.selectedScrollSnap() !== safeIndex) {
+        emblaApi.scrollTo(safeIndex);
+      }
+    };
+    sync();
+  }, [emblaApi, safeIndex]);
+
+  /* Dragging the carousel drives the page's index. */
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => onIndexChange(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onIndexChange]);
+
+  /* Re-measure the loop whenever the photo set changes (e.g. new variant),
+     landing on the photo the page asked for. The ref keeps this effect from
+     re-running on every slide change. */
+  const safeIndexRef = useRef(safeIndex);
+  useEffect(() => {
+    const remember = () => {
+      safeIndexRef.current = safeIndex;
+    };
+    remember();
+  }, [safeIndex]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const remeasure = () => {
+      emblaApi.reInit();
+      emblaApi.scrollTo(safeIndexRef.current, true);
+    };
+    remeasure();
+  }, [emblaApi, total]);
 
   useEffect(() => {
     if (!open || total === 0) return;
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
-      else if (event.key === "ArrowLeft")
-        onIndexChange((safeIndex - 1 + total) % total);
-      else if (event.key === "ArrowRight") onIndexChange((safeIndex + 1) % total);
+      else if (event.key === "ArrowLeft") step(-1);
+      else if (event.key === "ArrowRight") step(1);
     }
 
     const previousOverflow = document.body.style.overflow;
@@ -57,14 +133,9 @@ export default function PhotoViewer({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, total, safeIndex, onClose, onIndexChange]);
+  }, [open, total, onClose, step]);
 
-  if (!open || !active || typeof document === "undefined") return null;
-
-  function step(delta: number) {
-    if (total < 2) return;
-    onIndexChange((safeIndex + delta + total) % total);
-  }
+  if (!open || total === 0 || typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -92,49 +163,29 @@ export default function PhotoViewer({
         </div>
       </div>
 
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center bg-white px-2 py-3 sm:px-20"
-        onTouchStart={(event) => {
-          touchX.current = event.touches[0]?.clientX ?? null;
-        }}
-        onTouchEnd={(event) => {
-          const start = touchX.current;
-          touchX.current = null;
-          if (start === null) return;
-          const end = event.changedTouches[0]?.clientX ?? start;
-          const delta = end - start;
-          if (Math.abs(delta) < 45) return;
-          step(delta > 0 ? -1 : 1);
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={active.url}
-          alt={active.altText || title || "Photo"}
-          draggable={false}
-          className="max-h-full max-w-full object-contain select-none"
-        />
+      <div className="relative min-h-0 flex-1 bg-white">
+        {/* Swipe or drag to change photos — the arrows were removed on purpose. */}
+        <div className="h-full cursor-grab overflow-hidden px-2 py-3 active:cursor-grabbing" ref={emblaRef}>
+          <div className="flex h-full touch-pan-y select-none">
+            {images.map((image) => (
+              <div
+                key={image.id}
+                className="relative h-full min-w-0 shrink-0 grow-0 basis-full"
+              >
+                <Image
+                  src={image.url}
+                  alt={image.altText || title || "Photo"}
+                  fill
+                  draggable={false}
+                  sizes="100vw"
+                  className="object-contain"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
 
-        {total > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={() => step(-1)}
-              aria-label="Previous photo"
-              className="absolute top-1/2 left-1 z-10 inline-flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/95 text-stone-700 shadow-lg ring-1 ring-stone-200 transition-colors hover:bg-stone-50 sm:left-4 sm:h-12 sm:w-12"
-            >
-              <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
-            <button
-              type="button"
-              onClick={() => step(1)}
-              aria-label="Next photo"
-              className="absolute top-1/2 right-1 z-10 inline-flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/95 text-stone-700 shadow-lg ring-1 ring-stone-200 transition-colors hover:bg-stone-50 sm:right-4 sm:h-12 sm:w-12"
-            >
-              <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
-          </>
-        )}
+
       </div>
 
       {total > 1 && (
@@ -143,20 +194,21 @@ export default function PhotoViewer({
             <button
               key={image.id}
               type="button"
-              onClick={() => onIndexChange(i)}
+              onClick={() => scrollTo(i)}
               aria-label={`Show photo ${i + 1}`}
               aria-pressed={i === safeIndex}
-              className={`h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 transition-colors ${
+              className={`relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 transition-colors ${
                 i === safeIndex
                   ? "border-rose-400"
                   : "border-transparent hover:border-rose-200"
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={image.url}
                 alt={image.altText || title || "Photo"}
-                className="h-full w-full object-cover"
+                fill
+                sizes="48px"
+                className="object-cover"
               />
             </button>
           ))}

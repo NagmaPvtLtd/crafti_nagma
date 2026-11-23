@@ -15,11 +15,14 @@ product draws from, and the base-product form that turns them into a product.
 | `/manager/product-studio` | Hub — catalogue snapshot, section cards, recently updated products |
 | `/manager/product-studio/categories` | Global Categories — main categories and their sub categories |
 | `/manager/product-studio/options` | Global Options — option pools (Colour, Size, Material) and the values inside them |
+| `/manager/product-studio/tags` | Global Tags — the reusable tag master (search, rename, delete unused) |
 | `/manager/product-studio/products/new` | Add a product — create the **base** product |
 | `GET /api/manager/product-studio/overview` | Counts for the hub: products, variants, categories (`total`, `root`), options, recent products |
 | `GET/POST/PUT/DELETE /api/manager/product-studio/categories` | Read the category tree with totals; create, rename/move and delete |
 | `GET/POST/PUT/DELETE /api/manager/product-studio/options` | Read options with their values nested; create, rename and delete |
 | `POST/PUT/DELETE /api/manager/product-studio/options/values` | Add, rename and delete a value inside an option |
+| `GET/POST /api/manager/product-studio/tags` | List tags with usage counts (optional `?search=`), or create/reuse a tag |
+| `PUT/DELETE /api/manager/product-studio/tags/[tagId]` | Rename a tag (slug regenerated) or delete an unused one |
 | `POST /api/manager/product-studio` | Create a base product with its categories, options and values |
 | `POST /api/manager/product-studio/[id]/variants` | Generate variants — always created `inactive`, existing combinations are skipped |
 
@@ -59,6 +62,33 @@ Rules enforced in the APIs:
   are copied into `product_options`/`product_option_values` at creation time, but
   the ids still point at the global pool.
 - Audit entity types used here: `CATEGORY`, `OPTION`, `OPTION_VALUE`, `PRODUCT`.
+
+## Global tags
+
+- One reusable master: `global_tags(id, name UNIQUE, slug UNIQUE)`. A tag is
+  referenced, never copied — `product_tag_mappings` links base products and
+  `product_variant_tag_mappings` links variant-specific tags. Both cascade on
+  delete of the owner; the tag itself cascades out of the mappings.
+- **Effective variant tags = base product tags + variant-specific tags.**
+  Inherited tags are never inserted into the variant table and never
+  synchronised. A variant editor shows the inherited chips read-only.
+- Limits: 15 tags per base product, 15 additional tags per variant, 100
+  characters per tag. Enforced in zod (`tagIds` on the base-product create /
+  update schemas and on the variant update schema) and again by the routes.
+- Tag names are trimmed and whitespace-collapsed; the slug comes from the
+  shared slug helper (`SLUG_SOURCES.global_tags`), so renaming can never leave
+  a stale slug. A rename onto another tag's name answers 400 — tags are never
+  silently merged.
+- Creating a tag reuses an existing one with the same name (case-insensitive,
+  DB collation) instead of failing on a duplicate.
+- Deleting a tag is refused with 409 while any product or variant still uses
+  it; the message carries both counts.
+- After any product/variant tag edit, `pruneUnusedTags()` deletes global tags
+  that no longer have a single mapping (`src/utils/Tags/tag.util.ts`).
+- Admin UI: `TagInput` (`src/app/(components)/utils/TagInput.tsx`) — chips with
+  a small ✕, autocomplete from the master, Enter/comma to add, inline create.
+  It is used by Add a product, Edit product and the variant page.
+- Audit entity type: `TAG` (added to the `audit_logs.entity_type` ENUM).
 
 ## Base products
 

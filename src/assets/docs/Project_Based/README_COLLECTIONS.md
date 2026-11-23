@@ -28,6 +28,7 @@ Related files:
 | `/collections/[category]` | `src/app/collections/[category]/page.tsx` | `CollectionBrowse` |
 | `/collections/[category]/[subcategory]` | `src/app/collections/[category]/[subcategory]/page.tsx` | `CollectionBrowse` (with `subcategory`) |
 | `/collections/[category]/[subcategory]/[product]` | `src/app/collections/[category]/[subcategory]/[product]/page.tsx` | `CollectionProduct` |
+| `/search` | `src/app/search/page.tsx` | `SearchProducts` |
 
 Route files stay thin: they `await params` (Next 16 async params), pass the
 segments through, and nothing else. All fetching, state and layout live in the
@@ -267,13 +268,89 @@ handles horizontal swipe for touch, and keeps a thumbnail strip at the bottom.
   `position="fixed"`), plus `SectionDivider` / `SectionEyebrow` and the
   `mx-auto max-w-7xl px-4 sm:px-6` rhythm from the landing page.
 - `CustomLoader` only — no bespoke spinners or skeletons.
-- Cards/panels: `rounded-2xl sm:rounded-3xl`, `border-white/60 bg-white/85
+- Cards/panels: `rounded-2xl sm:rounded-3xl`, `border-rose-100 bg-white/85
   backdrop-blur-sm`, rose accents (`rose-500/600`, `rose-50`), stone text.
 - Prices always go through `formatCurrency()`.
-- Images are plain `<img>` with the `@next/next/no-img-element` disable — ImageKit
-  hosts vary, and `next/image` only whitelists `ik.imagekit.io/nagmapvtltd/**`.
+- Images are `<Image />` from `next/image` (`fill` inside a `relative` box,
+  with `sizes`); internal links are `<Link />`. See `README_PROJECT_HABIT.md`.
 - Errors are human sentences rendered as-is; the API never leaks SQL or stack
   details to the storefront.
+
+---
+
+## 6. Display rules the card/listing data follows
+
+The collection cards, the browse grids and the search results always show a
+**base product** — never a raw variant name — but they borrow one variant's
+commercial data so the card matches what the shopper can actually buy:
+
+| Field | Source |
+| --- | --- |
+| Name | base product name |
+| Brief / description | base product copy |
+| Reviews / stars | every approved review of the product, all variants combined (`{ average, count }`) |
+| Thumbnail | first photo of the **featured** variant (`product_variants.is_featured = 1`); fallback: the first variant's first photo |
+| Price / compare-at | the same **featured** variant; fallback: the first variant |
+
+`/api/public/collections` computes all of this in SQL (`display_price`,
+`display_compare_at`, `variant_image`, `review_count`, `review_average`) and
+returns `priceFrom === priceTo` for a single-variant price.
+
+## 7. Tag-aware search
+
+`GET /api/public/collections` accepts:
+
+| Param | Meaning |
+| --- | --- |
+| `search` (or `q`) | matches name, slug, code, brief description, base-product tags and variant-specific tags |
+| `minPrice` / `maxPrice` | filters by the displayed variant price |
+| `category` / `subcategory` | unchanged scope filters |
+
+The response also carries `priceRange` (catalogue-wide active-variant min/max,
+for the search slider) and `query` (the term served). Ranking is strict, so a
+weak tag match never outranks a name match:
+
+1. exact product name · 2. name prefix · 3. name contains · 4. exact tag ·
+5. tag contains · 6. slug/code · 7. description.
+
+Tags are never returned on the public product page — they only improve
+discovery.
+
+## 8. `/collections` landing layout
+
+1. **Featured products** — a full-width panel with a large heading and an
+   Embla carousel (`embla-carousel-react`, `{ dragFree: true }`) of square
+   product cards, plus previous/next controls.
+2. **Categories** — cards using each root category's `thumbnailUrl` (featured
+   variant first, then the first variant photo of a product in that category),
+   with the total product count and its subcategory chips.
+3. **Search + all products** — the search field pushes to
+   `/search?q=<term>`; below it the products render as a square-card grid and
+   the next batch of 8 is revealed by an `IntersectionObserver` sentinel well
+   before the shopper reaches the bottom, so scrolling never waits.
+
+## 9. `/search` page
+
+Desktop: a sticky **price** filter on the left (min/max range inputs), the
+result grid on the right, and a query line above it — `Searched for “X”` with
+an ✕ that clears the query and the results, falling back to
+`Search to show products!`.
+
+Mobile: the filters scroll horizontally under the search bar, then the query
+line, then a two-column grid of cards.
+
+## 10. Product page interaction rules
+
+- The heading is the **variant** name (`variant.name || product.name`); the
+  brief and description come from the variant first, then the base product.
+- The old “You are currently viewing: …” block is gone.
+- The purchase row has a quantity stepper (max **99**), an Add to Cart button
+  that answers “coming soon”, and a square WhatsApp button.
+- Asking above 99 shows: **“Bulk orders above 99 pieces are subject to terms
+  and conditions and take longer to deliver.”**
+- The WhatsApp message is prefilled:
+  `Hello, crafti nagma. I am interest in this product of yours!` + product name
+  + product ID (the variant SKU).
 
 ---
 

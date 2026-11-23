@@ -22,12 +22,12 @@ interface ProductRow extends RowDataPacket {
   brief_description: string | null;
   is_featured: number | boolean;
   orders_count: number | string;
-  price_from: number | string | null;
-  price_to: number | string | null;
-  compare_at: number | string | null;
+  display_price: number | string | null;
+  display_compare_at: number | string | null;
   total_stock: number | string | null;
-  product_image: string | null;
   variant_image: string | null;
+  review_count: number | string;
+  review_average: number | string | null;
 }
 
 interface CategoryRow extends RowDataPacket {
@@ -36,6 +36,7 @@ interface CategoryRow extends RowDataPacket {
   slug: string;
   parent_id: string | null;
   product_count: number | string;
+  thumbnail_url: string | null;
 }
 
 interface ProductCategoryRow extends RowDataPacket {
@@ -48,34 +49,50 @@ interface ProductCategoryRow extends RowDataPacket {
   parent_slug: string | null;
 }
 
+interface TagMatchRow extends RowDataPacket {
+  product_id: string;
+  name: string;
+}
+
+interface RangeRow extends RowDataPacket {
+  min_price: number | string | null;
+  max_price: number | string | null;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  SQL                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The card/listing data comes from ONE variant — the featured variant when the
+ * product has one, otherwise the first variant. Its price, compare-at price and
+ * first photo are what the storefront shows, per the collection brief.
+ */
 const PRODUCT_SELECT = `
   SELECT p.id, p.code, p.name, p.slug, p.brief_description,
          p.is_featured, p.orders_count,
-         (SELECT MIN(v.price) FROM product_variants v
-           WHERE v.product_id = p.id AND v.status = 'active')        AS price_from,
-         (SELECT MAX(v.price) FROM product_variants v
-           WHERE v.product_id = p.id AND v.status = 'active')        AS price_to,
-         (SELECT MIN(v.compare_at_price) FROM product_variants v
+         (SELECT v.price FROM product_variants v
            WHERE v.product_id = p.id AND v.status = 'active'
-             AND v.compare_at_price IS NOT NULL)                     AS compare_at,
+           ORDER BY v.is_featured DESC, v.created_at ASC, v.id ASC
+           LIMIT 1)                                                   AS display_price,
+         (SELECT v.compare_at_price FROM product_variants v
+           WHERE v.product_id = p.id AND v.status = 'active'
+           ORDER BY v.is_featured DESC, v.created_at ASC, v.id ASC
+           LIMIT 1)                                                   AS display_compare_at,
          (SELECT COALESCE(SUM(v.stock), 0) FROM product_variants v
-           WHERE v.product_id = p.id AND v.status = 'active')        AS total_stock,
-         (SELECT f.url FROM imagekit_files f
-           WHERE f.entity_type = 'product' AND f.entity_id = p.id
-           ORDER BY f.sort_order ASC, f.created_at ASC, f.id ASC
-           LIMIT 1)                                                  AS product_image,
+           WHERE v.product_id = p.id AND v.status = 'active')         AS total_stock,
          (SELECT f.url FROM imagekit_files f
             JOIN product_variants v ON v.id = f.entity_id
            WHERE f.entity_type = 'product_variant'
              AND f.file_purpose = 'product_variant_image'
              AND v.product_id = p.id
-           ORDER BY v.status = 'active' DESC,
+           ORDER BY v.is_featured DESC, v.status = 'active' DESC,
                     f.sort_order ASC, f.created_at ASC, f.id ASC
-           LIMIT 1)                                                  AS variant_image
+           LIMIT 1)                                                   AS variant_image,
+         (SELECT COUNT(*) FROM product_reviews r
+           WHERE r.product_id = p.id AND r.is_approved = 1)           AS review_count,
+         (SELECT AVG(r.rating) FROM product_reviews r
+           WHERE r.product_id = p.id AND r.is_approved = 1)           AS review_average
     FROM products p
    WHERE p.status = 'active'
    ORDER BY p.is_featured DESC, p.orders_count DESC, p.created_at DESC`;
@@ -85,7 +102,23 @@ const CATEGORY_SELECT = `
          (SELECT COUNT(DISTINCT pc.product_id)
             FROM product_categories pc
             JOIN products p ON p.id = pc.product_id AND p.status = 'active'
-           WHERE pc.category_id = c.id)                              AS product_count
+           WHERE pc.category_id = c.id)                              AS product_count,
+         (SELECT f.url
+            FROM product_categories pc2
+            JOIN products p2 ON p2.id = pc2.product_id AND p2.status = 'active'
+            JOIN product_variants v2 ON v2.product_id = p2.id
+            JOIN imagekit_files f ON f.entity_id = v2.id
+             AND f.entity_type = 'product_variant'
+             AND f.file_purpose = 'product_variant_image'
+           WHERE pc2.category_id = c.id
+              OR pc2.category_id IN (
+                   SELECT child.id FROM categories child
+                    WHERE child.parent_id = c.id
+                 )
+           ORDER BY p2.is_featured DESC, v2.is_featured DESC,
+                    v2.status = 'active' DESC,
+                    f.sort_order ASC, f.created_at ASC, f.id ASC
+           LIMIT 1)                                                  AS thumbnail_url
     FROM categories c
    ORDER BY c.name ASC`;
 
@@ -98,6 +131,24 @@ const PRODUCT_CATEGORY_SELECT = `
     LEFT JOIN categories par ON par.id = c.parent_id
     JOIN products p ON p.id = pc.product_id AND p.status = 'active'
    ORDER BY c.name ASC`;
+
+const TAG_MATCH_SELECT = `
+  SELECT DISTINCT ptm.product_id, t.name
+    FROM product_tag_mappings ptm
+    JOIN global_tags t ON t.id = ptm.tag_id
+   WHERE t.name LIKE ?
+  UNION
+  SELECT DISTINCT v.product_id, t.name
+    FROM product_variant_tag_mappings pvtm
+    JOIN global_tags t   ON t.id = pvtm.tag_id
+    JOIN product_variants v ON v.id = pvtm.variant_id
+   WHERE t.name LIKE ?`;
+
+const PRICE_RANGE_SELECT = `
+  SELECT MIN(v.price) AS min_price, MAX(v.price) AS max_price
+    FROM product_variants v
+    JOIN products p ON p.id = v.product_id AND p.status = 'active'
+   WHERE v.status = 'active'`;
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                  */
@@ -123,64 +174,111 @@ function subcategoryHref(rootSlug: string, subSlug: string): string {
   return `/collections/${rootSlug}/${subSlug}`;
 }
 
+/**
+ * Relevance score for a search term. Ranking is deliberately strict so a weak
+ * tag match can never outrank an exact product name:
+ *
+ *   100 exact name · 80 name prefix · 60 name contains
+ *    50 exact tag  · 40 tag contains  · 30 slug/code · 20 description
+ */
+function relevance(
+  product: CollectionProduct,
+  tagNames: string[],
+  term: string,
+): number {
+  const name = product.name.toLowerCase();
+  if (name === term) return 100;
+  if (name.startsWith(term)) return 80;
+  if (name.includes(term)) return 60;
 
-/* -------------------------------------------------------------------------- */
-/*  GET /api/public/collections                                              */
-/*  Public storefront data: featured picks, the category tree, and every      */
-/*  active product. `?category=` / `?subcategory=` narrow to one scope.      */
-/* -------------------------------------------------------------------------- */
+  const tags = tagNames.map((tag) => tag.toLowerCase());
+  if (tags.some((tag) => tag === term)) return 50;
+  if (tags.some((tag) => tag.includes(term))) return 40;
+
+  if (
+    product.slug.toLowerCase().includes(term) ||
+    product.code.toLowerCase().includes(term)
+  ) {
+    return 30;
+  }
+
+  const brief = (product.briefDescription ?? "").toLowerCase();
+  if (brief.includes(term)) return 20;
+  return 0;
+}
 
 /**
- * Returns the public storefront collections: featured picks, the category tree and every active
- * product, optionally narrowed to one category or subcategory.
+ * Returns the public storefront catalogue: featured picks, the category tree and
+ * every active product, optionally scoped, searched and price-filtered.
  *
  * @async
  * @function GET
- * @description Public route with no auth check. Every active product is read with its active
- *              variant price range, total stock, compare-at price and a cover image (product
- *              image first, then the variant image), plus its root category and subcategory
- *              links. Each product gets a `/collections/<root>/<sub>/<code>` href, using `all` for
- *              a missing segment. A `?subcategory=` narrows to that slug first, otherwise
- *              `?category=` narrows to products whose root category matches; a scoped request
- *              returns an empty `featured` list.
+ * @description Public route with no auth check. Every active product is read with
+ *              one variant's commercial data — the featured variant first, otherwise
+ *              the first variant — for the displayed price, compare-at price and
+ *              cover photo, plus its combined approved-review count and average and
+ *              its active-variant total stock. `?category=` / `?subcategory=` narrow
+ *              the scope (a missing or `all` segment means no scoping), `?search=`
+ *              (or `?q=`) matches name, slug, code, brief description, base-product
+ *              tags and variant-specific tags with a strict relevance ranking, and
+ *              `?minPrice=` / `?maxPrice=` filter on the displayed price. Each
+ *              product gets a `/collections/<root>/<sub>/<code>` href and each root
+ *              category gets a thumbnail from a product inside it.
  *
  * @param {NextRequest} req - The incoming HTTP request
+ *
  * @query {string} [category] - Root category slug (lowercased); `all` or empty means no scoping
  * @query {string} [subcategory] - Subcategory slug (lowercased); takes precedence over `category`
+ * @query {string} [search] - Search term (trimmed, max 120 chars); matched against names, slugs, codes, descriptions and tags
+ * @query {string} [q] - Alias for `search`, used when `search` is absent
+ * @query {number} [minPrice] - Minimum displayed price, inclusive (ignored when not a positive number)
+ * @query {number} [maxPrice] - Maximum displayed price, inclusive (ignored when not a positive number)
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
- *   - featured: up to 8 featured products (empty when scoped)
- *   - categories: the category tree with `productCount`, `totalProductCount`, `subcategories`
- *                 and `href`
- *   - products: the scoped list with `id`, `code`, `name`, `slug`, `briefDescription`,
- *               `isFeatured`, `imageUrl`, `priceFrom`, `priceTo`, `compareAtPrice`, `totalStock`,
- *               `category`, `subcategory` and `href`
- *   - totalProducts: number of active products before scoping
+ *   - featured: up to 8 featured products (empty when a scope is applied)
+ *   - categories: the root category tree with `productCount`, `totalProductCount`, `thumbnailUrl`, `subcategories` and `href`
+ *   - products: the scoped / searched / price-filtered list, each with `id`, `code`, `name`, `slug`, `briefDescription`, `isFeatured`, `imageUrl`, `priceFrom`, `priceTo`, `compareAtPrice`, `totalStock`, `reviews { average, count }`, `category`, `subcategory` and `href`
+ *   - totalProducts: number of active products before scoping, search or price filters
+ *   - priceRange: `{ min, max }` bounds of active variant prices across the whole catalogue
+ *   - query: the search term that was served, or `null`
  *   - scope: `{ type, name, slug, found }` for a scoped request, otherwise `null`
  *
  * @throws {500} "Could not load the collections" - Database failure
  *
  * @description Workflow:
- *   1. Read and lowercase `category` and `subcategory` from the query string
+ *   1. Read and lowercase `category` and `subcategory`; read `search` (or `q`, max 120 chars) and the numeric `minPrice` / `maxPrice`
  *   2. Initialize the database pool and take a connection
- *   3. Select every active product with price range, stock and cover image subqueries
- *   4. Select categories with their active product counts
+ *   3. Select every active product with the featured/first variant's price and compare-at price, total active stock, cover photo and review count/average
+ *   4. Select categories with their active product counts and a thumbnail from a product inside each category
  *   5. Select product-category links joined to category and parent names
- *   6. Group the links by product
- *   7. Map each product, preferring a subcategory link and falling back to a root link
- *   8. Apply the scope: subcategory match first, otherwise category (root) match
- *   9. Build `scope` with the matched name and a `found` flag
- *   10. Build the category tree with per-root and total product counts
- *   11. Return 200 response with featured, categories, products, total and scope
- *   12. Release the connection in `finally`
+ *   6. Select the catalogue-wide active variant price bounds
+ *   7. Group the links by product and map each product (preferring a subcategory link, falling back to a root link)
+ *   8. When searching, load the matching tag names per product from both mapping tables
+ *   9. Apply the scope: subcategory match first, otherwise root category match, building `scope` with its `found` flag
+ *   10. Apply the price filter against each product's displayed price
+ *   11. When searching, score each product (exact name 100, name prefix 80, name contains 60, exact tag 50, tag contains 40, slug/code 30, description 20), drop zero scores and sort by score
+ *   12. Build the category tree with per-root and total product counts and subcategory hrefs
+ *   13. Return 200 response with featured, categories, products, totalProducts, priceRange, query and scope
+ *   14. Release the connection in `finally`
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const categorySlug = (searchParams.get("category") ?? "").trim().toLowerCase();
-  const subcategorySlug = (
-    searchParams.get("subcategory") ?? ""
-  ).trim().toLowerCase();
+  const categorySlug = (searchParams.get("category") ?? "")
+    .trim()
+    .toLowerCase();
+  const subcategorySlug = (searchParams.get("subcategory") ?? "")
+    .trim()
+    .toLowerCase();
+  const search = (searchParams.get("search") ?? searchParams.get("q") ?? "")
+    .trim()
+    .slice(0, 120);
+  const minPriceRaw = Number(searchParams.get("minPrice") ?? "");
+  const maxPriceRaw = Number(searchParams.get("maxPrice") ?? "");
+  const minPrice =
+    Number.isFinite(minPriceRaw) && minPriceRaw > 0 ? minPriceRaw : null;
+  const maxPrice =
+    Number.isFinite(maxPriceRaw) && maxPriceRaw > 0 ? maxPriceRaw : null;
 
   const pool = await getPool();
   const conn = await pool.getConnection();
@@ -191,6 +289,7 @@ export async function GET(req: NextRequest) {
     const [linkRows] = await conn.query<ProductCategoryRow[]>(
       PRODUCT_CATEGORY_SELECT,
     );
+    const [rangeRows] = await conn.query<RangeRow[]>(PRICE_RANGE_SELECT);
 
     /* product id → its category links */
     const linksByProduct = new Map<string, ProductCategoryRow[]>();
@@ -227,6 +326,8 @@ export async function GET(req: NextRequest) {
         };
       }
 
+      const price = toNumber(row.display_price);
+
       return {
         id: row.id,
         code: row.code,
@@ -234,16 +335,37 @@ export async function GET(req: NextRequest) {
         slug: row.slug,
         briefDescription: row.brief_description,
         isFeatured: Boolean(row.is_featured),
-        imageUrl: row.product_image ?? row.variant_image ?? null,
-        priceFrom: toNumber(row.price_from),
-        priceTo: toNumber(row.price_to),
-        compareAtPrice: toNumber(row.compare_at),
+        imageUrl: row.variant_image ?? null,
+        priceFrom: price,
+        priceTo: price,
+        compareAtPrice: toNumber(row.display_compare_at),
         totalStock: Number(row.total_stock ?? 0),
+        reviews: {
+          average: Number(row.review_average ?? 0),
+          count: Number(row.review_count ?? 0),
+        },
         category,
         subcategory,
         href: productHref(row.code, category, subcategory),
       };
     });
+
+    /* ---------------- tags (only fetched when searching) ---------------- */
+    const tagNamesByProduct = new Map<string, string[]>();
+    const term = search.toLowerCase();
+
+    if (term) {
+      const like = `%${search}%`;
+      const [tagRows] = await conn.query<TagMatchRow[]>(TAG_MATCH_SELECT, [
+        like,
+        like,
+      ]);
+      for (const row of tagRows) {
+        const list = tagNamesByProduct.get(row.product_id) ?? [];
+        list.push(row.name);
+        tagNamesByProduct.set(row.product_id, list);
+      }
+    }
 
     /* ---------------- scope ---------------- */
     const requestedSub = subcategorySlug && subcategorySlug !== ALL_SEGMENT;
@@ -252,33 +374,50 @@ export async function GET(req: NextRequest) {
     let scoped = products;
     let scope: CollectionsResponse["scope"] = null;
 
-    if (requestedSub) {
-      const match = categoryRows.find(
-        (row) => row.slug.toLowerCase() === subcategorySlug,
+    if (requestedSub || requestedCat) {
+      const match = categoryRows.find((row) =>
+        requestedSub
+          ? row.slug.toLowerCase() === subcategorySlug
+          : row.slug.toLowerCase() === categorySlug,
       );
-      scoped = products.filter(
-        (product) =>
-          product.subcategory?.slug.toLowerCase() === subcategorySlug,
-      );
-      scope = {
-        type: "subcategory",
-        name: match?.name ?? subcategorySlug,
-        slug: subcategorySlug,
-        found: Boolean(match),
-      };
-    } else if (requestedCat) {
-      const match = categoryRows.find(
-        (row) => row.slug.toLowerCase() === categorySlug,
-      );
-      scoped = products.filter(
-        (product) => product.category?.slug.toLowerCase() === categorySlug,
+      scoped = products.filter((product) =>
+        requestedSub
+          ? product.subcategory?.slug.toLowerCase() === subcategorySlug
+          : product.category?.slug.toLowerCase() === categorySlug,
       );
       scope = {
-        type: "category",
-        name: match?.name ?? categorySlug,
-        slug: categorySlug,
+        type: requestedSub ? "subcategory" : "category",
+        name: match?.name ?? (requestedSub ? subcategorySlug : categorySlug),
+        slug: requestedSub ? subcategorySlug : categorySlug,
         found: Boolean(match),
       };
+    }
+
+    /* ---------------- price filter ---------------- */
+    if (minPrice !== null || maxPrice !== null) {
+      scoped = scoped.filter((product) => {
+        const price = product.priceFrom;
+        if (price === null) return false;
+        if (minPrice !== null && price < minPrice) return false;
+        if (maxPrice !== null && price > maxPrice) return false;
+        return true;
+      });
+    }
+
+    /* ---------------- search ---------------- */
+    if (term) {
+      scoped = scoped
+        .map((product) => ({
+          product,
+          score: relevance(
+            product,
+            tagNamesByProduct.get(product.id) ?? [],
+            term,
+          ),
+        }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((entry) => entry.product);
     }
 
     /* ---------------- category tree ---------------- */
@@ -306,12 +445,15 @@ export async function GET(req: NextRequest) {
         slug: root.slug,
         productCount: own,
         totalProductCount: total,
+        thumbnailUrl: root.thumbnail_url ?? null,
         subcategories: children,
         href: categoryHref(root.slug),
       };
     });
 
     const isScoped = Boolean(requestedSub || requestedCat);
+    const minCatalogue = toNumber(rangeRows[0]?.min_price) ?? 0;
+    const maxCatalogue = toNumber(rangeRows[0]?.max_price) ?? 0;
 
     const payload: CollectionsResponse = {
       ok: true,
@@ -321,6 +463,11 @@ export async function GET(req: NextRequest) {
       categories,
       products: scoped,
       totalProducts: products.length,
+      priceRange: {
+        min: Math.floor(minCatalogue),
+        max: Math.ceil(maxCatalogue),
+      },
+      query: term ? search : null,
       scope,
     };
 

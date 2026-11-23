@@ -35,6 +35,7 @@ export type AuditEntityType =
   | "ORDER"
   | "ORDER_ITEM"
   | "PAYMENT"
+  | "TAG"
   | "SYSTEM";
 
 export interface AuditLogRow extends RowDataPacket {

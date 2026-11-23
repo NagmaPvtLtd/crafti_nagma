@@ -1,5 +1,6 @@
-/* eslint-disable @next/next/no-img-element -- ImageKit already serves sized, converted images */
 "use client";
+
+import Image from "next/image";
 
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
@@ -84,7 +85,9 @@ export default function ExistingPhotosModal({
       );
       const linked = res.data.linkedCount;
       toast.success(
-        linked === 1 ? "Photo linked to this variant" : `${linked} photos linked`,
+        linked === 1
+          ? "Photo linked to this variant"
+          : `${linked} photos linked`,
       );
       onLinked();
       onClose();
@@ -183,7 +186,7 @@ export default function ExistingPhotosModal({
                         type="button"
                         onClick={() => toggle(image.id, image.alreadyLinked)}
                         aria-pressed={isSelected || image.alreadyLinked}
-                        className={`group relative block w-full cursor-pointer overflow-hidden rounded-xl border-2 transition-colors ${
+                        className={`group relative block aspect-square w-full cursor-pointer overflow-hidden rounded-xl border-2 transition-colors ${
                           image.alreadyLinked
                             ? "cursor-not-allowed border-emerald-300"
                             : isSelected
@@ -191,10 +194,12 @@ export default function ExistingPhotosModal({
                               : "border-transparent hover:border-rose-200"
                         }`}
                       >
-                        <img
+                        <Image
                           src={image.url}
                           alt={image.altText || group.sku}
-                          className="aspect-square w-full object-cover"
+                          fill
+                          sizes="(max-width: 640px) 50vw, 25vw"
+                          className="object-cover"
                         />
 
                         {image.alreadyLinked ? (

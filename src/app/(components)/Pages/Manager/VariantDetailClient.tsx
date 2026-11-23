@@ -31,6 +31,8 @@ import DimensionFields, {
 } from "../../utils/Form/DimensionFields";
 import PricingQuizButton from "./PricingQuizModal";
 import ProductMediaManager, { MediaGallery } from "./ProductMediaManager";
+import TagInput from "../../utils/TagInput";
+import type { TagRef } from "../../../../utils/Tags/tag.util";
 import ExistingPhotosModal from "./ExistingPhotosModal";
 import ConfirmDialog from "../../utils/ConfirmDialog";
 import {
@@ -77,6 +79,7 @@ export default function VariantDetailClient({
     useState<DimensionFormValue>(emptyDimensions);
   const [features, setFeatures] = useState<string[]>([]);
   const [careInstructions, setCareInstructions] = useState<string[]>([]);
+  const [additionalTags, setAdditionalTags] = useState<TagRef[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -126,9 +129,8 @@ export default function VariantDetailClient({
         unit: res.data.variant.dimensions.dimensionUnit ?? "cm",
       });
       setFeatures(res.data.features.map((item) => item.value));
-      setCareInstructions(
-        res.data.careInstructions.map((item) => item.value),
-      );
+      setCareInstructions(res.data.careInstructions.map((item) => item.value));
+      setAdditionalTags(res.data.tags?.additional ?? []);
     } catch (err) {
       /* A failed refresh must never blank a variant that is already on screen —
          the photos and edits stay visible while the banner explains the miss. */
@@ -174,6 +176,7 @@ export default function VariantDetailClient({
           careInstructions: careInstructions
             .map((item) => item.trim())
             .filter(Boolean),
+          tagIds: additionalTags.map((tag) => tag.id),
           status,
           isFeatured: form.isFeatured,
           mainShowcase: form.mainShowcase,
@@ -520,9 +523,7 @@ export default function VariantDetailClient({
                               length:
                                 data.baseProduct.dimensions.length === null
                                   ? ""
-                                  : String(
-                                      data.baseProduct.dimensions.length,
-                                    ),
+                                  : String(data.baseProduct.dimensions.length),
                               width:
                                 data.baseProduct.dimensions.width === null
                                   ? ""
@@ -531,7 +532,9 @@ export default function VariantDetailClient({
                                 data.baseProduct.dimensions.height === null
                                   ? ""
                                   : String(data.baseProduct.dimensions.height),
-                              unit: data.baseProduct.dimensions.dimensionUnit ?? "cm",
+                              unit:
+                                data.baseProduct.dimensions.dimensionUnit ??
+                                "cm",
                             })
                           }
                         />
@@ -599,6 +602,49 @@ export default function VariantDetailClient({
                       />
                     </div>
 
+                    <div className="rounded-xl border border-stone-200 bg-white p-3">
+                      <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+                        Product tags
+                      </p>
+
+                      <p className="mt-1.5 text-[10px] font-medium tracking-wide text-stone-400 uppercase">
+                        Inherited from {data.variant.productName}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {data.tags.inherited.length === 0 ? (
+                          <span className="text-[11px] text-stone-400">
+                            No inherited tags yet — add them on the base
+                            product.
+                          </span>
+                        ) : (
+                          data.tags.inherited.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-medium text-stone-600"
+                            >
+                              {tag.name}
+                              <span className="rounded-full bg-white px-1 py-px text-[8px] font-semibold tracking-wide text-stone-400 uppercase ring-1 ring-stone-200">
+                                Inherited
+                              </span>
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="mt-3 border-t border-dashed border-stone-100 pt-3">
+                        <p className="text-[10px] font-medium tracking-wide text-stone-400 uppercase">
+                          Additional tags for this variant
+                        </p>
+                        <div className="mt-1.5">
+                          <TagInput
+                            value={additionalTags}
+                            onChange={setAdditionalTags}
+                            placeholder="Type a tag and press Enter…"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <Field label="Status">
                       <select
                         value={form.status}
@@ -628,8 +674,8 @@ export default function VariantDetailClient({
                       ) : (
                         <>
                           Disabling this variant removes its photos and hides it
-                          from the storefront. A variant that appears in an order
-                          cannot be disabled.
+                          from the storefront. A variant that appears in an
+                          order cannot be disabled.
                         </>
                       )}
                     </p>
@@ -791,7 +837,8 @@ function LineListEditor({
   addLabel: string;
   emptyLabel: string;
 }) {
-  const canAdd = items.length === 0 || (items[items.length - 1] ?? "").trim().length > 0;
+  const canAdd =
+    items.length === 0 || (items[items.length - 1] ?? "").trim().length > 0;
 
   return (
     <div className="space-y-2">
@@ -809,9 +856,7 @@ function LineListEditor({
               value={value}
               onChange={(e) =>
                 onChange(
-                  items.map((item, i) =>
-                    i === index ? e.target.value : item,
-                  ),
+                  items.map((item, i) => (i === index ? e.target.value : item)),
                 )
               }
               placeholder={placeholder}

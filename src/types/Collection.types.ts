@@ -23,6 +23,8 @@ export type CollectionProduct = {
   priceTo: number | null;
   compareAtPrice: number | null;
   totalStock: number;
+  /** Rating across every review of the product (all variants combined). */
+  reviews: { average: number; count: number };
   category: CollectionCategoryRef | null;
   subcategory: CollectionCategoryRef | null;
   /** `/collections/{category}/{subcategory}/{code}` */
@@ -37,6 +39,8 @@ export type CollectionCategory = {
   productCount: number;
   /** Products in this category plus all of its subcategories. */
   totalProductCount: number;
+  /** Showcase photo for the category (featured variant first). */
+  thumbnailUrl: string | null;
   subcategories: {
     id: string;
     name: string;
@@ -53,6 +57,10 @@ export type CollectionsResponse = {
   categories: CollectionCategory[];
   products: CollectionProduct[];
   totalProducts: number;
+  /** Catalogue-wide active-variant price bounds, for the search slider. */
+  priceRange: { min: number; max: number };
+  /** The search term that was served, when one was sent. */
+  query: string | null;
   scope: {
     type: "all" | "category" | "subcategory";
     name: string;

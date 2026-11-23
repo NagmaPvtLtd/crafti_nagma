@@ -32,6 +32,8 @@ import DimensionFields, {
 import CustomLoader from "../../CustomLoader";
 import ConfirmDialog from "../../utils/ConfirmDialog";
 import { productBaseUpdateSchema } from "../../../../utils/zod/product/manager.productDetail.zod";
+import TagInput from "../../utils/TagInput";
+import type { TagRef } from "../../../../utils/Tags/tag.util";
 import type {
   ProductBaseUpdateInput,
   ProductDetailResponse,
@@ -110,6 +112,7 @@ export default function EditProductClient({
     useState<DimensionFormValue>(emptyDimensions);
   const [features, setFeatures] = useState<string[]>([]);
   const [careInstructions, setCareInstructions] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<TagRef[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -180,6 +183,7 @@ export default function EditProductClient({
       });
       setFeatures(data.features.map((item) => item.value));
       setCareInstructions(data.careInstructions.map((item) => item.value));
+      setSelectedTags(data.tags ?? []);
     } catch (err) {
       setLoadError(getAxiosErrorMessage(err, "Failed to load the product"));
     } finally {
@@ -319,6 +323,7 @@ export default function EditProductClient({
       mainShowcase: form.mainShowcase,
       status: form.status,
       categoryIds: selectedCategoryIds,
+      tagIds: selectedTags.map((tag) => tag.id),
       length: dimensions.length,
       width: dimensions.width,
       height: dimensions.height,
@@ -643,6 +648,21 @@ export default function EditProductClient({
 
             <SectionCard
               step="4"
+              eyebrow="Discovery"
+              title="Product Tags"
+              hint="Add relevant keywords to help customers discover this product through search. Every variant inherits these tags automatically."
+              error={errors.tagIds}
+            >
+              <TagInput value={selectedTags} onChange={setSelectedTags} />
+              <p className="mt-2 text-[11px] text-stone-500">
+                Optional. Tags are shared across the whole catalogue — reuse an
+                existing one instead of creating a duplicate. Maximum 15 per
+                product.
+              </p>
+            </SectionCard>
+
+            <SectionCard
+              step="5"
               eyebrow="Choices"
               title="Options & Values"
               hint="Options are the pools this product's variants are built from. Removing a value disables the variants that use it — or deletes them when they never sold."
@@ -746,7 +766,7 @@ export default function EditProductClient({
             </SectionCard>
 
             <SectionCard
-              step="5"
+              step="6"
               eyebrow="Money & fulfilment"
               title="Delivery, processing and status"
             >
@@ -807,20 +827,17 @@ export default function EditProductClient({
             </SectionCard>
 
             <SectionCard
-              step="6"
+              step="7"
               eyebrow="Measurements"
               title="Product dimensions"
               hint="Optional. Existing variants keep their own snapshot; new variants copy these values when generated."
               error={errors.dimensionUnit}
             >
-              <DimensionFields
-                value={dimensions}
-                onChange={setDimensions}
-              />
+              <DimensionFields value={dimensions} onChange={setDimensions} />
             </SectionCard>
 
             <SectionCard
-              step="7"
+              step="8"
               eyebrow="What shoppers read"
               title="Features & care instructions"
               hint="The base lists. Each variant starts from these and can be edited on its own variant page."
@@ -928,11 +945,12 @@ export default function EditProductClient({
               {removedChoices.length} choice
               {removedChoices.length === 1 ? "" : "s"}
             </span>{" "}
-            will be removed: {removedChoices.join(", ")}. Variants that never sold
-            are deleted together with their photos (linked photos are unlinked
-            and any variant left without photos is disabled). Variants that
-            already have orders are only disabled, and their value is disabled
-            instead of deleted. Photo sort order is renumbered automatically.
+            will be removed: {removedChoices.join(", ")}. Variants that never
+            sold are deleted together with their photos (linked photos are
+            unlinked and any variant left without photos is disabled). Variants
+            that already have orders are only disabled, and their value is
+            disabled instead of deleted. Photo sort order is renumbered
+            automatically.
           </>
         }
         confirmLabel="Remove choices"

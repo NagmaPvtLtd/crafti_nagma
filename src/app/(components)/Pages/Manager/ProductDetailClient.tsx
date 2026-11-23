@@ -1,5 +1,6 @@
-/* eslint-disable @next/next/no-img-element -- ImageKit already serves sized images */
 "use client";
+
+import Image from "next/image";
 
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -457,6 +458,26 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
         )}
       </div>
 
+      <div className="mt-4">
+        <p className="text-[10px] font-semibold tracking-wider text-stone-500 uppercase">
+          Product Tags
+        </p>
+        {data.tags.length === 0 ? (
+          <p className="mt-1 text-xs text-stone-400">No tags added.</p>
+        ) : (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {data.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="rounded-full border border-rose-200/70 bg-rose-50/60 px-2 py-0.5 text-[10px] font-medium text-rose-600"
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {data.features.length > 0 && (
         <div className="mt-5 border-t border-stone-100 pt-4">
           <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
@@ -729,12 +750,14 @@ function VariantRow({
         href={`/manager/product-studio/products/${productRef}/variants/${variant.sku || variant.id}`}
         className="group flex items-center gap-3 py-2.5"
       >
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100">
           {variant.imageUrl ? (
-            <img
+            <Image
               src={variant.imageUrl}
               alt={variant.name || variant.sku}
-              className="h-full w-full object-cover"
+              fill
+              sizes="40px"
+              className="object-cover"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-stone-300">
@@ -913,11 +936,11 @@ function buildGenerateCombos(product: ProductDetailResponse): GenerateCombo[] {
     combos = next;
   }
 
-      return combos.map((combo) => ({
-      key: [...combo.valueIds].sort().join("|"),
-      label: combo.labels.join(" / "),
-      valueIds: combo.valueIds,
-    }));
+  return combos.map((combo) => ({
+    key: [...combo.valueIds].sort().join("|"),
+    label: combo.labels.join(" / "),
+    valueIds: combo.valueIds,
+  }));
 }
 
 function GenerateVariantsModal({

@@ -86,7 +86,7 @@ export default function NavbarClient({ user }: Props) {
       e.preventDefault();
       const q = searchValue.trim();
       if (!q) return;
-      router.push(`/collections?q=${encodeURIComponent(q)}`);
+      router.push(`/search?q=${encodeURIComponent(q)}`);
       setSearchOpen(false);
       setSearchValue("");
     },
