@@ -9,3 +9,11 @@
 - The allowed remote hosts live in `next.config.ts` → `images.remotePatterns` (`lh3.googleusercontent.com`, `ik.imagekit.io/nagmapvtltd/**`). A new image host must be added there first, never worked around with a plain `<img>`.
 - When the image fills a known box, give the wrapper `relative` and use `<Image fill sizes="…" className="object-cover" />`. When the image has its own dimensions, pass `width` and `height`.
 - Do not add `@next/next/no-img-element` eslint-disable comments; convert the element to `<Image />` instead.
+
+# Verification — the owner does the manual testing
+
+- Do **not** start `next dev` (or any preview server), do **not** curl API endpoints or pages, and do **not** click through the app to test a change. That manual verification — sign-in flows, hitting APIs, dev-server smoke tests — is the owner's own work; they will do it themselves.
+- Do not write throwaway scripts, temporary probes or extra test harnesses just to exercise endpoints.
+- For a normal change, the only checks to run are the static ones: `npx tsc --noEmit`, `npx eslint` on the touched files, and `npx next typegen` when routes/pages changed.
+- Report anything runtime-related that was not exercised as **manually untested** — do not test it yourself and do not claim it works.
+- If a failure can only be reproduced with a running server, stop at the static error and hand it over.

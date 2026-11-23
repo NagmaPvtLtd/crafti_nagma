@@ -17,6 +17,7 @@
 │   ├── 📁 app
 │   │   ├── 📁 (components)
 │   │   │   ├── 📁 Navbar
+│   │   │   │   ├── 📄 CartBadge.tsx
 │   │   │   │   ├── 📄 Navbar.tsx
 │   │   │   │   ├── 📄 NavbarClient.tsx
 │   │   │   │   └── 📄 navLinks.ts
@@ -43,6 +44,7 @@
 │   │   │   │   │   ├── 📄 ProductMediaManager.tsx
 │   │   │   │   │   ├── 📄 StudioModal.tsx
 │   │   │   │   │   └── 📄 VariantDetailClient.tsx
+│   │   │   │   ├── 📄 CartClient.tsx
 │   │   │   │   ├── 📄 CollectionBrowse.tsx
 │   │   │   │   ├── 📄 CollectionCard.tsx
 │   │   │   │   ├── 📄 CollectionProduct.tsx
@@ -143,6 +145,14 @@
 │   │   │   │   └── 📁 heartbeat
 │   │   │   │       └── 📄 route.ts
 │   │   │   └── 📁 user
+│   │   │       └── 📁 cart
+│   │   │           ├── 📁 items
+│   │   │           │   ├── 📁 [variantId]
+│   │   │           │   │   └── 📄 route.ts
+│   │   │           │   └── 📄 route.ts
+│   │   │           └── 📄 route.ts
+│   │   ├── 📁 cart
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 collections
 │   │   │   ├── 📁 [category]
 │   │   │   │   ├── 📁 [subcategory]
@@ -209,6 +219,7 @@
 │   │   │   ├── 📁 Project_Based
 │   │   │   │   ├── 📝 PROJECT_STRUCTURE.md
 │   │   │   │   ├── 📝 README_API_STRUCTURE.md
+│   │   │   │   ├── 📝 README_CART.md
 │   │   │   │   ├── 📝 README_COLLECTIONS.md
 │   │   │   │   ├── 📝 README_PRODUCT_STUDIO.md
 │   │   │   │   ├── 📝 README_THUMBNAILS.md
@@ -272,6 +283,7 @@
 │   │   │   ├── 📄 JWT.types.ts
 │   │   │   ├── 📄 ProfileClient.types.ts
 │   │   │   └── 📄 UserRow.types.ts
+│   │   ├── 📄 Cart.types.ts
 │   │   ├── 📄 Collection.types.ts
 │   │   └── 📄 Heartbeat.types.ts
 │   ├── 📁 utils
@@ -285,6 +297,8 @@
 │   │   │   ├── 📄 Auth.isFromIndia.util.ts
 │   │   │   ├── 📄 Auth.requireRole.util.ts
 │   │   │   └── 📄 AuthErrors.ts
+│   │   ├── 📁 Cart
+│   │   │   └── 📄 cart.util.ts
 │   │   ├── 📁 Formator
 │   │   │   ├── 📄 capitalize.util.ts
 │   │   │   ├── 📄 formatCurrency.util.ts
@@ -311,6 +325,8 @@
 │   │   │   ├── 📄 getDateTime.util.ts
 │   │   │   └── 📄 getProduction.util.ts
 │   │   ├── 📁 zod
+│   │   │   ├── 📁 cart
+│   │   │   │   └── 📄 cart.zod.ts
 │   │   │   ├── 📁 product
 │   │   │   │   ├── 📄 manager.category.zod.ts
 │   │   │   │   ├── 📄 manager.option.zod.ts

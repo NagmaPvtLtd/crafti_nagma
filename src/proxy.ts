@@ -25,6 +25,7 @@ import { UserRole } from "./types/User/UserRow.types";
  * PAGE GROUPS:
  *   /admin/*       staff (manager and above)
  *   /dashboard/*   any authenticated user
+ *   /cart          any authenticated user (login-first cart, no guest carts)
  *   everything else  public — works for logged-in and logged-out visitors
  *
  * AUTH STATE:
@@ -56,6 +57,7 @@ const API_ADMIN_SUPER = "/api/admin-super";
 
 const PAGES_ADMIN = "/admin";
 const PAGES_DASHBOARD = "/dashboard";
+const PAGES_CART = "/cart";
 const PAGES_MANAGER = "/manager";
 
 const RATE_LIMIT_EXCLUDED_PREFIXES = [API_AUTH] as const;
@@ -223,6 +225,11 @@ function handlePage(
   }
 
   if (matchesPrefix(path, [PAGES_DASHBOARD])) {
+    if (!user) return respondUnauthorized(req, path);
+    return NextResponse.next();
+  }
+
+  if (matchesPrefix(path, [PAGES_CART])) {
     if (!user) return respondUnauthorized(req, path);
     return NextResponse.next();
   }
