@@ -104,8 +104,9 @@ export default function CartClient() {
   }
 
   async function updateQuantity(item: CartItemView, quantity: number) {
-    const ceiling = Math.max(1, Math.min(MAX_QUANTITY, item.stock));
-    const next = Math.min(Math.max(quantity, 1), ceiling);
+    /* Quantities are not capped by stock: the admin reviews and approves each
+       order before payment, so the requested amount is only bounded by 1–99. */
+    const next = Math.min(Math.max(quantity, 1), MAX_QUANTITY);
     if (next === item.quantity) return;
 
     await mutate(
@@ -285,7 +286,6 @@ function CartRow({
     compareAt !== null && compareAt > item.price
       ? Math.round((1 - item.price / compareAt) * 100)
       : null;
-  const ceiling = Math.max(1, Math.min(MAX_QUANTITY, item.stock));
   const reason = item.available
     ? null
     : item.status === "inactive"
@@ -389,7 +389,7 @@ function CartRow({
             <button
               type="button"
               onClick={() => onQuantity(item.quantity + 1)}
-              disabled={busy || !item.available || item.quantity >= ceiling}
+              disabled={busy || !item.available || item.quantity >= MAX_QUANTITY}
               aria-label="Increase quantity"
               className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
             >

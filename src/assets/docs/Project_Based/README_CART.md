@@ -25,7 +25,9 @@ cart_items (id, cart_id, variant_id, quantity, personalization_data, …)
 - `cart_items.personalization_data` is unused this turn; checkout/personalization
   will own it later.
 - `uq_cart_variant (cart_id, variant_id)` means one line per variant; adding the
-  same variant again increments the line's `quantity`.
+  same variant again increments the line's `quantity`. Different variants of the
+  same base product are independent lines, so one product page can fill several
+  lines (e.g. Red / M and Red / L) and each keeps its own quantity.
 
 ## The login-first rule
 
@@ -74,7 +76,7 @@ guests), and each handler calls `requireAuth()` so it has a trusted
 |---|---|---|
 | `GET /api/user/cart` | Creates the active cart lazily; returns items + summary. A brand-new user gets an empty cart, never a 404. | 401, 500 |
 | `POST /api/user/cart/items` | Body `{ variantId, quantity? }`. Adds a new line or increments the existing one. | 400 validation, 400 `"Out of stock"`, 400 `"Only N left"`, 409 missing/inactive variant, 401, 500 |
-| `PATCH /api/user/cart/items/[variantId]` | Body `{ quantity }` 0–99. `0` deletes the line. Setting 1–99 is stock-checked. | 400 validation/`"Only N left"`, 404 line not in cart, 409 missing/inactive variant, 401, 500 |
+| `PATCH /api/user/cart/items/[variantId]` | Body `{ quantity }` 0–99. `0` deletes the line. Setting 1–99 is **not** stock-capped. | 400 validation, 404 line not in cart, 409 missing/inactive variant, 400 `"Out of stock"`, 401, 500 |
 | `DELETE /api/user/cart/items/[variantId]` | Removes one line. Idempotent. | 400 bad id, 401, 500 |
 | `DELETE /api/user/cart` | Empties the cart, keeps the cart row. Idempotent. | 401, 500 |
 
@@ -93,12 +95,15 @@ selected `FOR UPDATE`, so two tabs adding the same variant cannot oversell it.
 - **Add / increment:** a missing or inactive variant is `409`; an active variant
   with `stock <= 0` is `400 "Out of stock"`; a quantity that would push the line
   past stock is `400 "Only N left"` with `N = stock`.
-- **Update:** the same checks apply to a positive quantity. `0` is always allowed
-  — a shopper must be able to remove a line whose variant was pulled.
+- **Update:** a positive quantity is bounded only by the 0–99 schema, not by
+  stock — the admin reviews and approves every order before payment. `0` is
+  always allowed — a shopper must be able to remove a line whose variant was
+  pulled.
 - **Totals:** `cartTotals()` counts only `available` lines. Inactive and sold-out
   lines stay visible (greyed, with the reason) but add nothing to `itemCount`,
   `quantity` or `subtotal`.
-- The cart page never lets a stepper exceed `min(99, stock)`.
+- The cart page never lets a stepper exceed 99; it does not stop at `stock`.
+  The product page stepper still stops at the variant's stock.
 
 Prices and stock are read from `product_variants` on every load; the cart stores
 no price snapshot. An order will snapshot at checkout, not here.
