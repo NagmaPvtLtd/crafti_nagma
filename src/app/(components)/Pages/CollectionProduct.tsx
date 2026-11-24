@@ -959,7 +959,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                 <div className="rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                      Product Description
+                      About this item
                     </h2>
                     {variant?.description?.trim() &&
                       selectedValueLabels.length > 0 && (
@@ -995,11 +995,11 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                 <SectionDivider className="mx-auto max-w-7xl py-8" />
                 <div className="space-y-3">
                   <DetailList
-                    title="Product Features"
+                    title="Qualities of this item"
                     items={features.map((feature) => feature.text)}
                   />
                   <DetailList
-                    title="Product Care Instructions"
+                    title="How to take care of this item?"
                     items={careInstructions.map((care) => care.text)}
                   />
                   <DetailList
