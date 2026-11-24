@@ -1,0 +1,5 @@
+i want you to research about this first and then carefully then implement this:
+
+1. write a migration file which will introduce a session_id and cooldown_till field in the users table
+2. When the user tries to attempt to login using "password" only then if their password are wrong for straight up 5-10 times. we'll put a cooldown on their users_table for 24 hours and if on the next try if the cooldown has not passed then we'll simply return them the message. Please try to login again after X hours. and always show the time in the priority wise like if hour available then only show hour, if minute are there then only show minutes. if seconds left then show only seconds. like this. ok?
+3. When we login then we'll store a session_id and we'll validate that session_id on the requireAuth roles functions we have created. so just in case if someone for example reset their password, so wherver other session_id exists for that same user, we'll delete those session so they will be forced to get logged out.

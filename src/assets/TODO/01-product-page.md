@@ -1,0 +1,6 @@
+- when the product is out of stock so maybe we can replace the increment and decrement quantity thing to become the heart thing
+- when clicking on that heart it'll trigger the same wishlist function which gets called when click on the heart on top right corner
+- and the share button is not exactly in the center of the that, it doesn't look center
+- Change everywhere the qualities of this item to -> Features
+- and how to take care of this item? to -> Care Instructions
+- and make these features and instrucitons left right, on desktop and up down in mobile. ( do this in the public product page and in the admin single product page admin page as well)
