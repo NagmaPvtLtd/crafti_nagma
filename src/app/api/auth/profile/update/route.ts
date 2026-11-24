@@ -5,6 +5,7 @@ import { profileUpdateSchema } from "../../../../../utils/zod/auth.profile.zod";
 import { getPool } from "../../../../../lib/Database/main.db";
 import { UserRow } from "../../../../../types/User/UserRow.types";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
+import { generateULID } from "../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../services/AuditLog.service";
 
 /* Indian mobile — same shape as the zod preprocess step, kept local so the
@@ -213,6 +214,15 @@ export async function POST(req: NextRequest) {
         dbUser.id,
       ],
     );
+
+    if (wantsPasswordChange) {
+      /* Rotate the account's session slot: every device holding the previous
+         id is signed out on its next protected request. */
+      await conn.query(`UPDATE users SET session_id = ? WHERE id = ?`, [
+        generateULID({ prefix: "sess", maxLength: 40 }),
+        dbUser.id,
+      ]);
+    }
 
     /* ---- audit ---- */
     try {

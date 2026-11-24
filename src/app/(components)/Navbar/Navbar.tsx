@@ -15,6 +15,7 @@ export default async function Navbar() {
         role: session.user.role ?? "customer",
         status: session.user.status ?? "active",
         profile_completed: Boolean(session.user.profile_completed),
+        session_id: session.user.session_id ?? null,
       }
     : null;
 

@@ -8,6 +8,8 @@ export interface MyJWT {
   role?: UserRole;
   status?: UserStatus;
   profile_completed?: boolean;
+  /** Session currently allowed for this account; rotated on sign-in. */
+  session_id?: string | null;
   [key: string]: unknown;
 }
 
@@ -25,4 +27,5 @@ export interface SessionUserClient {
   role: UserRole;
   status: UserStatus;
   profile_completed: boolean;
+  session_id: string | null;
 }

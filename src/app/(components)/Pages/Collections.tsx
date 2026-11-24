@@ -267,7 +267,7 @@ export default function Collections() {
                       >
                         <Link
                           href={category.href}
-                          className="group flex flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60"
+                          className="group flex flex-col overflow-hidden rounded-(--card-radius) border border-white/60 bg-white/85 backdrop-blur-sm transition-all [--card-radius:1rem] hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60"
                         >
                           <div className="relative aspect-square overflow-hidden bg-linear-to-br from-rose-100 via-rose-50 to-amber-50">
                             {category.thumbnailUrl ? (
@@ -276,7 +276,7 @@ export default function Collections() {
                                 alt={category.name}
                                 fill
                                 sizes="(max-width: 640px) 44vw, (max-width: 1024px) 25vw, 20vw"
-                                className="p-1 rounded-2xl object-cover transition-transform duration-300 group-hover:scale-103"
+                                className="card-photo object-cover transition-transform duration-300 group-hover:scale-103"
                               />
                             ) : (
                               <div className="flex h-full items-center justify-center">

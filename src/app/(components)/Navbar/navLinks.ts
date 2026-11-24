@@ -41,6 +41,11 @@ export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/dashboard/profile", label: "My Profile", icon: UserIcon },
   { href: "/dashboard/wishlist", label: "My Wishlist", icon: Heart },
   { href: "/collections", label: "Collections", icon: ShoppingBag },
+  {
+    href: "/dashboard/custom-order",
+    label: "Custom Order",
+    icon: TicketPercent,
+  },
 ];
 
 /* ------------------------------------------------------------------ */
