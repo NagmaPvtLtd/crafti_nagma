@@ -764,7 +764,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                   switching ? "opacity-70" : ""
                 }`}
               >
-                <div className="mt-2 flex items-start justify-between gap-3">
+                <div className="mt-2 flex items-center justify-between gap-3">
                   <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
                     {displayName}
                   </h1>
@@ -903,6 +903,17 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
 
                 <div className="mt-4 border-t border-stone-100 pt-4">
                   <div className="flex items-stretch gap-2">
+                    {soldOut ? (
+                      <button
+                        type="button"
+                        onClick={() => void addToWishlist()}
+                        aria-label="Add to wishlist"
+                        title="Add to wishlist"
+                        className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-600 transition-colors hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600"
+                      >
+                        <Heart className="h-4 w-4" />
+                      </button>
+                    ) : (
                     <div className="inline-flex shrink-0 items-center rounded-xl border border-stone-200 bg-white">
                       <button
                         type="button"
@@ -926,6 +937,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    )}
 
                     <button
                       type="button"
@@ -1016,14 +1028,22 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
               <>
                 <SectionDivider className="mx-auto max-w-7xl py-8" />
                 <div className="space-y-3">
-                  <DetailList
-                    title="Qualities of this item"
-                    items={features.map((feature) => feature.text)}
-                  />
-                  <DetailList
-                    title="How to take care of this item?"
-                    items={careInstructions.map((care) => care.text)}
-                  />
+                  <div
+                    className={`grid grid-cols-1 gap-3 ${
+                      features.length > 0 && careInstructions.length > 0
+                        ? "lg:grid-cols-2"
+                        : ""
+                    }`}
+                  >
+                    <DetailList
+                      title="Features"
+                      items={features.map((feature) => feature.text)}
+                    />
+                    <DetailList
+                      title="Care Instructions"
+                      items={careInstructions.map((care) => care.text)}
+                    />
+                  </div>
                   <DetailList
                     title="Gift Includes"
                     items={product.giftIncluded.map((gift) => gift.text)}

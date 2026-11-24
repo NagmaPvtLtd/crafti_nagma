@@ -22,6 +22,16 @@ import isRequestFromIndia from "../../../../utils/Auth/Auth.isFromIndia.util";
 import { googleProfileSchema } from "../../../../utils/zod/auth.valildator.zod";
 import { getPool } from "../../../../lib/Database/main.db";
 import { credentialsSchema } from "../../../../utils/zod/auth.credentialsLogin.schemas.zod";
+import {
+  applyCooldownIfNeeded,
+  clearFailedPassword,
+  countFailedPassword,
+} from "../../../../utils/Auth/Auth.loginGuard.util";
+import {
+  cooldownError,
+  loginCooldownMessage,
+  LOGIN_COOLDOWN_PREFIX,
+} from "../../../../utils/Auth/Auth.loginCooldown.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Environment                                                               */
@@ -95,6 +105,7 @@ declare module "next-auth" {
       role?: UserRole;
       status?: UserStatus;
       profile_completed?: boolean;
+      session_id?: string | null;
     } & DefaultSession["user"];
   }
 
@@ -106,6 +117,7 @@ declare module "next-auth" {
     role?: UserRole;
     status?: UserStatus;
     profile_completed?: boolean;
+    session_id?: string | null;
   }
 }
 
@@ -168,7 +180,7 @@ const authOptions: NextAuthOptions = {
             const [rows] = await conn.query<UserRow[]>(
               `SELECT id, first_name, last_name, full_name, email,
                       password_hash, google_profile_picture,
-                      role, status, profile_completed
+                      role, status, profile_completed, cooldown_till
                  FROM users
                 WHERE email = ?
                 LIMIT 1`,
@@ -194,9 +206,37 @@ const authOptions: NextAuthOptions = {
               throw new Error("password_not_set");
             }
 
+            /* ---- cooldown from too many wrong passwords ---- */
+            const cooling = cooldownError(dbUser.cooldown_till);
+            if (cooling) throw new Error(cooling);
+
             /* ---- password check ---- */
             const valid = await bcrypt.compare(password, dbUser.password_hash);
-            if (!valid) return null;
+
+            if (!valid) {
+              const attempts = await countFailedPassword(dbUser.id);
+              const till = await applyCooldownIfNeeded(
+                conn,
+                dbUser.id,
+                attempts,
+              );
+
+              /* The attempt that trips the threshold already reports the wait. */
+              if (till) {
+                throw new Error(
+                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}`,
+                );
+              }
+              return null;
+            }
+
+            /* A good password ends the streak and clears a stale cooldown. */
+            await conn.execute(
+              `UPDATE users SET cooldown_till = NULL
+                WHERE id = ? AND cooldown_till IS NOT NULL`,
+              [dbUser.id],
+            );
+            await clearFailedPassword(dbUser.id);
 
             return {
               id: dbUser.id,
@@ -213,9 +253,10 @@ const authOptions: NextAuthOptions = {
         } catch (err) {
           if (
             err instanceof Error &&
-            ["account_banned", "account_inactive", "password_not_set"].includes(
+            (["account_banned", "account_inactive", "password_not_set"].includes(
               err.message,
-            )
+            ) ||
+              err.message.startsWith(LOGIN_COOLDOWN_PREFIX))
           ) {
             throw err;
           }
@@ -438,6 +479,20 @@ const authOptions: NextAuthOptions = {
           t.role = dbUser.role ?? "customer";
           t.status = dbUser.status ?? "active";
           t.profile_completed = Boolean(dbUser.profile_completed);
+
+          if (account) {
+            /* A fresh sign-in claims the account's single session slot,
+               revoking whatever device held it before. */
+            const sessionId = generateULID({
+              prefix: "sess",
+              maxLength: 40,
+            });
+            await conn.execute(
+              `UPDATE users SET session_id = ? WHERE id = ?`,
+              [sessionId, dbUser.id],
+            );
+            t.session_id = sessionId;
+          }
         }
       } catch (err) {
         console.error("[AUTH - JWT] error:", err);
@@ -458,6 +513,7 @@ const authOptions: NextAuthOptions = {
         session.user.role = t.role ?? "customer";
         session.user.status = t.status ?? "active";
         session.user.profile_completed = Boolean(t.profile_completed);
+        session.user.session_id = t.session_id ?? null;
       }
       return session;
     },

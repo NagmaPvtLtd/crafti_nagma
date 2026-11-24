@@ -1,2 +1,0 @@
-- in the landing page custom product ki baat hai udar redirect the user to "/dashboard/custom-order"
-- usme bs header wagera bna do jo sab jaisa hai aur main me lik dena coming soon

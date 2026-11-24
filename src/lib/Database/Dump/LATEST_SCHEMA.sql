@@ -25,6 +25,8 @@ CREATE TABLE users (
     role ENUM('super_admin', 'admin', 'manager', 'customer') DEFAULT 'customer',
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     profile_completed BOOLEAN DEFAULT FALSE,
+    session_id CHAR(40) DEFAULT NULL,
+    cooldown_till DATETIME DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id),

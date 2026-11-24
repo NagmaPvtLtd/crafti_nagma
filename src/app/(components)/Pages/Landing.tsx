@@ -57,7 +57,7 @@ const LANDING_CONTENT = {
       description:
         "Pick a base design and customise colours, size, or a name. Crafted just for you!",
       cta: "Order custom",
-      href: "/custom",
+      href: "/dashboard/custom-order",
     },
     {
       icon: "gift" as const,
@@ -132,7 +132,10 @@ const LANDING_CONTENT = {
     heading: "Ready to bring handmade home?",
     body: "Explore the collection or tell us your idea — either way, something special is about to begin.",
     primaryCta: { label: "View collections", href: "/collections" },
-    secondaryCta: { label: "Start a custom order", href: "/custom" },
+    secondaryCta: {
+      label: "Start a custom order",
+      href: "/dashboard/custom-order",
+    },
     footnote: "Free shipping on special occassions! · Ships India-wide",
   },
 } as const;
@@ -222,7 +225,7 @@ export default function Landing() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
                 <Link
-                  href="/custom"
+                  href="/dashboard/custom-order"
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 px-5 py-3.5 text-sm font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-100 active:scale-[0.98] sm:px-7"
                 >
                   <MessageCircle className="h-4 w-4" />

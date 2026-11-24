@@ -9,6 +9,7 @@ import {
   FALLBACK_ERROR,
   resolveAuthError,
 } from "../../../utils/Auth/AuthErrors";
+import { parseCooldownError } from "../../../utils/Auth/Auth.loginCooldown.util";
 import Field from "../utils/Form/Field";
 import TextInput from "../utils/Form/TextInput";
 import PasswordInput from "../utils/Form/PasswordInput";
@@ -49,7 +50,9 @@ export default function LoginForm() {
       }
 
       if (result.error) {
-        setFormError(resolveAuthError(result.error));
+        setFormError(
+          parseCooldownError(result.error) ?? resolveAuthError(result.error),
+        );
         return;
       }
 

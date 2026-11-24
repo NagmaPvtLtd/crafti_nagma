@@ -478,41 +478,45 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
         )}
       </div>
 
-      {data.features.length > 0 && (
-        <div className="mt-5 border-t border-stone-100 pt-4">
-          <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-            Qualities of this item
-          </h3>
-          <ul className="mt-2 space-y-1.5">
-            {data.features.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-2 text-xs leading-snug text-stone-600"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                {item.value}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {(data.features.length > 0 || data.careInstructions.length > 0) && (
+        <div className="mt-5 grid grid-cols-1 gap-5 border-t border-stone-100 pt-4 lg:grid-cols-2">
+          {data.features.length > 0 && (
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                Features
+              </h3>
+              <ul className="mt-2 space-y-1.5">
+                {data.features.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-2 text-xs leading-snug text-stone-600"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    {item.value}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      {data.careInstructions.length > 0 && (
-        <div className="mt-5 border-t border-stone-100 pt-4">
-          <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-            How to take care of this item?
-          </h3>
-          <ul className="mt-2 space-y-1.5">
-            {data.careInstructions.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-2 text-xs leading-snug text-stone-600"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                {item.value}
-              </li>
-            ))}
-          </ul>
+          {data.careInstructions.length > 0 && (
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                Care Instructions
+              </h3>
+              <ul className="mt-2 space-y-1.5">
+                {data.careInstructions.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-2 text-xs leading-snug text-stone-600"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    {item.value}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,3 +1,0 @@
-- make admin/user-manager
-- we can see all the users ( their basic information )
-- we can assign them role or remove them

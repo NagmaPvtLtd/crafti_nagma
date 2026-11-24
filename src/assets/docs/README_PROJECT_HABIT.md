@@ -32,6 +32,12 @@ Writing a second copy of something that already exists is a bug, not a shortcut.
 - When the image fills a known box, give the wrapper `relative` and use `<Image fill sizes="…" className="object-cover" />`. When the image has its own dimensions, pass `width` and `height`.
 - Do not add `@next/next/no-img-element` eslint-disable comments; convert the element to `<Image />` instead.
 
+# Icons — never use a normal emoji
+
+- **Never** put a normal emoji anywhere: UI copy, buttons, toasts, badges, status icons, labels, comments, commit messages, docs. Not as decoration, not as a shorthand.
+- Every icon comes from `lucide-react`, sized and coloured with Tailwind classes like the rest of the app (`<Clock className="h-3.5 w-3.5" />`).
+- Pick the icon that carries the meaning (e.g. `Clock` for pending, `Truck` for shipped, `CheckCircle2` for completed, `XCircle` for cancelled, `Heart` for wishlist). If no lucide icon fits, use plain text — never an emoji or a hand-rolled inline SVG.
+
 # Verification — the owner does the manual testing
 
 - Do **not** start `next dev` (or any preview server), do **not** curl API endpoints or pages, and do **not** click through the app to test a change. That manual verification — sign-in flows, hitting APIs, dev-server smoke tests — is the owner's own work; they will do it themselves.

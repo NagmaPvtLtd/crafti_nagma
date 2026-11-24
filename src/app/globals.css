@@ -19,10 +19,36 @@
   }
 }
 
+/* Smooth anchor and programmatic scrolling; reduced-motion users get instant. */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ==========================================================================
+ * Card photos — the image is inset by 4px inside a card, so its radius comes
+ * from the card's own `--card-radius`. Top corners match the card (concentric
+ * after the inset); bottom corners are softer so the shelf edge tapers.
+ * Set `--card-radius` on the card at each breakpoint (e.g. 1rem, sm:1.5rem).
+ * ========================================================================== */
+
+@utility card-photo {
+  padding: 0.25rem;
+  border-start-start-radius: var(--card-radius, 1rem);
+  border-start-end-radius: var(--card-radius, 1rem);
+  border-end-start-radius: calc(var(--card-radius, 1rem) * 0.7);
+  border-end-end-radius: calc(var(--card-radius, 1rem) * 0.7);
 }
 
 /* ==========================================================================

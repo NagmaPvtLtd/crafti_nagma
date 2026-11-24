@@ -27,6 +27,8 @@ export interface UserRow extends RowDataPacket {
   role: UserRole;
   status: UserStatus;
   profile_completed: 0 | 1;
+  session_id: string | null;
+  cooldown_till: string | null;
   created_at: string;
   updated_at: string | null;
 }
