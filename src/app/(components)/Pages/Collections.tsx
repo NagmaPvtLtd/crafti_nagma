@@ -226,8 +226,8 @@ export default function Collections() {
                     Browse by category
                   </h2>
                   <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-stone-600">
-                    Each shelf holds its own story — pick a category to see every
-                    product inside it.
+                    Each shelf holds its own story — pick a category to see
+                    every product inside it.
                   </p>
                 </div>
 
@@ -276,7 +276,7 @@ export default function Collections() {
                                 alt={category.name}
                                 fill
                                 sizes="(max-width: 640px) 44vw, (max-width: 1024px) 25vw, 20vw"
-                                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                className="p-1 rounded-2xl object-cover transition-transform duration-300 group-hover:scale-103"
                               />
                             ) : (
                               <div className="flex h-full items-center justify-center">

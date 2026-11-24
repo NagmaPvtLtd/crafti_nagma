@@ -431,6 +431,28 @@ export default function CollectionProduct({ code }: { code: string }) {
     }
   }
 
+  /**
+   * Wishlist has no backend yet. A guest is sent to the login page (Google
+   * sign-in lives there) and comes back here; a signed-in shopper sees the
+   * placeholder notice.
+   */
+  async function addToWishlist() {
+    try {
+      await axios.get("/api/auth/profile");
+      toast("Wishlist is coming soon");
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : null;
+
+      if (status === 401) {
+        const back = `${window.location.pathname}${window.location.search}`;
+        router.push(`/login?callbackUrl=${encodeURIComponent(back)}`);
+        return;
+      }
+
+      toast("Wishlist is coming soon");
+    }
+  }
+
   /** Values that would leave no active variant behind are greyed out. */
   function isValueAvailable(optionId: string, valueId: string): boolean {
     if (!product) return false;
@@ -759,7 +781,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                     </button>
                     <button
                       type="button"
-                      onClick={() => toast("Wishlist feature coming soon")}
+                      onClick={() => void addToWishlist()}
                       aria-label="Add to wishlist"
                       title="Add to wishlist"
                       className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition-colors hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600"
