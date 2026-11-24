@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { SessionUserClient } from "../../../types/User/JWT.types";
+import CartBadge from "./CartBadge";
 import { getSectionsForRole, type NavLink } from "./navLinks";
 import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
 import { SectionDivider } from "../utils/SectionDiv";
@@ -275,6 +276,7 @@ export default function NavbarClient({ user }: Props) {
             >
               <ShoppingCart size={18} />
               <span className="hidden sm:inline">Cart</span>
+              <CartBadge />
             </RightLink>
 
             <IconButton

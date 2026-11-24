@@ -317,7 +317,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
     <div className="h-full rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
       <SectionEyebrow>Base product</SectionEyebrow>
       <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-        Product Description
+        About this item
       </h2>
 
       <p className="mt-3 text-sm leading-relaxed text-stone-700">
@@ -481,7 +481,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       {data.features.length > 0 && (
         <div className="mt-5 border-t border-stone-100 pt-4">
           <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-            Product Features
+            Qualities of this item
           </h3>
           <ul className="mt-2 space-y-1.5">
             {data.features.map((item) => (
@@ -500,7 +500,7 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
       {data.careInstructions.length > 0 && (
         <div className="mt-5 border-t border-stone-100 pt-4">
           <h3 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-            Care Instructions
+            How to take care of this item?
           </h3>
           <ul className="mt-2 space-y-1.5">
             {data.careInstructions.map((item) => (

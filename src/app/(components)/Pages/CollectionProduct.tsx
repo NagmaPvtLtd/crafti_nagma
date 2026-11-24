@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Heart,
+  Loader2,
   Maximize2,
   Flower2,
   Minus,
@@ -29,6 +30,7 @@ import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider } from "../utils/SectionDiv";
 import { WhatsAppIcon } from "../utils/SocialIcons";
 import { whatsappNumberLink } from "../../../utils/main.util";
+import getApiErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
 import type {
   CollectionOption,
@@ -182,6 +184,7 @@ export default function CollectionProduct({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [bulkNotice, setBulkNotice] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   /** `code|sku` already on screen — keeps the URL normalisation from refetching. */
   const loadedKeyRef = useRef<string | null>(null);
@@ -262,6 +265,48 @@ export default function CollectionProduct({ code }: { code: string }) {
     };
   }, [code, requestedSku, pathname, router]);
 
+  /** `addCart`/`qty` are written by the login round-trip — used once, then cleaned. */
+  const autoAddRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const variantId = searchParams.get("addCart");
+    if (!variantId || autoAddRef.current === variantId) return;
+    autoAddRef.current = variantId;
+
+    const requested = Number.parseInt(searchParams.get("qty") ?? "", 10);
+    const quantityToAdd = Number.isFinite(requested)
+      ? Math.min(Math.max(requested, 1), 99)
+      : 1;
+
+    void (async () => {
+      try {
+        await axios.post("/api/user/cart/items", {
+          variantId,
+          quantity: quantityToAdd,
+        });
+        window.dispatchEvent(new CustomEvent("cart:updated"));
+        toast.success("Added to cart");
+      } catch (err) {
+        toast.error(
+          getApiErrorMessage(err, "Could not add this item to your cart"),
+        );
+      } finally {
+        /* Whatever the product effect put in the URL stays; only the two
+           cart params are dropped, so a refresh cannot add twice. */
+        const live = new URLSearchParams(window.location.search);
+        live.delete("addCart");
+        live.delete("qty");
+        const clean = live.toString();
+        router.replace(
+          clean
+            ? `${window.location.pathname}?${clean}`
+            : window.location.pathname,
+          { scroll: false },
+        );
+      }
+    })();
+  }, [router, searchParams]);
+
   const options = product?.options ?? [];
 
   const selectedValueLabels = options
@@ -321,6 +366,10 @@ export default function CollectionProduct({ code }: { code: string }) {
   const compareAt = variant?.compareAtPrice ?? null;
   const stock = variant?.stock ?? null;
   const soldOut = stock !== null && stock <= 0;
+  /** Stock caps the stepper; 99 is the hard ceiling on every request. */
+  const quantityCeiling =
+    stock === null ? 99 : Math.max(1, Math.min(99, stock));
+  const effectiveQuantity = Math.min(quantity, quantityCeiling);
 
   const description =
     variant?.description?.trim() || product?.description || null;
@@ -442,18 +491,82 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
     whatsappMessage,
   )}`;
 
-  /** Quantity is capped at 99; past that the shopper sees a bulk-order note. */
+  /** Quantity is capped by the variant's stock, and at 99 in any case. */
   function changeQuantity(delta: -1 | 1) {
     setQuantity((current) => {
-      const next = current + delta;
-      if (next > 99) {
-        setBulkNotice(true);
-        return 99;
+      /* A variant switch can leave the stored value above the new ceiling. */
+      const from = Math.min(current, quantityCeiling);
+      const next = from + delta;
+
+      if (next > quantityCeiling) {
+        if (quantityCeiling === 99) setBulkNotice(true);
+        return quantityCeiling;
       }
       if (next < 1) return 1;
-      if (next < 99) setBulkNotice(false);
+      if (next < quantityCeiling) setBulkNotice(false);
       return next;
     });
+  }
+
+  /**
+   * Login-first add. A guest gets a 401 from the proxy-backed API; the item is
+   * remembered in the URL and added the moment they return signed in.
+   */
+  async function addToCart() {
+    if (!variant || variant.status !== "active" || soldOut || adding) return;
+
+    setAdding(true);
+
+    try {
+      await axios.post("/api/user/cart/items", {
+        variantId: variant.id,
+        quantity: effectiveQuantity,
+      });
+      window.dispatchEvent(new CustomEvent("cart:updated"));
+
+      toast.custom(
+        (t) => (
+          <div className="flex items-center gap-3 rounded-2xl border border-rose-100 bg-white px-4 py-3 shadow-lg shadow-rose-100/50">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            <span className="text-sm font-medium text-stone-800">
+              Added to cart
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                toast.dismiss(t.id);
+                router.push("/cart");
+              }}
+              className="cursor-pointer rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-rose-600"
+            >
+              View cart
+            </button>
+          </div>
+        ),
+        { duration: 5000 },
+      );
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : null;
+
+      if (status === 401) {
+        /* Sign in, then land back here with the item still queued. */
+        const next = new URLSearchParams(searchParams.toString());
+        next.delete("addCart");
+        next.delete("qty");
+        next.set("addCart", variant.id);
+        next.set("qty", String(effectiveQuantity));
+        const back = `${pathname}?${next.toString()}`;
+
+        router.push(`/login?callbackUrl=${encodeURIComponent(back)}`);
+        return;
+      }
+
+      toast.error(
+        getApiErrorMessage(err, "Could not add this item to your cart"),
+      );
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -772,20 +885,21 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                       <button
                         type="button"
                         onClick={() => changeQuantity(-1)}
-                        disabled={quantity <= 1}
+                        disabled={effectiveQuantity <= 1}
                         aria-label="Decrease quantity"
                         className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
                       <span className="inline-flex h-10 w-9 items-center justify-center border-x border-stone-100 text-sm font-semibold tabular-nums text-stone-900">
-                        {quantity}
+                        {effectiveQuantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => changeQuantity(1)}
+                        disabled={effectiveQuantity >= quantityCeiling}
                         aria-label="Increase quantity"
-                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
@@ -793,11 +907,27 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
 
                     <button
                       type="button"
-                      onClick={() => toast("Add to Cart is coming soon")}
-                      className="inline-flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600"
+                      onClick={() => void addToCart()}
+                      disabled={
+                        !variant ||
+                        variant.status !== "active" ||
+                        soldOut ||
+                        adding
+                      }
+                      className="inline-flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <ShoppingBag className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Add to Cart</span>
+                      {adding ? (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      ) : (
+                        <ShoppingBag className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="truncate">
+                        {!variant || variant.status !== "active"
+                          ? "Unavailable"
+                          : soldOut
+                            ? "Out of stock"
+                            : "Add to Cart"}
+                      </span>
                     </button>
 
                     <a
@@ -829,7 +959,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                 <div className="rounded-2xl border border-rose-100 bg-white/85 p-5 backdrop-blur-sm sm:rounded-3xl">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                      Product Description
+                      About this item
                     </h2>
                     {variant?.description?.trim() &&
                       selectedValueLabels.length > 0 && (
@@ -865,11 +995,11 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                 <SectionDivider className="mx-auto max-w-7xl py-8" />
                 <div className="space-y-3">
                   <DetailList
-                    title="Product Features"
+                    title="Qualities of this item"
                     items={features.map((feature) => feature.text)}
                   />
                   <DetailList
-                    title="Product Care Instructions"
+                    title="How to take care of this item?"
                     items={careInstructions.map((care) => care.text)}
                   />
                   <DetailList
