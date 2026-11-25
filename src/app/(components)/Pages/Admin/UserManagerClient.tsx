@@ -19,6 +19,7 @@ import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import ErrorState from "../../utils/ErrorState";
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { formatDateTime } from "../../../../utils/Formator/formatDateTime.util";
 import { USER_ROLES } from "../../../../utils/zod/admin/userManager.zod";
 import type {
   UserRole,
@@ -93,13 +94,6 @@ type UsersPayload = {
 /* ------------------------------------------------------------------ */
 /*  Format helpers                                                     */
 /* ------------------------------------------------------------------ */
-
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
 const roleCount = (payload: UsersPayload | null, role: UserRole) =>
   payload?.facets.roles.find((row) => row.value === role)?.count ?? 0;
@@ -184,7 +178,7 @@ export default function UserManagerClient() {
       <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <SectionEyebrow>Admin</SectionEyebrow>
+            <SectionEyebrow href="/admin/dashboard">Admin</SectionEyebrow>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
               User Manager
             </h1>
@@ -387,7 +381,8 @@ export default function UserManagerClient() {
                           </span>
                         )}
                         <span className="text-stone-400">
-                          Joined {fmtDate(user.createdAt)}
+                          Joined{" "}
+                          {formatDateTime(user.createdAt, { format: "date-long" })}
                         </span>
                       </div>
 

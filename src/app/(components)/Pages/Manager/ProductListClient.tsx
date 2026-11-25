@@ -438,6 +438,7 @@ function ProductRow({ product }: { product: ProductListItem }) {
               alt={product.name}
               fill
               sizes="56px"
+              loading={"eager"}
               className="object-cover"
             />
           ) : (

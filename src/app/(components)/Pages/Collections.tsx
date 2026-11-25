@@ -200,7 +200,10 @@ export default function Collections() {
                   Nothing is marked as featured yet.
                 </p>
               ) : (
-                <div className="overflow-hidden" ref={emblaRef}>
+                <div
+                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                  ref={emblaRef}
+                >
                   <div className="-ml-3 flex touch-pan-y select-none">
                     {featured.map((product) => (
                       <div
@@ -258,7 +261,10 @@ export default function Collections() {
                   No categories have been created yet.
                 </p>
               ) : (
-                <div className="overflow-hidden" ref={catRef}>
+                <div
+                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                  ref={catRef}
+                >
                   <div className="-ml-2.5 flex touch-pan-y select-none">
                     {categories.map((category) => (
                       <div
@@ -267,16 +273,17 @@ export default function Collections() {
                       >
                         <Link
                           href={category.href}
-                          className="group flex flex-col overflow-hidden rounded-(--card-radius) border border-white/60 bg-white/85 backdrop-blur-sm transition-all [--card-radius:1rem] hover:-translate-y-0.5 hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60"
+                          className="group flex flex-col rounded-(--card-radius) border border-white/60 bg-white/85 backdrop-blur-sm transition-all duration-300 [--card-radius:1rem] hover:scale-[1.02] hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60"
                         >
-                          <div className="relative aspect-square overflow-hidden bg-linear-to-br from-rose-100 via-rose-50 to-amber-50">
+                          <div className="relative aspect-square overflow-hidden rounded-t-(--card-radius) bg-linear-to-b from-rose-100 via-rose-50 to-white">
                             {category.thumbnailUrl ? (
                               <Image
                                 src={category.thumbnailUrl}
                                 alt={category.name}
                                 fill
+                                loading={"eager"}
                                 sizes="(max-width: 640px) 44vw, (max-width: 1024px) 25vw, 20vw"
-                                className="card-photo object-cover transition-transform duration-300 group-hover:scale-103"
+                                className="card-photo object-cover"
                               />
                             ) : (
                               <div className="flex h-full items-center justify-center">

@@ -676,6 +676,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                                 src={image.url}
                                 alt={image.altText ?? product.name}
                                 fill
+                                loading={"eager"}
                                 sizes="(max-width: 1024px) 100vw, 50vw"
                                 className="object-cover"
                                 draggable={false}
@@ -747,6 +748,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                             src={image.url}
                             alt={image.altText ?? product.name}
                             fill
+                            loading={"eager"}
                             sizes="64px"
                             className="object-cover"
                           />
@@ -914,29 +916,29 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                         <Heart className="h-4 w-4" />
                       </button>
                     ) : (
-                    <div className="inline-flex shrink-0 items-center rounded-xl border border-stone-200 bg-white">
-                      <button
-                        type="button"
-                        onClick={() => changeQuantity(-1)}
-                        disabled={effectiveQuantity <= 1}
-                        aria-label="Decrease quantity"
-                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="inline-flex h-10 w-9 items-center justify-center border-x border-stone-100 text-sm font-semibold tabular-nums text-stone-900">
-                        {effectiveQuantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => changeQuantity(1)}
-                        disabled={effectiveQuantity >= quantityCeiling}
-                        aria-label="Increase quantity"
-                        className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                      <div className="inline-flex shrink-0 items-center rounded-xl border border-stone-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => changeQuantity(-1)}
+                          disabled={effectiveQuantity <= 1}
+                          aria-label="Decrease quantity"
+                          className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="inline-flex h-10 w-9 items-center justify-center border-x border-stone-100 text-sm font-semibold tabular-nums text-stone-900">
+                          {effectiveQuantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => changeQuantity(1)}
+                          disabled={effectiveQuantity >= quantityCeiling}
+                          aria-label="Increase quantity"
+                          className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     )}
 
                     <button

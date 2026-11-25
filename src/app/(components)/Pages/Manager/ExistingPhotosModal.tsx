@@ -198,6 +198,7 @@ export default function ExistingPhotosModal({
                           src={image.url}
                           alt={image.altText || group.sku}
                           fill
+                          loading={"eager"}
                           sizes="(max-width: 640px) 50vw, 25vw"
                           className="object-cover"
                         />

@@ -193,7 +193,7 @@ export default function CollectionCard({
   }
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-(--card-radius) border border-rose-100 bg-white transition-all [--card-radius:1rem] hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-lg hover:shadow-rose-100/60 sm:[--card-radius:1.5rem]">
+    <div className="group relative flex h-full flex-col rounded-(--card-radius) border border-rose-100 bg-white transition-all duration-300 [--card-radius:1rem] hover:scale-[1.02] hover:border-rose-200 hover:shadow-lg hover:shadow-rose-100/60 sm:[--card-radius:1.5rem]">
       {/* Card-wide link sits under the two buttons. */}
       <Link
         href={product.href}
@@ -201,15 +201,16 @@ export default function CollectionCard({
         className="absolute inset-0 z-10"
       />
 
-      <div className="relative overflow-hidden bg-linear-to-br from-rose-50 via-white to-amber-50">
+      <div className="relative overflow-hidden rounded-t-(--card-radius) bg-linear-to-b from-rose-100 via-rose-50 to-white">
         <div className="relative aspect-square w-full">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt={product.name}
               fill
+              loading={"eager"}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              className="card-photo object-cover transition-transform duration-300 group-hover:scale-103"
+              className="card-photo object-cover"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">

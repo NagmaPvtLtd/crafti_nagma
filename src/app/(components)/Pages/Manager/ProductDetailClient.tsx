@@ -34,6 +34,7 @@ import StudioModal from "./StudioModal";
 import PricingQuizButton from "./PricingQuizModal";
 import { suggestPrice } from "../../../../utils/Pricing/pricing.util";
 import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
+import { formatDateTime } from "../../../../utils/Formator/formatDateTime.util";
 import type {
   ProductDetailResponse,
   ProductVariantSummary,
@@ -42,15 +43,6 @@ import type {
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
-
-const fmtDate = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -549,8 +541,14 @@ function BaseDetails({ data }: { data: ProductDetailResponse }) {
             label="Showcase"
             value={product.mainShowcase ? "Yes" : "No"}
           />
-          <DetailRow label="Created" value={fmtDate(product.createdAt)} />
-          <DetailRow label="Updated" value={fmtDate(product.updatedAt)} />
+          <DetailRow
+            label="Created"
+            value={formatDateTime(product.createdAt, { format: "date-long" })}
+          />
+          <DetailRow
+            label="Updated"
+            value={formatDateTime(product.updatedAt, { format: "date-long" })}
+          />
         </dl>
       </div>
 
@@ -761,6 +759,7 @@ function VariantRow({
               alt={variant.name || variant.sku}
               fill
               sizes="40px"
+              loading={"eager"}
               className="object-cover"
             />
           ) : (
@@ -909,7 +908,7 @@ function ReviewsSection({
                   </span>
                 )}
                 <span className="ml-auto text-[10px] text-stone-400">
-                  {fmtDate(review.createdAt)}
+                  {formatDateTime(review.createdAt, { format: "date-long" })}
                 </span>
               </div>
               {review.title && (

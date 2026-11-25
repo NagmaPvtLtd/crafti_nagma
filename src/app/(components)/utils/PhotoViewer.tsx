@@ -219,6 +219,7 @@ function ViewerPanel({
                     fill
                     draggable={false}
                     sizes="100vw"
+                    loading={"eager"}
                     className="object-contain"
                   />
                 </div>
@@ -248,6 +249,7 @@ function ViewerPanel({
                 alt={image.altText || title || "Photo"}
                 fill
                 sizes="48px"
+                loading={"eager"}
                 className="object-cover"
               />
             </button>

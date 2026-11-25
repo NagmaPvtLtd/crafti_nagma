@@ -77,6 +77,7 @@ export default function PageWrapper({
             fill
             priority
             sizes="100vw"
+            loading={"eager"}
             className="object-cover"
           />
           {soften && (

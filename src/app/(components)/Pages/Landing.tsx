@@ -291,6 +291,7 @@ export default function Landing() {
                       src={CraftiNagma}
                       alt="Crafti Nagma handmade crochet and embroidery"
                       fill
+                      loading={"eager"}
                       sizes="(max-width: 640px) 220px, (max-width: 768px) 320px, 384px"
                       className="object-cover"
                       priority

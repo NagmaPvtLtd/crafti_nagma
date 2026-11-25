@@ -17,6 +17,7 @@ import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.u
 import PageWrapper from "../../utils/PageWrapper";
 import ErrorState from "../../utils/ErrorState";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { formatDateTime } from "../../../../utils/Formator/formatDateTime.util";
 import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import {
   type RangeType,
@@ -97,27 +98,6 @@ type AuditLogsPayload = {
 /* ------------------------------------------------------------------ */
 /*  Format helpers                                                     */
 /* ------------------------------------------------------------------ */
-
-const fmtDateTime = (iso: string) =>
-  new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-const fmtRelative = (iso: string) => {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-};
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -426,7 +406,8 @@ function LogRow({ log }: { log: AuditLogEntry }) {
               {log.entityType}
             </span>
             <span className="text-[11px] text-stone-400">
-              {fmtRelative(log.createdAt)} · {fmtDateTime(log.createdAt)}
+              {formatDateTime(log.createdAt, { format: "relative" })} ·{" "}
+              {formatDateTime(log.createdAt, { format: "long" })}
             </span>
           </div>
 

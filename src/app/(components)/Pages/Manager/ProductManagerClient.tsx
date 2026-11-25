@@ -387,6 +387,7 @@ function RecentlyUpdated({
                       alt={p.name}
                       fill
                       sizes="44px"
+                      loading={"eager"}
                       className="object-cover"
                     />
                   ) : (

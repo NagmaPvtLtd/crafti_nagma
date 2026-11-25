@@ -135,6 +135,7 @@ export default function NavbarClient({ user }: Props) {
               width={140}
               height={36}
               priority
+              loading={"eager"}
               className="h-8 w-auto object-contain"
             />
           </Link>
@@ -456,6 +457,7 @@ function Avatar({
       alt={name}
       width={size}
       height={size}
+      loading={"eager"}
       onError={() => setFailed(true)}
       className="shrink-0 rounded-full border border-rose-200 object-cover"
       style={{ width: size, height: size }}

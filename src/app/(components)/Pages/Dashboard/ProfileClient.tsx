@@ -207,6 +207,7 @@ function ViewMode({ profile }: { profile: ProfileResponse }) {
             alt={displayName}
             width={56}
             height={56}
+            loading={"eager"}
             className="h-14 w-14 rounded-full border border-rose-200 object-cover"
           />
         ) : (

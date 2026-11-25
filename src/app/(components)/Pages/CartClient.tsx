@@ -44,9 +44,7 @@ export default function CartClient() {
       setCart(res.data);
       setError(null);
     } catch (err) {
-      setError(
-        getApiErrorMessage(err, "Could not load your cart right now."),
-      );
+      setError(getApiErrorMessage(err, "Could not load your cart right now."));
     } finally {
       setLoading(false);
     }
@@ -305,6 +303,7 @@ function CartRow({
             alt={item.name}
             fill
             sizes="96px"
+            loading={"eager"}
             className="object-cover"
           />
         ) : (
@@ -389,7 +388,9 @@ function CartRow({
             <button
               type="button"
               onClick={() => onQuantity(item.quantity + 1)}
-              disabled={busy || !item.available || item.quantity >= MAX_QUANTITY}
+              disabled={
+                busy || !item.available || item.quantity >= MAX_QUANTITY
+              }
               aria-label="Increase quantity"
               className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
             >

@@ -39,7 +39,8 @@ export function MediaGallery({
   className?: string;
 }) {
   const [index, setIndex] = useState(0);
-  const safeIndex = images.length === 0 ? 0 : Math.min(index, images.length - 1);
+  const safeIndex =
+    images.length === 0 ? 0 : Math.min(index, images.length - 1);
 
   /* ---- Full-screen viewer ---------------------------------------- */
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -112,6 +113,7 @@ export function MediaGallery({
                     src={image.url}
                     alt={image.altText || alt}
                     fill
+                    loading={"eager"}
                     sizes="(max-width: 640px) 100vw, 50vw"
                     className="object-cover"
                     draggable={false}
@@ -178,6 +180,7 @@ export function MediaGallery({
                   src={image.url}
                   alt={image.altText || alt}
                   fill
+                  loading={"eager"}
                   sizes="48px"
                   className="object-cover"
                 />
@@ -391,6 +394,7 @@ export default function ProductMediaManager({
                   src={image.url}
                   alt={image.altText || title}
                   fill
+                  loading={"eager"}
                   sizes="(max-width: 640px) 50vw, 33vw"
                   className="object-cover"
                 />

@@ -18,8 +18,7 @@ const FOOTER_CONTENT = {
       title: "Collections",
       links: [
         { label: "All collections", href: "/collections" },
-        { label: "Bouquets", href: "/collections?category=Bouquets" },
-        { label: "Custom orders", href: "/custom" },
+        { label: "Custom orders", href: "/dashboard/custom-order" },
       ],
     },
     {
@@ -100,6 +99,7 @@ export default function Footer() {
                 alt="Crafti Nagma"
                 width={140}
                 height={36}
+                loading={"eager"}
                 className="h-7 w-auto object-contain sm:h-8"
               />
             </Link>
@@ -175,7 +175,7 @@ export default function Footer() {
             {FOOTER_CONTENT.madeWith.before}
             <Heart
               aria-hidden
-              className="animate-cl-heartbeat motion-reduce:animate-none h-3 w-3 fill-rose-500 text-rose-500"
+              className="h-3 w-3 fill-rose-500 text-rose-500"
             />
             {FOOTER_CONTENT.madeWith.after}
             <Link

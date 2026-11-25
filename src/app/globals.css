@@ -19,16 +19,6 @@
   }
 }
 
-/* Smooth anchor and programmatic scrolling; reduced-motion users get instant. */
-html {
-  scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-}
 
 body {
   background: var(--background);
