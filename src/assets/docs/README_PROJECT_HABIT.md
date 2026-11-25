@@ -38,6 +38,13 @@ Writing a second copy of something that already exists is a bug, not a shortcut.
 - Every icon comes from `lucide-react`, sized and coloured with Tailwind classes like the rest of the app (`<Clock className="h-3.5 w-3.5" />`).
 - Pick the icon that carries the meaning (e.g. `Clock` for pending, `Truck` for shipped, `CheckCircle2` for completed, `XCircle` for cancelled, `Heart` for wishlist). If no lucide icon fits, use plain text — never an emoji or a hand-rolled inline SVG.
 
+# Server → Client boundary — never pass a function or component
+
+- A Server Component may only hand **plain data** to a `"use client"` component: strings, numbers, booleans, dates that serialise, plain objects and arrays. Passing a lucide icon, a render callback or any other function throws at runtime (`Functions cannot be passed directly to Client Components`) — and `tsc`/`eslint` will not catch it.
+- So shared client components take data, not behaviour: an icon **name** (`"heart"`, `"package"`) that the client file resolves from its own map, or a `children` node, instead of an `icon={Heart}` prop.
+- Icons rendered inside a Server Component are fine as components; the mistake is only when the value has to cross into a Client Component.
+- Symptom to recognise: the page returns `200`, then the browser console shows *"Only plain objects can be passed to Client Components from Server Components"* or the function error above. Fix the prop, not the page.
+
 # Verification — the owner does the manual testing
 
 - Do **not** start `next dev` (or any preview server), do **not** curl API endpoints or pages, and do **not** click through the app to test a change. That manual verification — sign-in flows, hitting APIs, dev-server smoke tests — is the owner's own work; they will do it themselves.

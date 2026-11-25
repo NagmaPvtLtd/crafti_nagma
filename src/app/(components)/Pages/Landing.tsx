@@ -21,7 +21,7 @@ const LANDING_CONTENT = {
     brand: "Crafti Nagma",
     tagline: "Stitch by stitch, made just for you.",
     description:
-      "Cozy crochet gifts, embroidery hoops, and custom decor — every piece handcrafted in small batches by a tiny homegrown team, never mass-produced.",
+      "Cozy crochet gifts, embroidery hoops, and custom decor — every piece handcrafted in small batches by one pair of hands, never mass-produced.",
     rating: 5,
     ratingCount: "120+",
     ratingCopy: "Happy {count} handcraft lovers!",
@@ -39,7 +39,7 @@ const LANDING_CONTENT = {
     heading: "Made by hand, made with heart.",
     body: "Crafti Nagma started as a quiet hobby in a small room in India — and grew into a tiny homegrown startup. From amigurumi cuties to embroidered wall art, every piece is made to order, made slowly, and made to last.",
     footnote:
-      "No factories. No shortcuts. Just a small team, a hook, and a whole lot of love.",
+      "No factories. No shortcuts. Just one pair of hands, a hook, and a whole lot of love.",
   },
 
   offerings: [
@@ -88,7 +88,7 @@ const LANDING_CONTENT = {
         icon: "check" as const,
         title: "Order accepted",
         description:
-          "We review your order and add it to the crafting queue with a big smile.",
+          "Your order is checked and added to the crafting queue with a big smile.",
       },
       {
         step: "03",

@@ -171,7 +171,8 @@ links**.
    "Clear search".
 
 The whole page is inside `PageWrapper variant="hero"` with two soft rose blobs,
-per the shared UI/UX doc.
+per the shared UI/UX doc. Copy on this page talks to a shopper only — the words
+"studio", "manager" and "admin" never appear on a public surface.
 
 ### 3.2 `/collections/[category]` and `/[subcategory]` — browse
 
@@ -328,6 +329,22 @@ discovery.
    `/search?q=<term>`; below it the products render as a square-card grid and
    the next batch of 8 is revealed by an `IntersectionObserver` sentinel well
    before the shopper reaches the bottom, so scrolling never waits.
+
+### Empty states — hide the block, do not fill it with an apology
+
+A section that has nothing to show is not rendered at all: no placeholder card,
+no "nothing here yet" note, and no `SectionDivider` left behind to float in
+space.
+
+| Situation | What renders |
+| --- | --- |
+| `featured.length === 0` | The whole **Featured** section (heading, controls, divider) is skipped. |
+| No categories, or categories exist but every one has `totalProductCount === 0` | The whole **Categories** section is skipped — `categories` is filtered to `totalProductCount > 0` before rendering. |
+| `products.length === 0` | The search field stays, followed by a single centred card: "No products yet" + a shopper-facing line ("Our shelves are being restocked — new handmade pieces will show up here soon."). No internal/studio wording. |
+
+The dividers between sections are conditional for the same reason: the
+Featured→Categories divider only renders when *both* sections do, and the
+Categories→All-products divider only when Categories renders.
 
 ## 9. `/search` page
 

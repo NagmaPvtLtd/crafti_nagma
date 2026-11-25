@@ -160,7 +160,8 @@ export default function Collections() {
         ) : (
           <>
             {/* ---------------- 1. Featured ---------------- */}
-            <section className="relative">
+            {featured.length > 0 && (
+              <section className="relative">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                 <div className="min-w-0">
                   <SectionEyebrow>Featured</SectionEyebrow>
@@ -195,15 +196,10 @@ export default function Collections() {
                 )}
               </div>
 
-              {featured.length === 0 ? (
-                <p className="mt-4 rounded-2xl border border-dashed border-rose-200 bg-white/70 px-4 py-6 text-center text-xs text-stone-500">
-                  Nothing is marked as featured yet.
-                </p>
-              ) : (
-                <div
-                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
-                  ref={emblaRef}
-                >
+              <div
+                className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                ref={emblaRef}
+              >
                   <div className="-ml-3 flex touch-pan-y select-none">
                     {featured.map((product) => (
                       <div
@@ -215,13 +211,16 @@ export default function Collections() {
                     ))}
                   </div>
                 </div>
-              )}
-            </section>
+              </section>
+            )}
 
-            <SectionDivider className="my-8" size={11} />
+            {featured.length > 0 && categories.length > 0 && (
+              <SectionDivider className="my-8" size={11} />
+            )}
 
             {/* ---------------- 2. Categories ---------------- */}
-            <section className="relative">
+            {categories.length > 0 && (
+              <section className="relative">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                 <div className="min-w-0">
                   <SectionEyebrow>Categories</SectionEyebrow>
@@ -256,15 +255,10 @@ export default function Collections() {
                 )}
               </div>
 
-              {categories.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-rose-200 bg-white/70 px-4 py-6 text-center text-xs text-stone-500">
-                  No categories have been created yet.
-                </p>
-              ) : (
-                <div
-                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
-                  ref={catRef}
-                >
+              <div
+                className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                ref={catRef}
+              >
                   <div className="-ml-2.5 flex touch-pan-y select-none">
                     {categories.map((category) => (
                       <div
@@ -310,10 +304,12 @@ export default function Collections() {
                     ))}
                   </div>
                 </div>
-              )}
-            </section>
+              </section>
+            )}
 
-            <SectionDivider className="my-8" size={11} />
+            {categories.length > 0 && (
+              <SectionDivider className="my-8" size={11} />
+            )}
 
             {/* ---------------- 3. Search + product grid ---------------- */}
             <section className="relative" id="all-products">
@@ -352,7 +348,8 @@ export default function Collections() {
                     No products yet
                   </h3>
                   <p className="mt-1 max-w-sm text-xs text-stone-600">
-                    Products added in the studio will appear here.
+                    Our shelves are being restocked — new handmade pieces
+                    will show up here soon. Please check back in a little while.
                   </p>
                 </div>
               ) : (
