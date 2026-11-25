@@ -1,0 +1,4 @@
+- in the collection page, in the all products section why you are writing products added in product studio will show here, like tf. user doesn't care about no product studio, give them user generic msg.
+- if there is no featured product then we wont show the featured section at all
+- if there is no categories or have categories but no product assigned in those categories ( cz empty categories we dont show ) so we wont render that whole categories wala block
+- if the all product page is empty then we'll simply show no products ok?

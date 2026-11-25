@@ -25,16 +25,15 @@ const FOOTER_CONTENT = {
       title: "About",
       links: [
         { label: "Our story", href: "/about" },
-        { label: "How it's made", href: "/about#process" },
-        { label: "Care guide", href: "/care" },
+        { label: "How it's made", href: "/how-it-is-made" },
+        { label: "Care guide", href: "/care-guide" },
       ],
     },
     {
       title: "Support",
       links: [
-        { label: "Track order", href: "/account/orders" },
-        { label: "Shipping & returns", href: "/shipping" },
-        { label: "Contact us", href: `mailto:${supportMail}` },
+        { label: "Track order", href: "/dashboard/orders" },
+        { label: "Shipping & returns", href: "/policy/cancellation-refund" },
       ],
     },
     {
