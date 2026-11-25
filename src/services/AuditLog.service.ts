@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
 import type { ResultSetHeader } from "mysql2/promise";
+import { generateULID } from "../utils/generateULID.util";
 import {
   DbExecutor,
   LogAuditInput,
@@ -19,7 +19,7 @@ export class AuditLogService {
       entityId = null,
       description,
       metadata = null,
-      id = randomUUID(),
+      id = generateULID("aud"),
       createdAt,
     } = input;
 

@@ -47,9 +47,9 @@ const LANDING_CONTENT = {
       icon: "heart" as const,
       title: "Catalogue is ready!",
       description:
-        "Browse our current collection — crochet plushies, keychains, hoops, and more.",
-      cta: "Shop collection",
-      href: "/products",
+        "Our current collection — crochet plushies, keychains, hoops, and more.",
+      cta: "View collections",
+      href: "/collections",
     },
     {
       icon: "message" as const,
@@ -57,7 +57,7 @@ const LANDING_CONTENT = {
       description:
         "Pick a base design and customise colours, size, or a name. Crafted just for you!",
       cta: "Order custom",
-      href: "/custom",
+      href: "/dashboard/custom-order",
     },
     {
       icon: "gift" as const,
@@ -65,7 +65,7 @@ const LANDING_CONTENT = {
       description:
         "Curated gift sets for birthdays, anniversaries, and baby showers — beautifully wrapped and ready to give.",
       cta: "Explore gifts",
-      href: "/products?category=gifts",
+      href: "/search?q=gift",
     },
   ] as const,
 
@@ -118,7 +118,7 @@ const LANDING_CONTENT = {
     footerNote: {
       before: "Track your order anytime from your",
       linkText: "account dashboard",
-      linkHref: "/account/orders",
+      linkHref: "/dashboard/orders",
       after: "— or reach out to us directly.",
     },
   },
@@ -130,9 +130,12 @@ const LANDING_CONTENT = {
 
   finalCta: {
     heading: "Ready to bring handmade home?",
-    body: "Browse the collection or tell us your idea — either way, something special is about to begin.",
-    primaryCta: { label: "Shop the collection", href: "/products" },
-    secondaryCta: { label: "Start a custom order", href: "/custom" },
+    body: "Explore the collection or tell us your idea — either way, something special is about to begin.",
+    primaryCta: { label: "View collections", href: "/collections" },
+    secondaryCta: {
+      label: "Start a custom order",
+      href: "/dashboard/custom-order",
+    },
     footnote: "Free shipping on special occassions! · Ships India-wide",
   },
 } as const;
@@ -215,14 +218,14 @@ export default function Landing() {
 
               <div className="mt-7 flex flex-col gap-2.5 sm:mt-9 sm:flex-row sm:justify-center md:justify-start">
                 <Link
-                  href="/products"
+                  href="/collections"
                   className="group inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-5 py-3.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-all hover:bg-rose-600 hover:shadow-md hover:shadow-rose-500/30 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-rose-500 active:scale-[0.98] sm:px-7"
                 >
-                  Shop the collection
+                  View collections
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
                 <Link
-                  href="/custom"
+                  href="/dashboard/custom-order"
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 px-5 py-3.5 text-sm font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-100 active:scale-[0.98] sm:px-7"
                 >
                   <MessageCircle className="h-4 w-4" />
@@ -288,6 +291,7 @@ export default function Landing() {
                       src={CraftiNagma}
                       alt="Crafti Nagma handmade crochet and embroidery"
                       fill
+                      loading={"eager"}
                       sizes="(max-width: 640px) 220px, (max-width: 768px) 320px, 384px"
                       className="object-cover"
                       priority
@@ -314,7 +318,7 @@ export default function Landing() {
         <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
 
         <section className="relative">
-          <div className="mx-auto w-full max-w-3xl px-4 py-12 text-center sm:px-6 sm:py-16 md:py-20">
+          <div className="mx-auto w-full max-w-7xl px-4 py-12 text-center sm:px-6 sm:py-16 md:py-20">
             <SectionEyebrow>{story.eyebrow}</SectionEyebrow>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-900 sm:mt-4 sm:text-3xl md:text-4xl">
               {story.heading}

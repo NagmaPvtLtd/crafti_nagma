@@ -3,11 +3,9 @@
 -- ===========================================================
 CREATE TABLE users (
     id CHAR(40) NOT NULL PRIMARY KEY,
-    -- Personal Information
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) DEFAULT NULL,
     full_name VARCHAR(255) DEFAULT NULL,
-    -- Authentication
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(20) NULL,
     password_hash VARCHAR(255) DEFAULT NULL,
@@ -15,7 +13,6 @@ CREATE TABLE users (
     google_profile_picture VARCHAR(500) DEFAULT NULL,
     email_verified BOOLEAN DEFAULT FALSE,
     phone_verified BOOLEAN DEFAULT FALSE,
-    -- Shipping Address
     address_line_1 VARCHAR(255) DEFAULT NULL,
     address_line_2 VARCHAR(255) DEFAULT NULL,
     landmark VARCHAR(255) DEFAULT NULL,
@@ -23,24 +20,17 @@ CREATE TABLE users (
     state VARCHAR(100) DEFAULT NULL,
     postal_code VARCHAR(10) DEFAULT NULL,
     country VARCHAR(100) DEFAULT 'India',
-    -- Optional Business Details
     company_name VARCHAR(255) DEFAULT NULL,
     gstin VARCHAR(20) DEFAULT NULL,
-    -- Account
-    role ENUM(
-        'super_admin',
-        'admin',
-        'manager',
-        'customer'
-    ) DEFAULT 'customer',
-    status ENUM(
-        'active',
-        'inactive',
-        'banned'
-    ) DEFAULT 'active',
+    role ENUM('super_admin', 'admin', 'manager', 'customer') DEFAULT 'customer',
+    status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     profile_completed BOOLEAN DEFAULT FALSE,
+    session_id CHAR(40) DEFAULT NULL,
+    cooldown_till DATETIME DEFAULT NULL,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME DEFAULT NULL
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
 );
 -- ===========================================================
 -- Categories
@@ -102,6 +92,10 @@ CREATE TABLE products (
     meta_description VARCHAR(500) DEFAULT NULL,
     delivery_charges DECIMAL(10, 2) DEFAULT 0,
     processing_time VARCHAR(100) DEFAULT NULL,
+    length DECIMAL(10, 2) DEFAULT NULL,
+    width DECIMAL(10, 2) DEFAULT NULL,
+    height DECIMAL(10, 2) DEFAULT NULL,
+    dimension_unit ENUM('cm', 'in') DEFAULT NULL,
     is_featured BOOLEAN DEFAULT FALSE,
     main_showcase BOOLEAN DEFAULT FALSE,
     orders_count INT DEFAULT 0,
@@ -130,6 +124,7 @@ CREATE TABLE product_options (
     global_option_id CHAR(40) NOT NULL,
     name VARCHAR(100) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -145,6 +140,7 @@ CREATE TABLE product_option_values (
     option_id CHAR(40) NOT NULL,
     global_option_value_id CHAR(40) NOT NULL,
     value VARCHAR(100) NOT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
     created_by CHAR(40) NOT NULL,
     updated_by CHAR(40) DEFAULT NULL,
     created_at DATETIME NOT NULL,
@@ -166,6 +162,10 @@ CREATE TABLE product_variants (
     compare_at_price DECIMAL(10, 2) DEFAULT NULL,
     stock INT NOT NULL DEFAULT 0,
     weight DECIMAL(10, 2) DEFAULT NULL,
+    length DECIMAL(10, 2) DEFAULT NULL,
+    width DECIMAL(10, 2) DEFAULT NULL,
+    height DECIMAL(10, 2) DEFAULT NULL,
+    dimension_unit ENUM('cm', 'in') DEFAULT NULL,
     status ENUM('active', 'inactive') DEFAULT 'active',
     is_featured BOOLEAN DEFAULT FALSE,
     main_showcase BOOLEAN DEFAULT FALSE,
@@ -233,6 +233,34 @@ CREATE TABLE product_care_instructions (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 -- ===========================================================
+-- Variant Features (snapshot of the base product's feature list)
+-- ===========================================================
+CREATE TABLE product_variant_features (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    variant_id CHAR(40) NOT NULL,
+    feature VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
+);
+-- ===========================================================
+-- Variant Care Instructions (snapshot of the base product's list)
+-- ===========================================================
+CREATE TABLE product_variant_care_instructions (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    variant_id CHAR(40) NOT NULL,
+    instruction VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
+);
+-- ===========================================================
 -- Product Gift Included
 -- ===========================================================
 CREATE TABLE product_gift_included (
@@ -246,11 +274,36 @@ CREATE TABLE product_gift_included (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 -- ===========================================================
+-- Product Reviews
+-- ===========================================================
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    product_id CHAR(40) NOT NULL,
+    variant_id CHAR(40) DEFAULT NULL,
+    user_id CHAR(40) DEFAULT NULL,
+    reviewer_name VARCHAR(150) NOT NULL,
+    rating TINYINT UNSIGNED NOT NULL,
+    title VARCHAR(200) DEFAULT NULL,
+    comment TEXT DEFAULT NULL,
+    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    KEY idx_product_reviews_product (product_id),
+    CONSTRAINT fk_product_reviews_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_product_reviews_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE
+    SET NULL,
+        CONSTRAINT fk_product_reviews_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE
+    SET NULL
+);
+-- ===========================================================
 -- ImageKit Files (Centralized File Management - Polymorphic)
 -- ===========================================================
 CREATE TABLE imagekit_files (
     id CHAR(40) NOT NULL PRIMARY KEY,
-    file_id VARCHAR(255) NOT NULL UNIQUE,
+    entity_type VARCHAR(50) NOT NULL DEFAULT 'product_variant',
+    entity_id CHAR(40) NOT NULL DEFAULT '',
+    source_image_id CHAR(40) DEFAULT NULL,
+    file_id VARCHAR(255) DEFAULT NULL UNIQUE,
     url VARCHAR(500) NOT NULL,
     file_purpose ENUM(
         'product_variant_image',
@@ -263,6 +316,31 @@ CREATE TABLE imagekit_files (
     created_by CHAR(40) NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_imagekit_files_link (source_image_id, entity_id),
+    KEY idx_imagekit_files_source (source_image_id),
+    CONSTRAINT chk_imagekit_files_entity_type CHECK (
+        entity_type = 'product_variant'
+        OR entity_type = 'product'
+    ),
+    CONSTRAINT chk_imagekit_files_file_purpose_variant CHECK (
+        (file_purpose IS NULL)
+        OR (
+            file_purpose = 'product_variant_image'
+            AND entity_type = 'product_variant'
+            AND entity_id <> ''
+        )
+    ),
+    CONSTRAINT fk_imagekit_files_source FOREIGN KEY (source_image_id) REFERENCES imagekit_files(id) ON DELETE CASCADE,
+    CONSTRAINT chk_imagekit_files_origin CHECK (
+        (
+            source_image_id IS NULL
+            AND file_id IS NOT NULL
+        )
+        OR (
+            source_image_id IS NOT NULL
+            AND file_id IS NULL
+        )
+    ),
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 -- ===========================================================
@@ -271,9 +349,7 @@ CREATE TABLE imagekit_files (
 CREATE TABLE carts (
     id CHAR(40) NOT NULL PRIMARY KEY,
     user_id CHAR(40) DEFAULT NULL,
-    -- NULL for guest carts
     session_id VARCHAR(255) DEFAULT NULL,
-    -- for guests before login
     status ENUM('active', 'converted', 'abandoned') DEFAULT 'active',
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
@@ -290,7 +366,6 @@ CREATE TABLE cart_items (
     variant_id CHAR(40) NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     personalization_data JSON DEFAULT NULL,
-    -- matches product_personalizations
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
@@ -303,10 +378,7 @@ CREATE TABLE cart_items (
 CREATE TABLE orders (
     id CHAR(40) NOT NULL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
-    -- human-readable, e.g. CRF-2026-0001
     user_id CHAR(40) DEFAULT NULL,
-    -- NULL if guest checkout allowed
-    -- Snapshot of shipping details (immutable after order placed)
     shipping_first_name VARCHAR(100) NOT NULL,
     shipping_last_name VARCHAR(100) DEFAULT NULL,
     shipping_phone VARCHAR(20) NOT NULL,
@@ -318,12 +390,10 @@ CREATE TABLE orders (
     shipping_state VARCHAR(100) NOT NULL,
     shipping_postal_code VARCHAR(10) NOT NULL,
     shipping_country VARCHAR(100) DEFAULT 'India',
-    -- Amounts (all snapshots at time of order)
     subtotal DECIMAL(10, 2) NOT NULL,
     delivery_charges DECIMAL(10, 2) DEFAULT 0,
     discount DECIMAL(10, 2) DEFAULT 0,
     total DECIMAL(10, 2) NOT NULL,
-    -- Order lifecycle (as per your workflow)
     order_status ENUM(
         'pending',
         'accepted',
@@ -334,12 +404,9 @@ CREATE TABLE orders (
         'delivered',
         'cancelled'
     ) DEFAULT 'pending',
-    -- Payment status (kept separate from order_status)
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
-    -- Optional admin/customer notes
     customer_note TEXT DEFAULT NULL,
     admin_note TEXT DEFAULT NULL,
-    -- Tracking (filled when shipped)
     tracking_number VARCHAR(100) DEFAULT NULL,
     tracking_url VARCHAR(500) DEFAULT NULL,
     shipped_at DATETIME DEFAULT NULL,
@@ -358,17 +425,12 @@ CREATE TABLE order_items (
     id CHAR(40) NOT NULL PRIMARY KEY,
     order_id CHAR(40) NOT NULL,
     variant_id CHAR(40) NOT NULL,
-    -- reference only, no cascade
-    -- Snapshots (so product edits/deletes never alter past orders)
     product_name VARCHAR(255) NOT NULL,
     variant_name VARCHAR(150) DEFAULT NULL,
     sku VARCHAR(100) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
-    -- price per unit at purchase time
     quantity INT NOT NULL DEFAULT 1,
     total DECIMAL(10, 2) NOT NULL,
-    -- price * quantity
-    -- Personalization captured at purchase
     personalization_data JSON DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
@@ -383,11 +445,8 @@ CREATE TABLE payments (
     order_id CHAR(40) NOT NULL,
     gateway VARCHAR(50) NOT NULL DEFAULT 'razorpay',
     gateway_order_id VARCHAR(255) DEFAULT NULL,
-    -- razorpay_order_id
     gateway_payment_id VARCHAR(255) DEFAULT NULL,
-    -- razorpay_payment_id
     gateway_signature VARCHAR(500) DEFAULT NULL,
-    -- razorpay_signature
     amount DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'INR',
     status ENUM(
@@ -398,10 +457,8 @@ CREATE TABLE payments (
         'refunded'
     ) DEFAULT 'created',
     method VARCHAR(50) DEFAULT NULL,
-    -- card, upi, netbanking, wallet
     failure_reason VARCHAR(500) DEFAULT NULL,
     raw_response JSON DEFAULT NULL,
-    -- full webhook/callback payload
     paid_at DATETIME DEFAULT NULL,
     refunded_at DATETIME DEFAULT NULL,
     refund_amount DECIMAL(10, 2) DEFAULT NULL,
@@ -415,7 +472,6 @@ CREATE TABLE payments (
 CREATE TABLE audit_logs (
     id CHAR(40) NOT NULL PRIMARY KEY,
     user_id CHAR(40) DEFAULT NULL,
-    -- who performed the action
     action ENUM(
         'CREATE',
         'UPDATE',
@@ -451,13 +507,12 @@ CREATE TABLE audit_logs (
         'ORDER',
         'ORDER_ITEM',
         'PAYMENT',
+        'TAG',
         'SYSTEM'
     ) NOT NULL,
     entity_id CHAR(40) DEFAULT NULL,
-    -- the affected record, if any
     description TEXT NOT NULL,
     metadata JSON DEFAULT NULL,
-    -- optional before/after snapshot
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE
     SET NULL
@@ -469,4 +524,43 @@ CREATE TABLE setting_toggle (
     field_name VARCHAR(100) NOT NULL PRIMARY KEY,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     save_in_redis BOOLEAN NOT NULL DEFAULT TRUE
+);
+-- ===========================================================
+-- Global Tags (centralised, reusable tag master)
+-- ===========================================================
+CREATE TABLE global_tags (
+    id CHAR(40) NOT NULL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    created_by CHAR(40) NOT NULL,
+    updated_by CHAR(40) DEFAULT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uq_global_tags_name (name),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+-- ===========================================================
+-- Product Tag Mappings (base product tags, inherited by variants)
+-- ===========================================================
+CREATE TABLE product_tag_mappings (
+    product_id CHAR(40) NOT NULL,
+    tag_id CHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (product_id, tag_id),
+    KEY idx_product_tag_mappings_tag (tag_id),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES global_tags(id) ON DELETE CASCADE
+);
+-- ===========================================================
+-- Product Variant Tag Mappings (variant-specific additional tags only)
+-- ===========================================================
+CREATE TABLE product_variant_tag_mappings (
+    variant_id CHAR(40) NOT NULL,
+    tag_id CHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (variant_id, tag_id),
+    KEY idx_product_variant_tag_mappings_tag (tag_id),
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES global_tags(id) ON DELETE CASCADE
 );

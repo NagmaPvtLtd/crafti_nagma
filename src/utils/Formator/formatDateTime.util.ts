@@ -20,6 +20,7 @@ export type DateTimeFormat =
   | "datetime" // 2025-01-15 10:23
   | "datetime-sec" // 2025-01-15 10:23:45
   | "date" // 2025-01-15
+  | "date-long" // 15 Jan 2025
   | "time" // 10:23
   | "time-sec" // 10:23:45
   | "relative" // 3m ago, 2h ago, 5d ago, 2025-01-15
@@ -104,6 +105,13 @@ export function formatDateTime(
 
     case "date":
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    case "date-long":
+      return d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
 
     case "time":
       return `${pad(d.getHours())}:${pad(d.getMinutes())}`;

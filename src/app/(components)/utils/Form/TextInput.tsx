@@ -8,11 +8,15 @@ type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
-  function TextInput({ invalid = false, className = "", ...rest }, ref) {
+  function TextInput({ invalid, className = "", ...rest }, ref) {
+    const ariaInvalid = rest["aria-invalid"];
+    const isInvalid =
+      invalid ?? (ariaInvalid === true || ariaInvalid === "true");
+
     return (
       <input
         ref={ref}
-        className={`${inputClass(invalid)} ${className}`}
+        className={`${inputClass(isInvalid)} ${className}`}
         {...rest}
       />
     );

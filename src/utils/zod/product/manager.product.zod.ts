@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { slugRegex } from "../../Slug/slug.util";
+
 const optionalTrimmed = (max: number) =>
   z
     .string()
@@ -7,8 +9,6 @@ const optionalTrimmed = (max: number) =>
     .max(max)
     .optional()
     .transform((v) => v ?? "");
-
-const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const productCreateSchema = z.object({
   code: z
@@ -60,3 +60,110 @@ export const productCreateSchema = z.object({
 });
 
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
+
+/* ------------------------------------------------------------------ */
+/*  Base product — created from Product Studio › Add a product         */
+/* ------------------------------------------------------------------ */
+
+const optionalText = (max: number, message?: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, message)
+    .optional()
+    .transform((v) => v ?? "");
+
+/** A dimension is optional; an empty string means "not measured" (NULL). */
+export const optionalDimension = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z.coerce
+      .number()
+      .min(0, "Dimensions cannot be negative")
+      .max(100_000)
+      .refine(
+        (v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9,
+        "Use at most two decimal places",
+      ),
+  ])
+  .optional()
+  .transform((v) => (v === "" || v === undefined || v === null ? null : v));
+
+export const optionalDimensionUnit = z
+  .union([z.literal(""), z.null(), z.enum(["cm", "in"])])
+  .optional()
+  .transform((v) => (v === "" || v === undefined || v === null ? null : v));
+
+export const dimensionFields = {
+  length: optionalDimension,
+  width: optionalDimension,
+  height: optionalDimension,
+  dimensionUnit: optionalDimensionUnit,
+};
+
+/** At least one measurement means a unit must be chosen. */
+export const requireUnitWithDimensions = (data: {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimensionUnit: "cm" | "in" | null;
+}) =>
+  (data.length === null && data.width === null && data.height === null) ||
+  data.dimensionUnit !== null;
+
+/**
+ * A base product is not purchasable — it only carries the shared data its
+ * variants inherit. At least one category and one option (with at least one
+ * value) are required so the base is always usable.
+ */
+export const baseProductCreateSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters")
+      .max(255),
+
+    briefDescription: optionalText(500),
+    description: optionalText(20000),
+
+    metaTitle: optionalText(255),
+    metaDescription: optionalText(500),
+
+    deliveryCharges: z.coerce.number().min(0).max(100000).default(0),
+
+    isFeatured: z.boolean().default(false),
+    mainShowcase: z.boolean().default(false),
+
+    status: z.enum(["active", "inactive"]).default("active"),
+
+    categoryIds: z
+      .array(z.string().trim().min(10).max(40))
+      .min(1, "Pick at least one category"),
+
+    ...dimensionFields,
+
+    options: z
+      .array(
+        z.object({
+          optionId: z.string().trim().min(10).max(40),
+          valueIds: z
+            .array(z.string().trim().min(10).max(40))
+            .min(1, "Pick at least one value for this option"),
+        }),
+      )
+      .min(1, "Pick at least one option"),
+
+    /** Optional tags — inherited automatically by every variant. */
+    tagIds: z
+      .array(z.string().trim().min(10).max(40))
+      .max(15, "A product can carry at most 15 tags")
+      .default([]),
+  })
+  .refine(requireUnitWithDimensions, {
+    message: "Pick a unit (cm or in) when a dimension is filled in",
+    path: ["dimensionUnit"],
+  });
+
+export type BaseProductCreateInput = z.infer<typeof baseProductCreateSchema>;

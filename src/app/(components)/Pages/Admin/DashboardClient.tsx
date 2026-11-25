@@ -17,15 +17,15 @@ import {
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import MetricChartCard from "../../MetricChartCard";
 import PageWrapper from "../../utils/PageWrapper";
+import ErrorState from "../../utils/ErrorState";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
+import { type RangeType, RANGES } from "../../../../utils/AdminRange/adminRange.utils";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 const BASE = "/api/admin/dashboard";
-
-type RangeType = "30d" | "90d" | "365d" | "lifetime";
 
 type Summary = {
   totalRevenue: number;
@@ -110,12 +110,7 @@ type DashboardPayload = AdminPayload | SuperAdminPayload;
 /*  Format helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-const inr = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+import { formatCurrency } from "../../../../utils/Formator/formatCurrency.util";
 
 const count = (n: number) => n.toLocaleString("en-IN");
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -130,13 +125,6 @@ const ORDER_STATUS_STYLES: Record<string, string> = {
   delivered: "border-emerald-200/70 bg-emerald-50 text-emerald-700",
   cancelled: "border-rose-200/70 bg-rose-50 text-rose-700",
 };
-
-const RANGES: { value: RangeType; label: string }[] = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "365d", label: "1y" },
-  { value: "lifetime", label: "All" },
-];
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -175,22 +163,7 @@ export default function AdminDashboardClient() {
 
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        {/* Decorative rose blobs — matches landing */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* --------------------------------------------------------- */}
-        {/* Header                                                    */}
-        {/* --------------------------------------------------------- */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <SectionEyebrow>SUPER ADMIN</SectionEyebrow>
@@ -204,16 +177,11 @@ export default function AdminDashboardClient() {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  {isSuper
-                    ? "Full analytical view — trends, breakdowns and operational health."
-                    : "Operational snapshot of orders, revenue and inventory."}
-                </p>
               </div>
 
               <div className="flex items-center gap-2">
                 <div className="inline-flex items-center rounded-full border border-rose-200/70 bg-white/70 p-0.5 backdrop-blur-sm">
-                  {RANGES.map((r) => (
+                  {RANGES.map((r: typeof RANGES[number]) => (
                     <button
                       key={r.value}
                       onClick={() => setRange(r.value)}
@@ -241,20 +209,13 @@ export default function AdminDashboardClient() {
                 </button>
               </div>
             </div>
-          </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+        <SectionDivider className="my-6" size={11} />
 
-        {/* --------------------------------------------------------- */}
-        {/* Body                                                      */}
-        {/* --------------------------------------------------------- */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
             {loading && !data && <DashboardSkeleton />}
 
             {error && !loading && (
-              <ErrorState message={error} onRetry={() => void load()} />
+              <ErrorState title="Couldn't load dashboard" message={error} onRetry={() => void load()} />
             )}
 
             {data && !error && (
@@ -328,7 +289,7 @@ export default function AdminDashboardClient() {
                               {o.orderStatus.replace(/_/g, " ")}
                             </span>
                             <span className="shrink-0 text-xs font-semibold tabular-nums text-stone-900">
-                              {inr(o.total)}
+                              {formatCurrency(o.total)}
                             </span>
                           </li>
                         ))}
@@ -380,8 +341,6 @@ export default function AdminDashboardClient() {
                 )}
               </div>
             )}
-          </div>
-        </section>
       </div>
     </PageWrapper>
   );
@@ -419,7 +378,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.label,
               value: p.count,
               format: count,
-              trailing: inr(p.revenue),
+              trailing: formatCurrency(p.revenue),
             }))}
           />
         </SectionCard>
@@ -436,7 +395,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
               label: p.name,
               sub: p.sku,
               value: p.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(p.units)} units`,
             }))}
           />
@@ -451,7 +410,7 @@ function SuperAdminBreakdowns({ data }: { data: SuperAdminPayload }) {
             items={data.analytics.topCategories.map((c) => ({
               label: c.name,
               value: c.revenue,
-              format: inr,
+              format: formatCurrency,
               trailing: `${count(c.orders)} orders`,
             }))}
           />
@@ -517,7 +476,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <Kpi
         label="Revenue"
-        value={inr(summary.totalRevenue)}
+        value={formatCurrency(summary.totalRevenue)}
         icon={<IndianRupee className="h-3.5 w-3.5" />}
         tone="emerald"
       />
@@ -530,7 +489,7 @@ function KpiStrip({ summary }: { summary: Summary }) {
       />
       <Kpi
         label="AOV"
-        value={inr(summary.averageOrderValue)}
+        value={formatCurrency(summary.averageOrderValue)}
         icon={<TrendingUp className="h-3.5 w-3.5" />}
         tone="violet"
       />
@@ -755,28 +714,3 @@ function DashboardSkeleton() {
   );
 }
 
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-rose-800">
-          Couldn&apos;t load dashboard
-        </p>
-        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}

@@ -9,15 +9,18 @@ type PasswordInputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  function PasswordInput({ invalid = false, className = "", ...rest }, ref) {
+  function PasswordInput({ invalid, className = "", ...rest }, ref) {
     const [visible, setVisible] = useState(false);
+    const ariaInvalid = rest["aria-invalid"];
+    const isInvalid =
+      invalid ?? (ariaInvalid === true || ariaInvalid === "true");
 
     return (
       <div className="relative">
         <input
           ref={ref}
           type={visible ? "text" : "password"}
-          className={`${inputClass(invalid)} pr-10 ${className}`}
+          className={`${inputClass(isInvalid)} pr-10 ${className}`}
           {...rest}
         />
         <button

@@ -104,21 +104,35 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
         <Toaster
           position="bottom-right"
+          gutter={8}
+          containerStyle={{ margin: "16px" }}
           toastOptions={{
             duration: 3000,
             style: {
-              background: "#171717",
-              color: "#f5f5f5",
-              border: "1px solid #262626",
-              fontSize: "14px",
-              borderRadius: "10px",
-              padding: "10px 14px",
+              /* Matches the studio's white cards, stone borders and rose accent. */
+              background: "#ffffff",
+              color: "#1c1917",
+              border: "1px solid #e7e5e4",
+              fontSize: "13px",
+              fontWeight: 500,
+              lineHeight: 1.45,
+              borderRadius: "14px",
+              boxShadow:
+                "0 10px 30px -12px rgba(244, 63, 94, 0.18), 0 8px 20px -10px rgba(28, 25, 23, 0.16)",
+              padding: "11px 15px",
+              maxWidth: "380px",
             },
             success: {
-              iconTheme: { primary: "#10b981", secondary: "#171717" },
+              iconTheme: { primary: "#10b981", secondary: "#ffffff" },
             },
             error: {
-              iconTheme: { primary: "#ef4444", secondary: "#171717" },
+              iconTheme: { primary: "#f43f5e", secondary: "#ffffff" },
+            },
+            loading: {
+              iconTheme: { primary: "#fb7185", secondary: "#ffffff" },
+            },
+            blank: {
+              iconTheme: { primary: "#fb7185", secondary: "#ffffff" },
             },
           }}
         />

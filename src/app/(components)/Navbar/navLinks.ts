@@ -40,7 +40,12 @@ export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/dashboard/orders", label: "My Orders", icon: Package },
   { href: "/dashboard/profile", label: "My Profile", icon: UserIcon },
   { href: "/dashboard/wishlist", label: "My Wishlist", icon: Heart },
-  { href: "/shop", label: "Shop", icon: ShoppingBag },
+  { href: "/collections", label: "Collections", icon: ShoppingBag },
+  {
+    href: "/dashboard/custom-order",
+    label: "Custom Order",
+    icon: TicketPercent,
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -49,7 +54,12 @@ export const CUSTOMER_LINKS: NavLink[] = [
 export const MANAGER_LINKS: NavLink[] = [
   { href: "/admin/orders", label: "Enquiries / Orders", icon: Package },
   { href: "/manager/product-studio", label: "Project Studio", icon: Boxes },
-  { href: "/admin/store", label: "Store Dashboard", icon: LayoutDashboard },
+  {
+    href: "/manager/dashboard",
+    label: "Store Dashboard",
+    icon: LayoutDashboard,
+    exact: true,
+  },
   { href: "/admin/wishlist-trend", label: "Wishlist Trend", icon: TrendingUp },
 ];
 
@@ -87,7 +97,7 @@ export function getSectionsForRole(role: UserRole): NavSection[] {
   }
 
   const sections: NavSection[] = [];
-  sections.push({ label: "Shop", links: CUSTOMER_LINKS });
+  sections.push({ label: "Collections", links: CUSTOMER_LINKS });
   sections.push({ label: "Store Manager", links: MANAGER_LINKS });
   if (isAdmin) sections.push({ label: "Admin", links: ADMIN_LINKS });
   if (isSuperAdmin)

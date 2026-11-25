@@ -3,12 +3,12 @@
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   AlertCircle,
   ArrowRight,
-  BadgeCheck,
   Boxes,
-  FileImage,
+  ChevronRight,
   FolderTree,
   Layers,
   ListChecks,
@@ -16,17 +16,17 @@ import {
   RefreshCw,
   Sparkles,
   Tag,
-  Wand2,
 } from "lucide-react";
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
 import PageWrapper from "../../utils/PageWrapper";
+import ErrorState from "../../utils/ErrorState";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-const BASE = "/api/manager/products/overview";
+const BASE = "/api/manager/product-studio/overview";
 
 type OverviewPayload = {
   ok: true;
@@ -40,6 +40,7 @@ type OverviewPayload = {
     };
     variants: { total: number; lowStock: number; outOfStock: number };
     categories: { total: number; root: number };
+    options?: { total: number };
     pendingPersonalizations?: number;
   };
   quickStats?: {
@@ -48,10 +49,13 @@ type OverviewPayload = {
   };
   recentlyUpdated: {
     id: string;
+    code: string;
     name: string;
     slug: string;
     status: "active" | "inactive";
     updatedAt: string;
+    /** Product-level cover first, else the first variant photo. */
+    imageUrl: string | null;
   }[];
 };
 
@@ -72,72 +76,48 @@ const MANAGE_ITEMS: MenuItem[] = [
     title: "Add a product",
     description:
       "Create a new product with its base info, categories, and showcase settings.",
-    href: "/manager/products/new",
+    href: "/manager/product-studio/products/new",
     icon: <Sparkles className="h-5 w-5" />,
   },
   {
     title: "All products",
     description:
       "Browse, search, and edit every product. Filter by status or category.",
-    href: "/manager/products/all",
+    href: "/manager/product-studio/products",
     icon: <Package className="h-5 w-5" />,
     badge: (d) =>
       `${d.counts.products.total} product${d.counts.products.total === 1 ? "" : "s"}`,
   },
-  {
-    title: "Variants & inventory",
-    description:
-      "Manage stock, pricing, SKUs, and per-variant options. Spot low-stock fast.",
-    href: "/manager/products/variants",
-    icon: <Layers className="h-5 w-5" />,
-    badge: (d) =>
-      d.counts.variants.lowStock > 0
-        ? `${d.counts.variants.lowStock} low stock`
-        : `${d.counts.variants.total} variants`,
-  },
-  {
-    title: "Options & values",
-    description:
-      "Colours, sizes, materials — define the choices customers pick from.",
-    href: "/manager/products/options",
-    icon: <ListChecks className="h-5 w-5" />,
-  },
-  {
-    title: "Personalization fields",
-    description:
-      "Add custom inputs — names, dates, notes — that shoppers fill at checkout.",
-    href: "/manager/products/personalizations",
-    icon: <Wand2 className="h-5 w-5" />,
-  },
 ];
 
-const ORGANISE_ITEMS: MenuItem[] = [
+const GLOBAL_ITEMS: MenuItem[] = [
   {
-    title: "Categories",
+    title: "Global Categories",
     description:
-      "Create, reorder, and nest categories. Root and child categories supported.",
-    href: "/manager/products/categories",
+      "Create categories & sub categories to assign to your products.",
+    href: "/manager/product-studio/categories",
     icon: <FolderTree className="h-5 w-5" />,
+    // Always the parent (main) categories — sub categories are counted inside them.
     badge: (d) =>
-      `${d.counts.categories.total} categor${d.counts.categories.total === 1 ? "y" : "ies"}`,
+      `${d.counts.categories.root} categor${d.counts.categories.root === 1 ? "y" : "ies"}`,
   },
   {
-    title: "Features & care",
+    title: "Global Options",
     description:
-      "Bullet features, care instructions, and gift inclusions per product.",
-    href: "/manager/products/details",
-    icon: <BadgeCheck className="h-5 w-5" />,
-  },
-  {
-    title: "Featured & showcase",
-    description:
-      "Curate what appears first — featured products and main showcase picks.",
-    href: "/manager/products/curation",
-    icon: <Tag className="h-5 w-5" />,
+      "Create all the pool of options you want to give your product to have.",
+    href: "/manager/product-studio/options",
+    icon: <ListChecks className="h-5 w-5" />,
     badge: (d) =>
-      d.counts.products.featured > 0
-        ? `${d.counts.products.featured} featured`
+      d.counts.options
+        ? `${d.counts.options.total} option${d.counts.options.total === 1 ? "" : "s"}`
         : null,
+  },
+  {
+    title: "Global Tags",
+    description:
+      "One reusable tag master for search — rename or clean up tags in one place.",
+    href: "/manager/product-studio/tags",
+    icon: <Tag className="h-5 w-5" />,
   },
 ];
 
@@ -174,80 +154,64 @@ export default function ProductManagerHubClient() {
 
   return (
     <PageWrapper variant="content" position="fixed">
-      <div className="relative flex flex-col overflow-hidden text-stone-800">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/3 -left-32 h-80 w-80 rounded-full bg-rose-100/60 blur-3xl"
-        />
-
-        {/* Header */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-                  Product Studio
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-                  Everything you need to build, arrange, and maintain the
-                  catalogue — products, variants, media, and curation.
-                </p>
-              </div>
-
-              <button
-                onClick={() => void load()}
-                disabled={loading}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-            </div>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 sm:pt-10 sm:pb-16">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <SectionEyebrow href="/manager/dashboard">
+              Store Dashboard
+            </SectionEyebrow>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+              Product Studio
+            </h1>
           </div>
-        </section>
 
-        <SectionDivider className="mx-auto max-w-7xl px-4 sm:px-6" />
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-rose-200/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-600 backdrop-blur-sm transition-colors hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
 
-        {/* Body */}
-        <section className="relative">
-          <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
-            {loading && !data && <HubSkeleton />}
+        <SectionDivider className="my-6" size={11} />
 
-            {error && !loading && (
-              <ErrorState message={error} onRetry={() => void load()} />
-            )}
+        {loading && !data && <HubSkeleton />}
 
-            {data && !error && (
-              <div className="space-y-8">
-                <SnapshotStrip data={data} />
+        {error && !loading && (
+          <ErrorState
+            title="Couldn't load the product overview"
+            message={error}
+            onRetry={() => void load()}
+          />
+        )}
 
-                <MenuSection
-                  eyebrow="Build & maintain"
-                  title="Manage products"
-                  subtitle="The day-to-day work of keeping the catalogue healthy."
-                  items={MANAGE_ITEMS}
-                  data={data}
-                />
+        {data && !error && (
+          <div className="space-y-8">
+            <SnapshotStrip data={data} />
 
-                <MenuSection
-                  eyebrow="Shape the catalogue"
-                  title="Organise & curate"
-                  subtitle="Categories, highlights, and the finer details."
-                  items={ORGANISE_ITEMS}
-                  data={data}
-                />
+            <MenuSection
+              eyebrow="Build & maintain"
+              title="Manage products"
+              subtitle="The day-to-day work of keeping the catalogue healthy."
+              items={MANAGE_ITEMS}
+              data={data}
+            />
 
-                <RecentlyUpdated items={data.recentlyUpdated} />
-              </div>
-            )}
+            <MenuSection
+              eyebrow="Shape the catalogue"
+              title="Organise & curate"
+              subtitle="The shared pools every product draws from — categories and options."
+              items={GLOBAL_ITEMS}
+              data={data}
+            />
+
+            <RecentlyUpdated items={data.recentlyUpdated} />
           </div>
-        </section>
+        )}
       </div>
     </PageWrapper>
   );
@@ -347,6 +311,7 @@ function MenuSection({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => {
           const badge = it.badge?.(data);
+
           return (
             <Link
               key={it.title}
@@ -401,48 +366,77 @@ function RecentlyUpdated({
         </h2>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/60 bg-white/85 backdrop-blur-sm sm:rounded-3xl">
-        {items.length === 0 ? (
-          <div className="flex items-center gap-2 px-5 py-6 text-xs text-stone-500">
-            <AlertCircle className="h-3.5 w-3.5 text-stone-900" />
-            No products yet.
-          </div>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {items.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
+      {items.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-white/70 px-4 py-6 text-xs text-stone-500 sm:rounded-3xl">
+          <AlertCircle className="h-3.5 w-3.5 text-stone-900" />
+          No products yet.
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {items.map((p) => (
+            <li key={p.id}>
+              <Link
+                href={`/manager/product-studio/products/${p.code || p.id}`}
+                aria-label={`Open ${p.name}`}
+                className="group flex items-start gap-3 rounded-2xl border border-white/60 bg-white/85 p-3 backdrop-blur-sm transition-all hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60 sm:items-center sm:gap-4 sm:rounded-3xl sm:p-4"
               >
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-100 sm:h-11 sm:w-11">
+                  {p.imageUrl ? (
+                    <Image
+                      src={p.imageUrl}
+                      alt={p.name}
+                      fill
+                      sizes="44px"
+                      loading={"eager"}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-stone-300">
+                      <Package className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="text-sm font-medium wrap-break-word text-stone-900">
                     {p.name}
                   </p>
-                  <p className="truncate font-mono text-[10px] text-stone-400">
-                    {p.slug}
+                  <p className="text-[10px] break-all text-stone-400">
+                    Code: <span className="font-mono">{p.code}</span>
                   </p>
+
+                  {/* Mobile: status sits under the name instead of squeezing
+                      it, so a long name wraps and is never cut. */}
+                  <div className="mt-2 sm:hidden">
+                    <StatusPill status={p.status} />
+                  </div>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                    p.status === "active"
-                      ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-                      : "border-stone-200/70 bg-stone-50 text-stone-600"
-                  }`}
-                >
-                  {p.status}
-                </span>
-                <Link
-                  href={`/manager/products/${p.id}`}
-                  className="shrink-0 rounded-full border border-rose-200/70 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
-                >
-                  Edit
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+
+                <div className="hidden shrink-0 sm:block">
+                  <StatusPill status={p.status} />
+                </div>
+
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-rose-500 sm:mt-0" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: "active" | "inactive" }) {
+  return (
+    <span
+      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${
+        status === "active"
+          ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+          : "border-stone-200/70 bg-stone-50 text-stone-600"
+      }`}
+    >
+      {status}
+    </span>
   );
 }
 
@@ -474,32 +468,6 @@ function HubSkeleton() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-3.5 sm:rounded-3xl sm:px-5 sm:py-4">
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-      <div className="flex-1">
-        <p className="text-sm font-semibold text-rose-800">
-          Couldn&apos;t load the product overview
-        </p>
-        <p className="mt-0.5 text-xs text-rose-700">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="shrink-0 cursor-pointer rounded-full border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
-      >
-        Retry
-      </button>
     </div>
   );
 }

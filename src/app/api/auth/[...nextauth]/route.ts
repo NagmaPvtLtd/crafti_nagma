@@ -22,6 +22,16 @@ import isRequestFromIndia from "../../../../utils/Auth/Auth.isFromIndia.util";
 import { googleProfileSchema } from "../../../../utils/zod/auth.valildator.zod";
 import { getPool } from "../../../../lib/Database/main.db";
 import { credentialsSchema } from "../../../../utils/zod/auth.credentialsLogin.schemas.zod";
+import {
+  applyCooldownIfNeeded,
+  clearFailedPassword,
+  countFailedPassword,
+} from "../../../../utils/Auth/Auth.loginGuard.util";
+import {
+  cooldownError,
+  loginCooldownMessage,
+  LOGIN_COOLDOWN_PREFIX,
+} from "../../../../utils/Auth/Auth.loginCooldown.util";
 
 /* -------------------------------------------------------------------------- */
 /*  Environment                                                               */
@@ -41,6 +51,17 @@ const TOGGLE_NEW_USER_BLOCKED: string = "backend:new_user_not_allowed_to_login";
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Splits a Google display name into first and last name
+ *
+ * @function splitFullName
+ * @description Splits on the last space so multi-word first names stay intact. An empty name
+ *              becomes "Customer" with no last name, and a single word becomes the first name.
+ *
+ * @param {string} fullName - Display name from the Google profile
+ *
+ * @returns {{ firstName: string, lastName: string | null }} Name parts for the `users` row
+ */
 function splitFullName(fullName: string): {
   firstName: string;
   lastName: string | null;
@@ -55,6 +76,17 @@ function splitFullName(fullName: string): {
   };
 }
 
+/**
+ * Builds the login redirect that carries an error code
+ *
+ * @function loginRedirect
+ * @description Returns `/login?error=<code>` so the sign-in page can show the reason a Google
+ *              sign-in was refused.
+ *
+ * @param {string} code - Machine-readable error code (for example `service_offline`)
+ *
+ * @returns {string} Relative login URL with the encoded error code
+ */
 function loginRedirect(code: string): string {
   return `/login?error=${encodeURIComponent(code)}`;
 }
@@ -73,6 +105,7 @@ declare module "next-auth" {
       role?: UserRole;
       status?: UserStatus;
       profile_completed?: boolean;
+      session_id?: string | null;
     } & DefaultSession["user"];
   }
 
@@ -84,6 +117,7 @@ declare module "next-auth" {
     role?: UserRole;
     status?: UserStatus;
     profile_completed?: boolean;
+    session_id?: string | null;
   }
 }
 
@@ -91,8 +125,20 @@ declare module "next-auth" {
 /*  NextAuth options                                                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * NextAuth configuration for Google OAuth and email/password sign-in
+ *
+ * @const {NextAuthOptions} authOptions
+ * @description JWT sessions last 60 days (`60 * 24 * 30 * 6` seconds). The Credentials provider
+ *              validates the body with `credentialsSchema` and rejects banned, inactive or
+ *              password-less accounts with typed errors; the Google provider runs geo, global
+ *              lock, profile, signup lock and account-status gates in `signIn`, then upserts the
+ *              `users` row. The `jwt` callback re-reads the user from `users` on every token
+ *              touch so role, status and `profile_completed` stay fresh, and `session` copies
+ *              those claims onto the session user.
+ */
 const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 60 * 24 * 30 },
+  session: { strategy: "jwt", maxAge: 60 * 24 * 30 * 6 },
 
   providers: [
     Google({
@@ -134,7 +180,7 @@ const authOptions: NextAuthOptions = {
             const [rows] = await conn.query<UserRow[]>(
               `SELECT id, first_name, last_name, full_name, email,
                       password_hash, google_profile_picture,
-                      role, status, profile_completed
+                      role, status, profile_completed, cooldown_till
                  FROM users
                 WHERE email = ?
                 LIMIT 1`,
@@ -160,9 +206,37 @@ const authOptions: NextAuthOptions = {
               throw new Error("password_not_set");
             }
 
+            /* ---- cooldown from too many wrong passwords ---- */
+            const cooling = cooldownError(dbUser.cooldown_till);
+            if (cooling) throw new Error(cooling);
+
             /* ---- password check ---- */
             const valid = await bcrypt.compare(password, dbUser.password_hash);
-            if (!valid) return null;
+
+            if (!valid) {
+              const attempts = await countFailedPassword(dbUser.id);
+              const till = await applyCooldownIfNeeded(
+                conn,
+                dbUser.id,
+                attempts,
+              );
+
+              /* The attempt that trips the threshold already reports the wait. */
+              if (till) {
+                throw new Error(
+                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}`,
+                );
+              }
+              return null;
+            }
+
+            /* A good password ends the streak and clears a stale cooldown. */
+            await conn.execute(
+              `UPDATE users SET cooldown_till = NULL
+                WHERE id = ? AND cooldown_till IS NOT NULL`,
+              [dbUser.id],
+            );
+            await clearFailedPassword(dbUser.id);
 
             return {
               id: dbUser.id,
@@ -179,9 +253,10 @@ const authOptions: NextAuthOptions = {
         } catch (err) {
           if (
             err instanceof Error &&
-            ["account_banned", "account_inactive", "password_not_set"].includes(
+            (["account_banned", "account_inactive", "password_not_set"].includes(
               err.message,
-            )
+            ) ||
+              err.message.startsWith(LOGIN_COOLDOWN_PREFIX))
           ) {
             throw err;
           }
@@ -226,6 +301,12 @@ const authOptions: NextAuthOptions = {
 
       /* 2. Global lock */
       const globalLock = await setting.isActive(pool, TOGGLE_NOBODY_CAN_LOGIN);
+      if (globalLock === null) {
+        console.warn(
+          `[AUTH - SIGNIN] ✕ project configuration not set | ${TOGGLE_NOBODY_CAN_LOGIN}`,
+        );
+        return loginRedirect("project_configuration_not_set");
+      }
       console.log(
         `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NOBODY_CAN_LOGIN}" = ${globalLock}`,
       );
@@ -273,6 +354,12 @@ const authOptions: NextAuthOptions = {
             pool,
             TOGGLE_NEW_USER_BLOCKED,
           );
+          if (newUserBlocked === null) {
+            console.warn(
+              `[AUTH - SIGNIN] ✕ project configuration not set | ${TOGGLE_NEW_USER_BLOCKED}`,
+            );
+            return loginRedirect("project_configuration_not_set");
+          }
           console.log(
             `[AUTH - SIGNIN] ➤ toggle "${TOGGLE_NEW_USER_BLOCKED}" = ${newUserBlocked} | new user: ${email}`,
           );
@@ -392,6 +479,20 @@ const authOptions: NextAuthOptions = {
           t.role = dbUser.role ?? "customer";
           t.status = dbUser.status ?? "active";
           t.profile_completed = Boolean(dbUser.profile_completed);
+
+          if (account) {
+            /* A fresh sign-in claims the account's single session slot,
+               revoking whatever device held it before. */
+            const sessionId = generateULID({
+              prefix: "sess",
+              maxLength: 40,
+            });
+            await conn.execute(
+              `UPDATE users SET session_id = ? WHERE id = ?`,
+              [sessionId, dbUser.id],
+            );
+            t.session_id = sessionId;
+          }
         }
       } catch (err) {
         console.error("[AUTH - JWT] error:", err);
@@ -412,6 +513,7 @@ const authOptions: NextAuthOptions = {
         session.user.role = t.role ?? "customer";
         session.user.status = t.status ?? "active";
         session.user.profile_completed = Boolean(t.profile_completed);
+        session.user.session_id = t.session_id ?? null;
       }
       return session;
     },
@@ -423,6 +525,49 @@ const authOptions: NextAuthOptions = {
   },
 };
 
+/**
+ * NextAuth catch-all GET handler (sign-in page, callback and session lookups)
+ *
+ * @async
+ * @function GET
+ * @description Delegates to the NextAuth handler built from `authOptions`. This route has no
+ *              guard of its own; the providers and callbacks decide who may sign in.
+ *
+ * @param {Request} req - The incoming NextAuth request
+ *
+ * @returns {Promise<Response>} NextAuth response (redirect, JSON session or error page)
+ *
+ * @description Workflow:
+ *   1. NextAuth parses the action from the catch-all path
+ *   2. Google sign-in runs the `signIn` gate chain (geo, global lock, profile parse,
+ *      signup lock, banned/inactive) and upserts the `users` row
+ *   3. Credentials sign-in runs `authorize` (schema, status, password compare)
+ *   4. The `jwt` callback refreshes the token from `users`
+ *   5. The `session` callback copies the claims onto `session.user`
+ *   6. Refusals redirect to `/login?error=<code>`
+ */
+
+/**
+ * NextAuth catch-all POST handler (credentials submit and callback POSTs)
+ *
+ * @async
+ * @function POST
+ * @description Delegates to the same NextAuth handler as `GET`. Credentials submissions are
+ *              validated in the provider's `authorize`; Google callbacks run the `signIn`
+ *              gate chain. No separate auth guard exists on this route.
+ *
+ * @param {Request} req - The incoming NextAuth request
+ *
+ * @returns {Promise<Response>} NextAuth response (redirect, JSON session or error page)
+ *
+ * @description Workflow:
+ *   1. NextAuth parses the action from the catch-all path
+ *   2. Credentials submissions are validated by `credentialsSchema` inside `authorize`
+ *   3. Banned, inactive or password-less accounts raise typed errors and surface as
+ *      `?error=<code>` on `/login`
+ *   4. Successful sign-ins are signed into a JWT session
+ *   5. Refusals redirect to `/login?error=<code>`
+ */
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
 export { authOptions };

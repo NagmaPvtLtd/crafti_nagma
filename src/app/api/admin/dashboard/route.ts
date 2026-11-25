@@ -1,29 +1,19 @@
-// app/api/admin/dashboard/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPool } from "../../../../lib/Database/main.db";
 import { requireAdmin } from "../../../../utils/Auth/Auth.requireRole.util";
+import {
+  type RangeType,
+  parseRange,
+} from "../../../../utils/AdminRange/adminRange.utils";
 
 type DbPool = Awaited<ReturnType<typeof getPool>>;
-
-export type RangeType = "30d" | "90d" | "365d" | "lifetime";
 type BucketType = "day" | "week" | "month";
 
 export interface TrendDatum {
   label: string;
   count: number;
-}
-
-const ALLOWED_RANGES = ["30d", "90d", "365d", "lifetime"] as const;
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function parseRange(v: string | null): RangeType {
-  return v && (ALLOWED_RANGES as readonly string[]).includes(v)
-    ? (v as RangeType)
-    : "90d";
 }
 
 function rangeWindow(range: RangeType): {
@@ -45,6 +35,9 @@ function rangeWindow(range: RangeType): {
       return { start, end, bucket: "month" };
     case "lifetime":
       return { start: null, end, bucket: "month" };
+    default:
+      // Should be unreachable — parseRange guarantees a valid RangeType.
+      throw new Error(`Unknown admin range: ${range}`);
   }
 }
 
@@ -370,6 +363,56 @@ async function fetchAuditSummary(p: DbPool) {
 /*  GET /api/admin/dashboard?range=30d|90d|365d|lifetime               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Returns the dashboard payload: KPI summary, recent orders and low stock, plus full
+ * analytics for super admins.
+ *
+ * @async
+ * @function GET
+ * @description Runs the dashboard queries in parallel against the pool. Admin and
+ *              super_admin both receive `summary`, `recentOrders` and `lowStock`; only a
+ *              super admin also receives zero-filled order / revenue / customer trends
+ *              bucketed by day, week or month depending on `range`, the categorical
+ *              breakdowns, cart and customer KPIs, the settings overview and the audit
+ *              action mix. For `lifetime` the trend start is anchored to the earliest row.
+ *
+ * @param {NextRequest} req - The incoming HTTP request
+ * @query {string} [range] - `30d` (default, daily buckets), `90d` (weekly), `365d` (monthly)
+ *                           or `lifetime` (monthly, anchored to the earliest record)
+ *
+ * @returns {Promise<NextResponse>} JSON response with:
+ *   - scope: `admin` or `super_admin`
+ *   - generatedAt: ISO timestamp of the response
+ *   - range: the applied range
+ *   - summary: `totalRevenue`, `totalOrders`, `pendingOrders`, `deliveredOrders`,
+ *              `cancelledOrders`, `averageOrderValue`, `totalCustomers`, `activeProducts`,
+ *              `lowStockCount` (numeric strings normalized, average rounded)
+ *   - recentOrders: the 8 newest orders with `customerName` (falls back to "Guest")
+ *   - lowStock: up to 8 active variants with `stock <= 5`
+ *   - analytics (super_admin only): `revenueTrend`, `ordersTrend`, `customersTrend`,
+ *     `orderStatusMix`, `paymentMethodMix`, `topProducts`, `topCategories`, `cartMetrics`,
+ *     `customerMetrics`, `settingsOverview` and `auditSummary`
+ *
+ * @throws {401} Unauthorized - No session
+ * @throws {403} Forbidden - Account not active, no role, or role below admin
+ * @throws {500} Database failure while reading orders, users, products, payments, carts,
+ *               settings or audit logs
+ *
+ * @description Workflow:
+ *   1. Initialize the admin guard (session, active status, role rank)
+ *   2. Derive `isSuperAdmin` from the session role
+ *   3. Parse `range` through `parseRange` (default `30d`)
+ *   4. Initialize the database pool
+ *   5. Fetch summary, recent orders and low stock in parallel
+ *   6. Return the lean admin payload when the role is not `super_admin`
+ *   7. Build the revenue trend (paid orders only), order trend (all orders) and customer
+ *      trend (role `customer`), each zero-filled across its buckets
+ *   8. Fetch order status mix, captured-payment method mix, top products by revenue and
+ *      top categories (cancelled orders excluded)
+ *   9. Fetch cart metrics (conversion and abandonment rates), customer metrics (new in
+ *      range and repeat-buyer rate), settings overview and audit summary
+ *   10. Return 200 response with `scope: "super_admin"` and the analytics block
+ */
 export async function GET(req: NextRequest) {
   const guard = await requireAdmin({ label: "GET /api/admin/dashboard" });
   if (!guard.ok) return guard.response;

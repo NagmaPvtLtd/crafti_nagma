@@ -51,9 +51,15 @@
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
+import type { RowDataPacket } from "mysql2/promise";
 
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import type { UserRole } from "@/types/User/UserRow.types";
+import type { UserRole } from "../../types/User/UserRow.types";
+import { authOptions } from "../../app/api/auth/[...nextauth]/route";
+import { getPool } from "../../lib/Database/main.db";
+
+interface SessionRow extends RowDataPacket {
+  session_id: string | null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Role hierarchy                                                     */
@@ -206,7 +212,55 @@ export async function requireRole(
     };
   }
 
-  /* ---- 6. granted ----------------------------------------------- */
+  /* ---- 6. session revocation check ------------------------------ */
+  /* A password change or a newer sign-in rotates `users.session_id`, so a
+     token that no longer matches is treated as signed out. */
+  const sessionId = session.user.session_id ?? null;
+  if (!sessionId) {
+    console.warn(`[AUTH - DENY] ✕ ${label} — token has no session id | ${who}`);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Your session is no longer active. Please sign in again." },
+        { status: 401 },
+      ),
+    };
+  }
+
+  try {
+    const p = await getPool();
+    const [rows] = await p.query<SessionRow[]>(
+      `SELECT session_id FROM users WHERE id = ? LIMIT 1`,
+      [id],
+    );
+
+    if (!rows[0] || rows[0].session_id !== sessionId) {
+      console.warn(
+        `[AUTH - DENY] ✕ ${label} — session revoked | ${who}`,
+      );
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Your session is no longer active. Please sign in again." },
+          { status: 401 },
+        ),
+      };
+    }
+  } catch (err) {
+    console.error(
+      `[AUTH - FAILED] ✕ ${label} — session lookup failed :`,
+      err,
+    );
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Auth service unavailable" },
+        { status: 500 },
+      ),
+    };
+  }
+
+  /* ---- 7. granted ----------------------------------------------- */
   console.log(`[AUTH - ALLOW] >_ ${label} — access granted | ${who}`);
 
   return { ok: true, session };
