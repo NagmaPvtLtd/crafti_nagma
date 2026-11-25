@@ -34,7 +34,7 @@ export default function CustomOrderPage() {
           </h2>
           <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-stone-600">
             The custom order form is being stitched together. Until then, message
-            us with your idea and we will make it happen.
+            in with your idea and it will be taken from there.
           </p>
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-rose-200/70 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600">
             <MessageCircle className="h-3.5 w-3.5" />

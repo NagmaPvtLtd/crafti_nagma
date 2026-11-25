@@ -98,8 +98,8 @@ export default function CancellationRefundPage() {
                   sent to the exact UPI ID you provide.
                 </li>
                 <li>
-                  If you entered an incorrect UPI ID, please contact our support
-                  team right away so we can help resolve the issue.
+                  If you entered an incorrect UPI ID, please write to us right
+                  away so the issue can be resolved.
                 </li>
               </ul>
             </Section>

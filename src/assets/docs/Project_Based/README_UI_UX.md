@@ -62,6 +62,8 @@ project — it only exists to help the next click.
   - Dashboard pages: orders, profile, wishlist (already use it)
 - Page routes stay thin: a `page.tsx` that renders one client component; logic lives in the client file or the API.
 - Currency formatting: always use `formatCurrency()` from `src/utils/Formator/formatCurrency.util.ts` — never define a local `inr()` helper in individual files. The utility formats INR with `en-IN` locale and 0 decimal places.
+- **Page-header nav bars share one height.** The pill row above a page (`PolicyLayout`, `AboutLayout`) is `px-5 py-3.5` on the bar and `text-sm leading-5` with **no vertical padding** on each link; that is what keeps `/policy/*` and `/about`, `/how-it-is-made`, `/care-guide` identical. Do not add `py-*` to the links of one bar and not the other.
+- **Public pages speak shopper, never staff.** Words like `studio`, `manager`, `admin`, `database` never appear on `/`, `/collections`, `/search`, `/cart` or the About pages; an empty section hides itself or explains itself in the shopper's terms.
 
 ---
 
