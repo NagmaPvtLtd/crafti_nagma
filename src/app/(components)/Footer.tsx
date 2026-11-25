@@ -34,6 +34,7 @@ const FOOTER_CONTENT = {
       links: [
         { label: "Track order", href: "/dashboard/orders" },
         { label: "Shipping & returns", href: "/policy/cancellation-refund" },
+        { label: "Email support", href: `mailto:${supportMail}` },
       ],
     },
     {
@@ -141,16 +142,27 @@ export default function Footer() {
                 {col.title}
               </h3>
               <ul className="mt-3 space-y-2">
-                {col.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-stone-600 transition-colors hover:text-rose-600"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {col.links.map((link) => {
+                  /* Internal routes use next/link; mail and external links stay
+                     plain anchors so the router never handles them. */
+                  const isInternal = link.href.startsWith("/");
+                  const linkClass =
+                    "text-sm text-stone-600 transition-colors hover:text-rose-600";
+
+                  return (
+                    <li key={link.href}>
+                      {isInternal ? (
+                        <Link href={link.href} className={linkClass}>
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <a href={link.href} className={linkClass}>
+                          {link.label}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

@@ -14,6 +14,7 @@ import {
   Search,
   ShoppingBag,
   ShoppingCart,
+  User,
   X,
 } from "lucide-react";
 import { SessionUserClient } from "../../../types/User/JWT.types";
@@ -264,9 +265,11 @@ export default function NavbarClient({ user }: Props) {
               <button
                 type="button"
                 onClick={handleSignIn}
-                className="ml-1 flex cursor-pointer items-center rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
+                aria-label="Login"
+                title="Login"
+                className="ml-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-rose-200 bg-rose-50/70 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 active:scale-[0.98]"
               >
-                Login
+                <User size={17} />
               </button>
             )}
 
@@ -416,6 +419,7 @@ export default function NavbarClient({ user }: Props) {
                 }}
                 className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-rose-500 px-3 py-3 text-sm font-medium text-white shadow-sm shadow-rose-500/25 transition hover:bg-rose-600 active:scale-[0.98]"
               >
+                <User size={16} />
                 Login
               </button>
             )}

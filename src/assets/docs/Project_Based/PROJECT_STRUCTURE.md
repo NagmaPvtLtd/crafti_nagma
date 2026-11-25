@@ -16,6 +16,8 @@
 ├── 📁 src
 │   ├── 📁 app
 │   │   ├── 📁 (components)
+│   │   │   ├── 📁 About
+│   │   │   │   └── 📄 AboutLayout.tsx
 │   │   │   ├── 📁 Navbar
 │   │   │   │   ├── 📄 CartBadge.tsx
 │   │   │   │   ├── 📄 Navbar.tsx
@@ -151,6 +153,10 @@
 │   │   │           │   │   └── 📄 route.ts
 │   │   │           │   └── 📄 route.ts
 │   │   │           └── 📄 route.ts
+│   │   ├── 📁 about
+│   │   │   └── 📄 page.tsx
+│   │   ├── 📁 care-guide
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 cart
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 collections
@@ -162,12 +168,16 @@
 │   │   │   │   └── 📄 page.tsx
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 dashboard
+│   │   │   ├── 📁 custom-order
+│   │   │   │   └── 📄 page.tsx
 │   │   │   ├── 📁 orders
 │   │   │   │   └── 📄 page.tsx
 │   │   │   ├── 📁 profile
 │   │   │   │   └── 📄 page.tsx
 │   │   │   ├── 📁 wishlist
 │   │   │   │   └── 📄 page.tsx
+│   │   │   └── 📄 page.tsx
+│   │   ├── 📁 how-it-is-made
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 login
 │   │   │   ├── 📄 opengraph-image.tsx
@@ -218,12 +228,15 @@
 │   │   ├── 📁 docs
 │   │   │   ├── 📁 Project_Based
 │   │   │   │   ├── 📝 PROJECT_STRUCTURE.md
+│   │   │   │   ├── 📝 README_ABOUT_PAGES.md
 │   │   │   │   ├── 📝 README_API_STRUCTURE.md
+│   │   │   │   ├── 📝 README_AUTH_SESSIONS.md
 │   │   │   │   ├── 📝 README_CART.md
 │   │   │   │   ├── 📝 README_COLLECTIONS.md
 │   │   │   │   ├── 📝 README_PRODUCT_STUDIO.md
 │   │   │   │   ├── 📝 README_THUMBNAILS.md
-│   │   │   │   └── 📝 README_UI_UX.md
+│   │   │   │   ├── 📝 README_UI_UX.md
+│   │   │   │   └── 📝 README_USER_MANAGER.md
 │   │   │   ├── 📝 README.md
 │   │   │   ├── 📝 README_API_DOCUMENTATION.md
 │   │   │   ├── 📝 README_PROJECT_HABIT.md

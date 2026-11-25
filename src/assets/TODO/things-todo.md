@@ -1,6 +1,0 @@
-- in the collection page, in the all products section why you are writing products added in product studio will show here, like tf. user doesn't care about no product studio, give them user generic msg.
-- if there is no featured product then we wont show the featured section at all
-- if there is no categories or have categories but no product assigned in those categories ( cz empty categories we dont show ) so we wont render that whole categories wala block
-- if the all product page is empty then we'll simply show no products ok?
-- Navbar me desktop me jo login button dikta hai usko change it to a Profile Icon ro User icon from lucide react, jab user kudh click karega toh ajayega login page me
-- aur mobile view me dropdown wala theek hai woh waisa hi rehne do ig.. lekin icon lga sakte ho in tha login button
