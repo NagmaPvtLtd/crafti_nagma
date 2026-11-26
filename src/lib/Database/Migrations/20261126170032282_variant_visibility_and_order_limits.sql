@@ -10,10 +10,21 @@
 --                   cart still caps at MAX_CART_QUANTITY, 100 per line).
 --
 -- Both order limits are optional, so existing variants keep today's behaviour.
+--
+-- One ALTER per column on purpose: TiDB validates every clause of a multi-change
+-- ALTER against the table as it exists BEFORE the statement, so
+-- `ADD COLUMN hide_stock …, ADD COLUMN min_order_qty … AFTER hide_stock` fails
+-- with ER_BAD_FIELD_ERROR (1054). Local MySQL accepts it, TiDB Cloud does not.
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE product_variants
-  ADD COLUMN processing_time VARCHAR(100) DEFAULT NULL AFTER description,
-  ADD COLUMN hide_stock BOOLEAN NOT NULL DEFAULT FALSE AFTER stock,
-  ADD COLUMN min_order_qty INT DEFAULT NULL AFTER hide_stock,
+  ADD COLUMN processing_time VARCHAR(100) DEFAULT NULL AFTER description;
+
+ALTER TABLE product_variants
+  ADD COLUMN hide_stock BOOLEAN NOT NULL DEFAULT FALSE AFTER stock;
+
+ALTER TABLE product_variants
+  ADD COLUMN min_order_qty INT DEFAULT NULL AFTER hide_stock;
+
+ALTER TABLE product_variants
   ADD COLUMN max_order_qty INT DEFAULT NULL AFTER min_order_qty;
