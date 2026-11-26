@@ -45,6 +45,22 @@ Writing a second copy of something that already exists is a bug, not a shortcut.
 - Icons rendered inside a Server Component are fine as components; the mistake is only when the value has to cross into a Client Component.
 - Symptom to recognise: the page returns `200`, then the browser console shows *"Only plain objects can be passed to Client Components from Server Components"* or the function error above. Fix the prop, not the page.
 
+# Remembered UI state — `sessionStorage`, read on open
+
+- Small bits of convenience state that should survive a reload live in
+  `sessionStorage` under a namespaced key (`crafti:<area>:<thing>`, e.g.
+  `crafti:pricing-quiz:labour`). Existing examples: the pricing quiz's salary /
+  hours / days, `WhatsappFloating`'s dismissal, `Heartbeat.hook`'s session flag.
+- **Never read storage in a `useState` initialiser.** The component is
+  server-rendered too, so the server (no storage) and the first client render
+  would disagree. Initialise with the real default, then read storage in the
+  handler that opens the surface (or in an event), and write on every change.
+- Parsing and writing are wrapped in `try/catch`: blocked storage (private mode)
+  and corrupt JSON fall back to the defaults field by field, and a failed write
+  never breaks the UI.
+- Anything that must outlive the tab (preferences, draft orders) belongs in the
+  database behind an API, not here.
+
 # Verification — the owner does the manual testing
 
 - Do **not** start `next dev` (or any preview server), do **not** curl API endpoints or pages, and do **not** click through the app to test a change. That manual verification — sign-in flows, hitting APIs, dev-server smoke tests — is the owner's own work; they will do it themselves.

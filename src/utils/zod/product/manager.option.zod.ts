@@ -58,6 +58,12 @@ export type OptionValueCreateInput = z.infer<typeof optionValueCreateSchema>;
 export type GlobalOptionValue = {
   id: string;
   value: string;
+  /**
+   * How many product option rows (`product_option_values`) still point at this
+   * value. `0` means it is safe to delete, even when the parent option itself is
+   * assigned to products.
+   */
+  productCount: number;
 };
 
 export type GlobalOption = {

@@ -15,6 +15,7 @@ import {
   TrendingUp,
   UserCog,
   Heart,
+  LayoutGrid,
 } from "lucide-react";
 import { UserRole } from "../../../types/User/UserRow.types";
 
@@ -40,6 +41,7 @@ export const CUSTOMER_LINKS: NavLink[] = [
   { href: "/dashboard/orders", label: "My Orders", icon: Package },
   { href: "/dashboard/profile", label: "My Profile", icon: UserIcon },
   { href: "/dashboard/wishlist", label: "My Wishlist", icon: Heart },
+  { href: "/categories", label: "Categories", icon: LayoutGrid },
   { href: "/collections", label: "Collections", icon: ShoppingBag },
   {
     href: "/dashboard/custom-order",
@@ -97,7 +99,7 @@ export function getSectionsForRole(role: UserRole): NavSection[] {
   }
 
   const sections: NavSection[] = [];
-  sections.push({ label: "Collections", links: CUSTOMER_LINKS });
+  sections.push({ label: "Dashboard", links: CUSTOMER_LINKS });
   sections.push({ label: "Store Manager", links: MANAGER_LINKS });
   if (isAdmin) sections.push({ label: "Admin", links: ADMIN_LINKS });
   if (isSuperAdmin)

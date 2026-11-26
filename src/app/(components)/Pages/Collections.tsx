@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import axios from "axios";
 import useEmblaCarousel from "embla-carousel-react";
 import {
@@ -11,6 +10,7 @@ import {
   ChevronRight,
   CornerDownLeft,
   Flower2,
+  LayoutGrid,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -21,6 +21,7 @@ import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import { inputClass } from "../utils/Form/fieldStyles";
 import { useDebouncedValue } from "../utils/Hooks/useDebouncedValue";
 import CollectionCard from "./CollectionCard";
+import CategoryCard from "./CategoryCard";
 import type { CollectionsResponse } from "../../../types/Collection.types";
 import { useRouter } from "next/navigation";
 
@@ -162,44 +163,44 @@ export default function Collections() {
             {/* ---------------- 1. Featured ---------------- */}
             {featured.length > 0 && (
               <section className="relative">
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <SectionEyebrow>Featured</SectionEyebrow>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                    Featured products
-                  </h2>
-                  <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-stone-600">
-                    The pieces we are proudest of right now — drag to browse the
-                    shelf.
-                  </p>
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <SectionEyebrow>Featured</SectionEyebrow>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                      Featured products
+                    </h2>
+                    <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-stone-600">
+                      The pieces we are proudest of right now — drag to browse
+                      the shelf.
+                    </p>
+                  </div>
+
+                  {featured.length > 1 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => scrollFeatured(-1)}
+                        aria-label="Previous featured products"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => scrollFeatured(1)}
+                        aria-label="Next featured products"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {featured.length > 1 && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => scrollFeatured(-1)}
-                      aria-label="Previous featured products"
-                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => scrollFeatured(1)}
-                      aria-label="Next featured products"
-                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div
-                className="-mx-4 -my-7 overflow-hidden px-4 py-7"
-                ref={emblaRef}
-              >
+                <div
+                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                  ref={emblaRef}
+                >
                   <div className="-ml-3 flex touch-pan-y select-none">
                     {featured.map((product) => (
                       <div
@@ -221,87 +222,85 @@ export default function Collections() {
             {/* ---------------- 2. Categories ---------------- */}
             {categories.length > 0 && (
               <section className="relative">
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <SectionEyebrow>Categories</SectionEyebrow>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                    Browse by category
-                  </h2>
-                  <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-stone-600">
-                    Each shelf holds its own story — pick a category to see
-                    every product inside it.
-                  </p>
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <SectionEyebrow>Categories</SectionEyebrow>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                      Browse by category
+                    </h2>
+                    <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-stone-600">
+                      Each shelf holds its own story — pick a category to see
+                      every product inside it.
+                    </p>
+                  </div>
+
+                  {categories.length > 2 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => catApi?.scrollPrev()}
+                        aria-label="Previous categories"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => catApi?.scrollNext()}
+                        aria-label="Next categories"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {categories.length > 2 && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => catApi?.scrollPrev()}
-                      aria-label="Previous categories"
-                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => catApi?.scrollNext()}
-                      aria-label="Next categories"
-                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-rose-200/70 bg-white text-stone-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div
-                className="-mx-4 -my-7 overflow-hidden px-4 py-7"
-                ref={catRef}
-              >
+                <div
+                  className="-mx-4 -my-7 overflow-hidden px-4 py-7"
+                  ref={catRef}
+                >
                   <div className="-ml-2.5 flex touch-pan-y select-none">
                     {categories.map((category) => (
                       <div
                         key={category.id}
                         className="min-w-0 shrink-0 grow-0 basis-[44%] pl-2.5 sm:basis-[30%] md:basis-1/4 lg:basis-1/5 xl:basis-[16%]"
                       >
-                        <Link
-                          href={category.href}
-                          className="group flex flex-col rounded-(--card-radius) border border-white/60 bg-white/85 backdrop-blur-sm transition-all duration-300 [--card-radius:1rem] hover:scale-[1.02] hover:border-rose-200 hover:bg-white hover:shadow-lg hover:shadow-rose-100/60"
-                        >
-                          <div className="relative aspect-square overflow-hidden rounded-t-(--card-radius) bg-linear-to-b from-rose-100 via-rose-50 to-white">
-                            {category.thumbnailUrl ? (
-                              <Image
-                                src={category.thumbnailUrl}
-                                alt={category.name}
-                                fill
-                                loading={"eager"}
-                                sizes="(max-width: 640px) 44vw, (max-width: 1024px) 25vw, 20vw"
-                                className="card-photo object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full items-center justify-center">
-                                <Flower2 className="h-7 w-7 text-rose-300" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="p-2.5">
-                            <div className="flex items-center justify-between gap-1.5">
-                              <h3 className="truncate text-xs font-semibold text-stone-900 group-hover:text-rose-600">
-                                {category.name}
-                              </h3>
-                              <ArrowRight className="h-3 w-3 shrink-0 text-rose-500 transition-transform group-hover:translate-x-0.5" />
-                            </div>
-                            <p className="mt-0.5 text-[10px] font-medium text-rose-600">
-                              {category.totalProductCount} product
-                              {category.totalProductCount === 1 ? "" : "s"}{" "}
-                              available!
-                            </p>
-                          </div>
-                        </Link>
+                        <CategoryCard category={category} />
                       </div>
                     ))}
+
+                    {/* The last slide points at the categories-only page, so
+                        every shelf stays one quiet click away. */}
+                    <div
+                      key="all-categories"
+                      className="min-w-0 shrink-0 grow-0 basis-[44%] pl-2.5 sm:basis-[30%] md:basis-1/4 lg:basis-1/5 xl:basis-[16%]"
+                    >
+                      <Link
+                        href="/categories"
+                        className="group flex h-full flex-col rounded-(--card-radius) border border-dashed border-rose-200/80 bg-rose-50/40 transition-colors [--card-radius:1rem] hover:border-rose-300 hover:bg-rose-50"
+                      >
+                        <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-t-(--card-radius) px-3 text-center">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-500 transition-transform group-hover:scale-105">
+                            <LayoutGrid className="h-4 w-4" />
+                          </span>
+                          <span className="text-xs font-semibold text-stone-800 group-hover:text-rose-600">
+                            All categories
+                          </span>
+                          <span className="text-[10px] leading-relaxed text-stone-500">
+                            Every shelf in one place
+                          </span>
+                        </div>
+                        <div className="p-2.5">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[10px] font-semibold tracking-wide text-rose-600 uppercase">
+                              See all
+                            </span>
+                            <ArrowRight className="h-3 w-3 shrink-0 text-rose-500 transition-transform group-hover:translate-x-0.5" />
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -348,8 +347,8 @@ export default function Collections() {
                     No products yet
                   </h3>
                   <p className="mt-1 max-w-sm text-xs text-stone-600">
-                    Our shelves are being restocked — new handmade pieces
-                    will show up here soon. Please check back in a little while.
+                    Our shelves are being restocked — new handmade pieces will
+                    show up here soon. Please check back in a little while.
                   </p>
                 </div>
               ) : (

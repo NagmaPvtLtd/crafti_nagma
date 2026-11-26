@@ -38,6 +38,22 @@ import type {
 const BASE = "/api/manager/product-studio/options";
 const VALUES = `${BASE}/values`;
 
+/** One value may be at most 100 characters (matches `optionValueCreateSchema`). */
+const VALUE_MAX = 100;
+
+/**
+ * Splits whatever was typed into the inline add-value field into separate
+ * values, so "Red, Blue, Green" adds three values instead of one. Commas
+ * (plain and full-width) and newlines all separate, and blank pieces are
+ * dropped.
+ */
+function parseValueDraft(draft: string): string[] {
+  return draft
+    .split(/[,，\n]+/)
+    .map((value) => value.trim().slice(0, VALUE_MAX))
+    .filter((value) => value.length > 0);
+}
+
 type OptionModalState =
   | { mode: "create" }
   | { mode: "edit"; option: GlobalOption };
@@ -130,13 +146,27 @@ export default function GlobalOptionsClient() {
     [load],
   );
 
-  /* ---- value create ---- */
-  const addValue = useCallback(
-    async (optionId: string, value: string): Promise<boolean> => {
-      await axios.post(VALUES, { optionId, value }, { withCredentials: true });
-      toast.success("Value added");
-      await load();
-      return true;
+  /* ---- value create — one value, or the whole comma list at once ---- */
+  const addValues = useCallback(
+    async (
+      optionId: string,
+      values: string[],
+    ): Promise<{ added: number; failed: string[] }> => {
+      const results = await Promise.allSettled(
+        values.map((value) =>
+          axios.post(VALUES, { optionId, value }, { withCredentials: true }),
+        ),
+      );
+
+      const failed = values.filter((_, i) => results[i].status === "rejected");
+      const added = values.length - failed.length;
+
+      if (added > 0) {
+        toast.success(added === 1 ? "Value added" : `${plural(added, "value")} added`);
+        await load();
+      }
+
+      return { added, failed };
     },
     [load],
   );
@@ -268,7 +298,7 @@ export default function GlobalOptionsClient() {
                       option={option}
                       onEdit={() => setOptionModal({ mode: "edit", option })}
                       onDelete={() => setToDelete({ kind: "option", option })}
-                      onAddValue={addValue}
+                      onAddValues={addValues}
                       onEditValue={(value) => setValueEdit({ option, value })}
                       onDeleteValue={(value) =>
                         setToDelete({ kind: "value", option, value })
@@ -370,14 +400,17 @@ function OptionCard({
   option,
   onEdit,
   onDelete,
-  onAddValue,
+  onAddValues,
   onEditValue,
   onDeleteValue,
 }: {
   option: GlobalOption;
   onEdit: () => void;
   onDelete: () => void;
-  onAddValue: (optionId: string, value: string) => Promise<boolean>;
+  onAddValues: (
+    optionId: string,
+    values: string[],
+  ) => Promise<{ added: number; failed: string[] }>;
   onEditValue: (value: GlobalOptionValue) => void;
   onDeleteValue: (value: GlobalOptionValue) => void;
 }) {
@@ -387,14 +420,41 @@ function OptionCard({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const value = draft.trim();
-    if (!value) return;
+
+    /* Everything already in the option, plus what this batch has typed so far. */
+    const seen = new Set(
+      option.values.map((v) => v.value.trim().toLowerCase()),
+    );
+    const parsed = parseValueDraft(draft);
+    if (parsed.length === 0) return;
+
+    const values = parsed.filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    if (values.length === 0) {
+      setErr("Those values are already in this option.");
+      return;
+    }
 
     setSaving(true);
     setErr(null);
     try {
-      await onAddValue(option.id, value);
-      setDraft("");
+      const { added, failed } = await onAddValues(option.id, values);
+
+      /* Keep only the values that did not make it, so a retry is just Enter. */
+      if (added > 0) setDraft(failed.join(", "));
+
+      if (failed.length > 0) {
+        setErr(
+          added === 0
+            ? `Could not add ${failed.join(", ")}.`
+            : `Added the rest — ${failed.join(", ")} could not be added.`,
+        );
+      }
     } catch (error) {
       const details = fieldErrors(error);
       setErr(
@@ -482,8 +542,8 @@ function OptionCard({
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Add a value to ${option.name}`}
-          maxLength={100}
+          placeholder={`Add values to ${option.name} — Red, Blue, Green`}
+          maxLength={400}
           disabled={saving}
           className="w-full rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 disabled:cursor-not-allowed disabled:bg-stone-50"
         />
@@ -799,6 +859,15 @@ function ConfirmDelete({
   const isOption = target.kind === "option";
   const label = isOption ? target.option.name : target.value.value;
 
+  /**
+   * An option is deletable only while no product uses it. A value is deletable
+   * whenever *that value* is unused — the parent option being assigned to a
+   * product is irrelevant, that is what used to block this dialog by mistake.
+   */
+  const blocked = isOption
+    ? target.option.productCount > 0
+    : target.value.productCount > 0;
+
   const warnings: string[] = [];
   if (isOption) {
     if (target.option.valueCount > 0) {
@@ -806,18 +875,16 @@ function ConfirmDelete({
         `${plural(target.option.valueCount, "value")} inside it will be deleted too.`,
       );
     }
-    if (target.option.productCount > 0) {
+    if (blocked) {
       warnings.push(
         `Used by ${plural(target.option.productCount, "product")}, cannot delete.`,
       );
     }
-  } else if (target.option.productCount > 0) {
+  } else if (blocked) {
     warnings.push(
-      `Used by ${plural(target.option.productCount, "product")}, cannot delete while it is in use.`,
+      `“${target.value.value}” is used by ${plural(target.value.productCount, "product")}, so it cannot be deleted. Remove it from those products first.`,
     );
   }
-
-  const blocked = !isOption && target.option.productCount > 0;
 
   return (
     <Overlay onClose={busy ? undefined : onCancel}>

@@ -25,6 +25,7 @@ Related files:
 | Route | File | Renders |
 | --- | --- | --- |
 | `/collections` | `src/app/collections/page.tsx` | `Collections` |
+| `/categories` | `src/app/categories/page.tsx` | `CategoryList` — every category with products, as a grid |
 | `/collections/[category]` | `src/app/collections/[category]/page.tsx` | `CollectionBrowse` |
 | `/collections/[category]/[subcategory]` | `src/app/collections/[category]/[subcategory]/page.tsx` | `CollectionBrowse` (with `subcategory`) |
 | `/collections/[category]/[subcategory]/[product]` | `src/app/collections/[category]/[subcategory]/[product]/page.tsx` | `CollectionProduct` |
@@ -219,6 +220,13 @@ Amazon-style reading order, all of it top-to-bottom in one column:
    | 1 – 4 | `Low stock! Hurry up!` |
    | 0 | `Out of stock` |
    | inactive variant | `Currently unavailable` |
+   | `hide_stock = 1` | `Out of stock` (the API sends `stock: 0`, the real count stays in the studio) |
+
+   A hidden variant is skipped when the page picks its default variant and is left
+   out of the collection cards' `totalStock`, so a product whose every visible
+   variant is hidden reads as "Sold out" in listings too. An explicit
+   `?variant=<sku>` link still opens the hidden variant, showing it as out of
+   stock — shared links never break.
 
 4. **Options** — one row per `product_option`, chips per value, the selected one
    rose-tinted with a ring. Values that would leave **no active variant** behind
@@ -237,6 +245,16 @@ Amazon-style reading order, all of it top-to-bottom in one column:
 8. **Specifications** — two-column `<dl>`: option name(s) + selected values,
    Category, Subcategory (separate rows), Weight in grams, Processing time.
    Every missing value renders an em dash (`—`), never a blank.
+   Processing time is the **variant's own** value (`processing_time`), falling
+   back to the base product's — so one slow colour can read differently from the
+   rest.
+
+   The quantity stepper starts at the variant's `min_order_qty` (1 when unset)
+   and stops at `max_order_qty` — or at `MAX_CART_QUANTITY` (100) when no maximum
+   is set. Stock never bounds it: with 10 in stock a shopper can still pick 20, and
+   the maker approves the order before payment. A one-line hint under the stepper
+   states the minimum and maximum when either is set; the existing 99-piece bulk
+   note is unchanged.
 9. **Reviews** — a dashed "Under construction" panel that still shows the live
    average/count. **TODO(reviews):** replace it with paginated approved reviews
    from `product_reviews`, a rating breakdown, helpful votes and a submit form.
@@ -324,7 +342,10 @@ discovery.
    product cards, plus previous/next controls.
 2. **Categories** — cards using each root category's `thumbnailUrl` (featured
    variant first, then the first variant photo of a product in that category),
-   with the total product count and its subcategory chips.
+   with the total product count and its subcategory chips. The rail is the shared
+   `CategoryCard` (`src/app/(components)/Pages/CategoryCard.tsx`) and ends with a
+   dashed **All categories** tile that opens `/categories`, so the categories-only
+   page is one quiet click from the landing page instead of a loud button.
 3. **Search + all products** — the search field pushes to
    `/search?q=<term>`; below it the products render as a square-card grid and
    the next batch of 8 is revealed by an `IntersectionObserver` sentinel well
@@ -361,9 +382,10 @@ line, then a two-column grid of cards.
 - The heading is the **variant** name (`variant.name || product.name`); the
   brief and description come from the variant first, then the base product.
 - The old “You are currently viewing: …” block is gone.
-- The purchase row has a quantity stepper (max **99**), an Add to Cart button
-  that answers “coming soon”, and a square WhatsApp button.
-- Asking above 99 shows: **“Bulk orders above 99 pieces are subject to terms
+- The purchase row has a quantity stepper (max **100**, or the variant's own
+  `max_order_qty` when lower), an Add to Cart button, and a square WhatsApp
+  button.
+- Reaching 100 pieces shows: **“Bulk orders above 99 pieces are subject to terms
   and conditions and take longer to deliver.”**
 - The WhatsApp message is prefilled:
   `Hello, crafti nagma. I am interest in this product of yours!` + product name

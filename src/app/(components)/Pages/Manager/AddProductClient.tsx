@@ -12,6 +12,7 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Sparkles,
 } from "lucide-react";
 
@@ -32,6 +33,14 @@ import CustomLoader from "../../CustomLoader";
 import TagInput from "../../utils/TagInput";
 import type { TagRef } from "../../../../utils/Tags/tag.util";
 import { baseProductCreateSchema } from "../../../../utils/zod/product/manager.product.zod";
+import {
+  clearAddProductDraft,
+  isAddProductDraftEmpty,
+  pruneCategoryIds,
+  pruneSelectedValues,
+  readAddProductDraft,
+  writeAddProductDraft,
+} from "../../../../utils/ProductStudio/productDraft.util";
 import type {
   GlobalCategoriesResponse,
   GlobalCategory,
@@ -115,6 +124,8 @@ export default function AddProductClient() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** `true` once the saved draft has been applied, so it is never overwritten early. */
+  const [draftReady, setDraftReady] = useState(false);
 
   const fetchPools = useCallback(async () => {
     const [categoryRes, optionRes] = await Promise.all([
@@ -136,6 +147,11 @@ export default function AddProductClient() {
       const data = await fetchPools();
       setCategories(data.categories);
       setOptions(data.options);
+      /* Saved ids that no longer exist are dropped instead of staying selected. */
+      setSelectedCategoryIds((prev) =>
+        pruneCategoryIds(prev, data.categories),
+      );
+      setSelectedValues((prev) => pruneSelectedValues(prev, data.options));
       setLoadError(null);
     } catch (err: unknown) {
       setLoadError(
@@ -154,6 +170,11 @@ export default function AddProductClient() {
         if (!active) return;
         setCategories(data.categories);
         setOptions(data.options);
+        /* Saved ids that no longer exist are dropped instead of staying selected. */
+        setSelectedCategoryIds((prev) =>
+          pruneCategoryIds(prev, data.categories),
+        );
+        setSelectedValues((prev) => pruneSelectedValues(prev, data.options));
       })
       .catch((err: unknown) => {
         if (active) {
@@ -170,6 +191,57 @@ export default function AddProductClient() {
       active = false;
     };
   }, [fetchPools]);
+
+  /*
+   * Restoring happens one microtask after mount, so the first client render
+   * still matches the server HTML. A missing or unreadable draft leaves the
+   * form untouched, and saved ids are matched against the pools as they load.
+   */
+  useEffect(() => {
+    let active = true;
+
+    Promise.resolve().then(() => {
+      if (!active) return;
+
+      const draft = readAddProductDraft();
+      if (draft) {
+        setForm(draft.form);
+        setDimensions(draft.dimensions);
+        setSelectedCategoryIds(draft.categoryIds);
+        setSelectedTags(draft.tags);
+        setSelectedValues(draft.values);
+      }
+      setDraftReady(true);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /* Every edit lands in localStorage, so closing the page loses nothing. */
+  useEffect(() => {
+    if (!draftReady) return;
+
+    const draft = {
+      form,
+      dimensions,
+      categoryIds: selectedCategoryIds,
+      tags: selectedTags,
+      values: selectedValues,
+    };
+
+    /* A blank form is not worth a stored key at all. */
+    if (isAddProductDraftEmpty(draft)) clearAddProductDraft();
+    else writeAddProductDraft(draft);
+  }, [
+    draftReady,
+    form,
+    dimensions,
+    selectedCategoryIds,
+    selectedTags,
+    selectedValues,
+  ]);
 
   /* ---- derived ---- */
 
@@ -260,6 +332,19 @@ export default function AddProductClient() {
     });
   };
 
+  /** Wipes every field and the saved draft, so the page starts over. */
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setDimensions(emptyDimensions);
+    setSelectedCategoryIds([]);
+    setSelectedTags([]);
+    setSelectedValues({});
+    setErrors({});
+    setFormError(null);
+    clearAddProductDraft();
+    toast.success("Form cleared");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -306,6 +391,8 @@ export default function AddProductClient() {
         { withCredentials: true },
       );
       const created = res.data.product;
+      /* The draft's job ends here — the next Add a product starts blank. */
+      clearAddProductDraft();
       toast.success("Base product created");
       router.push(
         created?.code || created?.id
@@ -343,9 +430,20 @@ export default function AddProductClient() {
         <SectionEyebrow href="/manager/product-studio">
           PRODUCT STUDIO
         </SectionEyebrow>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
-          Add a product
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl md:text-4xl">
+            Add a product
+          </h1>
+          <button
+            type="button"
+            onClick={resetForm}
+            disabled={saving}
+            className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 backdrop-blur-sm transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset form
+          </button>
+        </div>
         <SectionDivider className="my-6" size={11} />
 
         {loading && !categories && (
@@ -740,8 +838,8 @@ export default function AddProductClient() {
                   checked={form.isFeatured}
                   onChange={(checked) => setField("isFeatured", checked)}
                   label="Is featured"
-                  hint="Ticked, this product appears in the featured picks on the home page."
-                  description="Extra visibility on the home page."
+                  hint="Ticked, this product appears in the featured picks at the top of the collections page."
+                  description="Extra visibility on the collections page."
                 />
                 <CheckboxRow
                   checked={form.mainShowcase}
