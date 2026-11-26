@@ -29,6 +29,79 @@ const toNumber = (value: string) => {
 const asInputValue = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(2);
 
+/** No month is longer than 31 days, so the field cannot hold more. */
+const MAX_DAYS_PER_MONTH = 31;
+
+/** Digits only, capped at 31 — pasting or typing 45 lands on 31. */
+const clampDaysPerMonth = (raw: string) => {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  return String(Math.min(Number(digits), MAX_DAYS_PER_MONTH));
+};
+
+/** The making-time field can be read in minutes or in hours. */
+type TimeUnit = "min" | "hr";
+
+/** Step 1 answers — the same numbers for every product, so they are remembered. */
+type LabourAnswers = {
+  monthlySalary: string;
+  hoursPerDay: string;
+  daysPerMonth: string;
+};
+
+const LABOUR_DEFAULTS: LabourAnswers = {
+  monthlySalary: "15000",
+  hoursPerDay: "8",
+  daysPerMonth: "26",
+};
+
+/**
+ * Session storage key for the step 1 answers. They live in the tab session, like
+ * the other remembered UI state (`WhatsappFloating`, `Heartbeat.hook`), so the
+ * quiz opens where the manager left it instead of starting from scratch.
+ */
+const LABOUR_SESSION_KEY = "crafti:pricing-quiz:labour";
+
+/** Reads the saved answers, falling back to the defaults for anything missing. */
+function readLabourAnswers(): LabourAnswers {
+  try {
+    const raw = window.sessionStorage.getItem(LABOUR_SESSION_KEY);
+    if (!raw) return LABOUR_DEFAULTS;
+
+    const saved = JSON.parse(raw) as Partial<LabourAnswers> | null;
+    return {
+      monthlySalary:
+        typeof saved?.monthlySalary === "string"
+          ? saved.monthlySalary
+          : LABOUR_DEFAULTS.monthlySalary,
+      hoursPerDay:
+        typeof saved?.hoursPerDay === "string"
+          ? saved.hoursPerDay
+          : LABOUR_DEFAULTS.hoursPerDay,
+      daysPerMonth:
+        typeof saved?.daysPerMonth === "string"
+          ? clampDaysPerMonth(saved.daysPerMonth)
+          : LABOUR_DEFAULTS.daysPerMonth,
+    };
+  } catch {
+    /* storage blocked (private mode) — the defaults still work */
+    return LABOUR_DEFAULTS;
+  }
+}
+
+/** Saves a copy of the answers; a failed write must never break the quiz. */
+function writeLabourAnswers(answers: LabourAnswers) {
+  try {
+    window.sessionStorage.setItem(LABOUR_SESSION_KEY, JSON.stringify(answers));
+  } catch {
+    /* storage full or blocked — the quiz keeps working without it */
+  }
+}
+
+/** Only the legible decimals matter when minutes become hours (45 → 0.75). */
+const asTimeValue = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(2);
+
 const SUBTITLES = [
   "Start with what one month of this work costs you.",
   "Now the cost of making one piece.",
@@ -60,12 +133,14 @@ export default function PricingQuizButton({
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
 
-  const [monthlySalary, setMonthlySalary] = useState("15000");
-  const [hoursPerDay, setHoursPerDay] = useState("8");
-  const [daysPerMonth, setDaysPerMonth] = useState("26");
+  /* Starts on the defaults so the server HTML and the first client render
+     agree; the saved answers are read when the quiz is opened. */
+  const [labour, setLabour] = useState<LabourAnswers>(LABOUR_DEFAULTS);
+  const { monthlySalary, hoursPerDay, daysPerMonth } = labour;
 
   const [materialCost, setMaterialCost] = useState("");
-  const [minutes, setMinutes] = useState("");
+  const [makingTime, setMakingTime] = useState("");
+  const [timeUnit, setTimeUnit] = useState<TimeUnit>("min");
   const [packagingCost, setPackagingCost] = useState("");
   const [marginPercent, setMarginPercent] = useState("30");
 
@@ -81,9 +156,25 @@ export default function PricingQuizButton({
     productiveHours,
   );
 
+  /** The cost model always works in minutes, whatever unit is on screen. */
+  const makingMinutes =
+    timeUnit === "hr" ? toNumber(makingTime) * 60 : toNumber(makingTime);
+
+  /** Switching the unit rewrites the value so the same time is still shown. */
+  const changeTimeUnit = (next: TimeUnit) => {
+    if (next === timeUnit) return;
+    const current = toNumber(makingTime);
+    if (current > 0) {
+      setMakingTime(
+        asTimeValue(next === "hr" ? current / 60 : current * 60),
+      );
+    }
+    setTimeUnit(next);
+  };
+
   const priceInput = {
     materialCost: toNumber(materialCost),
-    minutes: toNumber(minutes),
+    minutes: makingMinutes,
     hourlyRate,
     packagingCost: toNumber(packagingCost),
     marginPercent: toNumber(marginPercent),
@@ -102,16 +193,26 @@ export default function PricingQuizButton({
 
   const canContinue = step === 0 ? hourlyRate > 0 : cost > 0;
 
+  /** Any edit to a step 1 answer is remembered for the next opening. */
+  const updateLabour = (patch: Partial<LabourAnswers>) => {
+    const next = { ...labour, ...patch };
+    setLabour(next);
+    writeLabourAnswers(next);
+  };
+
+  const openQuiz = () => {
+    setLabour(readLabourAnswers());
+    setStep(0);
+    setOpen(true);
+  };
+
   const close = () => setOpen(false);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => {
-          setStep(0);
-          setOpen(true);
-        }}
+        onClick={openQuiz}
         className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-rose-200/70 bg-rose-50/60 px-2.5 py-0.5 text-[10px] font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-50"
       >
         <Wand2 className="h-3 w-3" />
@@ -180,7 +281,9 @@ export default function PricingQuizButton({
               <input
                 inputMode="decimal"
                 value={monthlySalary}
-                onChange={(e) => setMonthlySalary(e.target.value)}
+                onChange={(e) =>
+                  updateLabour({ monthlySalary: e.target.value })
+                }
                 className={inputClass()}
               />
             </QuizField>
@@ -190,15 +293,23 @@ export default function PricingQuizButton({
                 <input
                   inputMode="decimal"
                   value={hoursPerDay}
-                  onChange={(e) => setHoursPerDay(e.target.value)}
+                  onChange={(e) => updateLabour({ hoursPerDay: e.target.value })}
                   className={inputClass()}
                 />
               </QuizField>
-              <QuizField label="Working days / month">
+              <QuizField
+                label="Working days / month"
+                hint={`Maximum ${MAX_DAYS_PER_MONTH} days.`}
+              >
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   value={daysPerMonth}
-                  onChange={(e) => setDaysPerMonth(e.target.value)}
+                  onChange={(e) =>
+                    updateLabour({
+                      daysPerMonth: clampDaysPerMonth(e.target.value),
+                    })
+                  }
+                  maxLength={2}
                   className={inputClass()}
                 />
               </QuizField>
@@ -239,13 +350,30 @@ export default function PricingQuizButton({
                   className={inputClass()}
                 />
               </QuizField>
-              <QuizField label="Making time (min)">
-                <input
-                  inputMode="decimal"
-                  value={minutes}
-                  onChange={(e) => setMinutes(e.target.value)}
-                  className={inputClass()}
-                />
+              <QuizField label="Making time">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    inputMode="decimal"
+                    value={makingTime}
+                    onChange={(e) => setMakingTime(e.target.value)}
+                    className={inputClass()}
+                  />
+                  {/* Same shared input styling (and therefore the same height)
+                      as the field next to it — only the width is fixed. */}
+                  <div className="w-20 shrink-0">
+                    <select
+                      value={timeUnit}
+                      onChange={(e) =>
+                        changeTimeUnit(e.target.value as TimeUnit)
+                      }
+                      aria-label="Making time unit"
+                      className={`${inputClass(false)} cursor-pointer`}
+                    >
+                      <option value="min">min</option>
+                      <option value="hr">hr</option>
+                    </select>
+                  </div>
+                </div>
               </QuizField>
             </div>
 

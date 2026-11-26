@@ -97,6 +97,9 @@ interface VariantRow extends RowDataPacket {
   price: number | string;
   compare_at_price: number | string | null;
   stock: number | string;
+  hide_stock: number | boolean;
+  min_order_qty: number | string | null;
+  max_order_qty: number | string | null;
   status: "active" | "inactive";
   image_url: string | null;
 }
@@ -261,7 +264,9 @@ async function normalizeMediaSortOrder(
  *   - features, careInstructions: `{ id, value, sortOrder }` rows in sort order
  *   - categories: `{ id, name, slug, parentId }`, ordered by name
  *   - options: `{ id, name, description, values }`
- *   - variants: `{ id, name, sku, price, compareAtPrice, stock, status, optionValues, imageUrl }`
+ *   - variants: `{ id, name, sku, price, compareAtPrice, stock, hideStock, minOrderQty,
+ *               maxOrderQty, status, optionValues, imageUrl }` — `hideStock` powers the
+ *               "Hidden" chip on the variant list, the order limits are `null` when unset
  *   - media: `{ id, url, fileId, altText, sortOrder, variantId, createdAt, isLinked,
  *              sourceImageId, ownerVariantName, ownerSku, linkedVariantCount }`
  *   - stats: `variantCount`, `totalStock`, `lowStock`, `outOfStock`, `minPrice`, `maxPrice`,
@@ -388,7 +393,7 @@ export async function GET(
 
     const [variantRows] = await conn.query<VariantRow[]>(
       `SELECT v.id, v.name, v.sku, v.price, v.compare_at_price,
-              v.stock, v.status,
+              v.stock, v.hide_stock, v.min_order_qty, v.max_order_qty, v.status,
               (SELECT f.url
                  FROM imagekit_files f
                 WHERE f.file_purpose = 'product_variant_image'
@@ -574,6 +579,9 @@ export async function GET(
         compareAtPrice:
           v.compare_at_price === null ? null : Number(v.compare_at_price),
         stock: Number(v.stock ?? 0),
+        hideStock: Boolean(v.hide_stock),
+        minOrderQty: v.min_order_qty === null ? null : Number(v.min_order_qty),
+        maxOrderQty: v.max_order_qty === null ? null : Number(v.max_order_qty),
         status: v.status,
         optionValues: (valuesByVariant.get(v.id) ?? []).map((value) => ({
           option: value.option,

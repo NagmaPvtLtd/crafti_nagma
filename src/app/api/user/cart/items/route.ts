@@ -14,6 +14,7 @@ import {
 } from "../../../../../utils/Cart/cart.util";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
 import { generateULID } from "../../../../../utils/generateULID.util";
+import { MAX_CART_QUANTITY } from "../../../../../utils/Cart/cartLimit.util";
 import { cartAddSchema } from "../../../../../utils/zod/cart/cart.zod";
 
 /* -------------------------------------------------------------------------- */
@@ -28,28 +29,38 @@ import { cartAddSchema } from "../../../../../utils/zod/cart/cart.zod";
  * @description Login-first write: there is no guest cart, so only a signed-in user
  *              can add (`requireAuth()`). One line per variant (`uq_cart_variant`),
  *              and stock is checked against the total the line would hold afterwards.
- *              The check and the write run inside one transaction with the line
+ *              The variant must be active, its stock not hidden (`hide_stock`) and
+ *              not zero. Stock does **not** cap the line: the resulting quantity is
+ *              bounded only by the variant's optional `min_order_qty` / `max_order_qty`
+ *              (default 1 and the shared `MAX_CART_QUANTITY` ceiling), because the
+ *              maker reviews every order before payment.
+ *              The checks and the write run inside one transaction with the line
  *              locked `FOR UPDATE`, so two tabs cannot oversell the same variant.
  *              Every result returns the whole cart, so the client needs no refetch.
  *
  * @param {NextRequest} req - The incoming HTTP request with a JSON body
  *
  * @body {string} variantId - `product_variants.id` to add (trimmed, 2–40 characters)
- * @body {number} [quantity] - Units to add (integer 1–99, default: 1)
+ * @body {number} [quantity] - Units to add (integer 1–100, default: 1)
  *
  * @returns {Promise<NextResponse>} `no-store` JSON response with:
  *   - ok: always `true`
  *   - items: the whole cart after the write (`variantId`, `sku`, `productName`,
  *            `productCode`, `name`, `imageUrl`, `price`, `compareAtPrice`,
- *            `quantity`, `lineTotal`, `stock`, `status`, `available`)
+ *            `quantity`, `lineTotal`, `stock`, `minOrderQty`, `maxOrderQty`,
+ *            `status`, `available`)
  *   - summary: `itemCount`, `quantity`, `subtotal` — available lines only
  *
  * @throws {400} Validation failed - malformed body or a `variantId` outside 2–40 chars
  * @throws {400} `"Out of stock"` - the variant is active but its `stock` is 0
- * @throws {400} `"Only N left"` - the resulting line quantity would exceed stock
+ * @throws {400} `"Minimum order for this piece is N"` - the resulting line is below
+ *               `min_order_qty`
+ * @throws {400} `"You can order up to N of this piece at a time"` - the resulting line is above
+ *               `max_order_qty`
  * @throws {401} Unauthorized - No session, inactive account, or a session without a user id
  * @throws {409} The variant does not exist ("This variant is no longer available")
- * @throws {409} The variant is inactive ("This variant is not available right now")
+ * @throws {409} The variant is inactive or its stock is hidden ("This variant is not available
+ *               right now")
  * @throws {500} Database failure, or the cart could not be resolved
  *
  * @description Workflow:
@@ -59,22 +70,27 @@ import { cartAddSchema } from "../../../../../utils/zod/cart/cart.zod";
  *      `invalidInput()` (400 `{ error, details }`)
  *   3. Initialize the database pool with `getPool()` and take a connection
  *   4. Begin a transaction on the connection
- *   5. Select `id`, `stock`, `status` from `product_variants` for `variantId`
- *   6. Return 409 when the variant is missing, 409 when `status = 'inactive'`
+ *   5. Select `id`, `stock`, `hide_stock`, `min_order_qty`, `max_order_qty` and `status` from
+ *      `product_variants` for `variantId`
+ *   6. Return 409 when the variant is missing, 409 when `status = 'inactive'`, and 409 when
+ *      `hide_stock` is on
  *   7. Read `stock` as a number and return 400 `"Out of stock"` when it is 0 or less
  *   8. Resolve or create the user's active cart with
  *      `resolveUserCart(conn, userId, true)`
  *   9. Lock the existing `cart_items` line for this cart and variant `FOR UPDATE`
  *   10. Read its `quantity` (0 when the line does not exist) and add the requested
- *       `quantity`
- *   11. Return 400 `"Only N left"` when the result exceeds the variant's stock
- *   12. Insert the line (`generateULID("cit")`, `created_at`, `updated_at`) or update
+ *       `quantity`; stock is never compared against the result
+ *   11. Return 400 `"Minimum order for this piece is N"` when the result is below
+ *       `min_order_qty` (default 1)
+ *   12. Return 400 `"You can order up to N of this piece at a time"` when the result exceeds
+ *       `max_order_qty`, or `MAX_CART_QUANTITY` (100) while no maximum is set
+ *   13. Insert the line (`generateULID("cit")`, `created_at`, `updated_at`) or update
  *       its `quantity` and `updated_at`
- *   13. Bump `carts.updated_at` with `touchCart()`
- *   14. Commit the transaction
- *   15. Reload the whole cart with `loadCart()` and compute `cartTotals()`
- *   16. Return 200 `no-store` response with `{ ok, items, summary }`
-  *   17. Roll back the transaction and release the connection on error
+ *   14. Bump `carts.updated_at` with `touchCart()`
+ *   15. Commit the transaction
+ *   16. Reload the whole cart with `loadCart()` and compute `cartTotals()`
+ *   17. Return 200 `no-store` response with `{ ok, items, summary }`
+ *   18. Roll back the transaction and release the connection on error
  */
 
 export async function POST(req: NextRequest) {
@@ -102,7 +118,7 @@ export async function POST(req: NextRequest) {
     await conn.beginTransaction();
 
     const [variantRows] = await conn.query<CartVariantRow[]>(
-      `SELECT id, stock, status
+      `SELECT id, stock, hide_stock, min_order_qty, max_order_qty, status
          FROM product_variants
         WHERE id = ?
         LIMIT 1`,
@@ -118,7 +134,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (variant.status !== "active") {
+    /* A hidden variant is sold out from the shopper's point of view, even when
+       the manager kept the stock number. */
+    if (variant.status !== "active" || Boolean(variant.hide_stock)) {
       await conn.rollback();
       return NextResponse.json(
         { error: "This variant is not available right now" },
@@ -152,10 +170,25 @@ export async function POST(req: NextRequest) {
     const current = lineRows[0] ? Number(lineRows[0].quantity ?? 0) : 0;
     const nextQuantity = current + quantity;
 
-    if (nextQuantity > stock) {
+    const minOrder = Number(variant.min_order_qty ?? 1);
+    if (nextQuantity < minOrder) {
       await conn.rollback();
       return NextResponse.json(
-        { error: `Only ${stock} left` },
+        { error: `Minimum order for this piece is ${minOrder}` },
+        { status: 400 },
+      );
+    }
+
+    /* The maker's maximum is the only upper bound — stock never caps a line — and
+       the shared cart ceiling applies when no maximum was set. */
+    const maxOrder =
+      variant.max_order_qty === null
+        ? MAX_CART_QUANTITY
+        : Math.min(Number(variant.max_order_qty), MAX_CART_QUANTITY);
+    if (nextQuantity > maxOrder) {
+      await conn.rollback();
+      return NextResponse.json(
+        { error: `You can order up to ${maxOrder} of this piece at a time` },
         { status: 400 },
       );
     }

@@ -80,7 +80,8 @@ const PRODUCT_SELECT = `
            ORDER BY v.is_featured DESC, v.created_at ASC, v.id ASC
            LIMIT 1)                                                   AS display_compare_at,
          (SELECT COALESCE(SUM(v.stock), 0) FROM product_variants v
-           WHERE v.product_id = p.id AND v.status = 'active')         AS total_stock,
+           WHERE v.product_id = p.id AND v.status = 'active'
+             AND v.hide_stock = 0)                                    AS total_stock,
          (SELECT f.url FROM imagekit_files f
             JOIN product_variants v ON v.id = f.entity_id
            WHERE f.entity_type = 'product_variant'
@@ -217,7 +218,9 @@ function relevance(
  *              one variant's commercial data — the featured variant first, otherwise
  *              the first variant — for the displayed price, compare-at price and
  *              cover photo, plus its combined approved-review count and average and
- *              its active-variant total stock. `?category=` / `?subcategory=` narrow
+ *              its active-variant total stock — variants whose stock the manager hid
+ *              (`hide_stock = 1`) are left out, so a product whose every visible
+ *              variant is hidden reads as sold out. `?category=` / `?subcategory=` narrow
  *              the scope (a missing or `all` segment means no scoping), `?search=`
  *              (or `?q=`) matches name, slug, code, brief description, base-product
  *              tags and variant-specific tags with a strict relevance ranking, and
@@ -249,7 +252,7 @@ function relevance(
  * @description Workflow:
  *   1. Read and lowercase `category` and `subcategory`; read `search` (or `q`, max 120 chars) and the numeric `minPrice` / `maxPrice`
  *   2. Initialize the database pool and take a connection
- *   3. Select every active product with the featured/first variant's price and compare-at price, total active stock, cover photo and review count/average
+ *   3. Select every active product with the featured/first variant's price and compare-at price, the total stock of active variants whose stock is not hidden, cover photo and review count/average
  *   4. Select categories with their active product counts and a thumbnail from a product inside each category
  *   5. Select product-category links joined to category and parent names
  *   6. Select the catalogue-wide active variant price bounds

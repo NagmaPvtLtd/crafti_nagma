@@ -14,6 +14,7 @@ import {
   type CartVariantRow,
 } from "../../../../../../utils/Cart/cart.util";
 import { getCurrentDateTime } from "../../../../../../utils/ValueFetcher/getDateTime.util";
+import { MAX_CART_QUANTITY } from "../../../../../../utils/Cart/cartLimit.util";
 import { cartUpdateSchema } from "../../../../../../utils/zod/cart/cart.zod";
 
 type VariantRouteContext = {
@@ -31,10 +32,11 @@ type VariantRouteContext = {
  * @function PATCH
  * @description The quantity is not capped by the variant's stock: every order is
  *              reviewed and approved by the admin before payment, so the requested
- *              amount is only bounded by the 0–99 body schema. An inactive or
- *              deleted variant cannot be given a positive quantity, but its line
+ *              amount is bounded by the 0–100 body schema and by the variant's own
+ *              `min_order_qty` / `max_order_qty` limits. An inactive or hidden-stock
+ *              (`hide_stock`) variant cannot be given a positive quantity, but its line
  *              can still be removed — `0` is always allowed. A user without a cart
- *              gets the empty payload back. The variant check and the update run
+ *              gets the empty payload back. The variant checks and the update run
  *              inside one transaction with the line locked `FOR UPDATE`.
  *
  * @param {NextRequest} req - The incoming HTTP request with a JSON body
@@ -42,18 +44,21 @@ type VariantRouteContext = {
  * @param {Promise<{ variantId: string }>} context.params - Route parameters
  *                        (`(await context.params).variantId`)
  *
- * @body {number} quantity - New line quantity (integer 0–99; `0` removes the line)
+ * @body {number} quantity - New line quantity (integer 0–100; `0` removes the line)
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: always `true`
  *   - items: the whole cart after the change
  *   - summary: `itemCount`, `quantity`, `subtotal` — available lines only
  *
- * @throws {400} Validation failed - malformed body, bad `variantId` length, or quantity outside 0–99
+ * @throws {400} Validation failed - malformed body, bad `variantId` length, or quantity outside 0–100
  * @throws {400} `"Out of stock"` - the variant is active but its `stock` is 0
+ * @throws {400} `"Minimum order for this piece is N"` - the quantity is below `min_order_qty`
+ * @throws {400} `"You can order up to N of this piece at a time"` - the quantity is above
+ *               `max_order_qty`
  * @throws {401} Unauthorized - No session, inactive account, or a session without a user id
  * @throws {404} The line is not in the cart ("This item is not in your cart")
- * @throws {409} The variant does not exist or is inactive
+ * @throws {409} The variant does not exist, is inactive, or its stock is hidden
  * @throws {500} Database failure while updating the line
  *
  * @description Workflow:
@@ -69,16 +74,22 @@ type VariantRouteContext = {
  *   6. When `quantity === 0`: delete the `cart_items` line, bump `carts.updated_at`,
  *      reload the cart and return it (no stock check on removal)
  *   7. Begin a transaction on the connection
- *   8. Select `id`, `stock`, `status` from `product_variants` for `variantId`
- *   9. Return 409 when the variant is missing, 409 when `status = 'inactive'`
+ *   8. Select `id`, `stock`, `hide_stock`, `min_order_qty`, `max_order_qty` and `status` from
+ *      `product_variants` for `variantId`
+ *   9. Return 409 when the variant is missing, 409 when `status = 'inactive'`, and 409 when
+ *      `hide_stock` is on
  *   10. Read `stock`; return 400 `"Out of stock"` when it is 0 or less. The
  *       requested quantity itself is not compared against stock
- *   11. Lock the `cart_items` line `FOR UPDATE` and return 404 when it is absent
- *   12. Update the line's `quantity` and `updated_at`
- *   13. Bump `carts.updated_at` with `touchCart()` and commit the transaction
- *   14. Reload the cart with `loadCart()` and compute `cartTotals()`
- *   15. Return 200 response with `{ ok, items, summary }`
-  *   16. Roll back the transaction and release the connection on error
+ *   11. Return 400 `"Minimum order for this piece is N"` when the quantity is below
+ *       `min_order_qty` (default 1)
+ *   12. Return 400 `"You can order up to N of this piece at a time"` when `max_order_qty` is set
+ *       and the quantity exceeds it
+ *   13. Lock the `cart_items` line `FOR UPDATE` and return 404 when it is absent
+ *   14. Update the line's `quantity` and `updated_at`
+ *   15. Bump `carts.updated_at` with `touchCart()` and commit the transaction
+ *   16. Reload the cart with `loadCart()` and compute `cartTotals()`
+ *   17. Return 200 response with `{ ok, items, summary }`
+ *   18. Roll back the transaction and release the connection on error
  */
 
 export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
@@ -139,7 +150,7 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
 
     try {
       const [variantRows] = await conn.query<CartVariantRow[]>(
-        `SELECT id, stock, status
+        `SELECT id, stock, hide_stock, min_order_qty, max_order_qty, status
            FROM product_variants
           WHERE id = ?
           LIMIT 1`,
@@ -155,7 +166,8 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
         );
       }
 
-      if (variant.status !== "active") {
+      /* Hidden stock reads as sold out, so the line cannot be raised either. */
+      if (variant.status !== "active" || Boolean(variant.hide_stock)) {
         await conn.rollback();
         return NextResponse.json(
           { error: "This variant is not available right now" },
@@ -167,6 +179,27 @@ export async function PATCH(req: NextRequest, ctx: VariantRouteContext) {
       if (stock <= 0) {
         await conn.rollback();
         return NextResponse.json({ error: "Out of stock" }, { status: 400 });
+      }
+
+      const minOrder = Number(variant.min_order_qty ?? 1);
+      if (quantity < minOrder) {
+        await conn.rollback();
+        return NextResponse.json(
+          { error: `Minimum order for this piece is ${minOrder}` },
+          { status: 400 },
+        );
+      }
+
+      const maxOrder =
+        variant.max_order_qty === null
+          ? null
+          : Math.min(Number(variant.max_order_qty), MAX_CART_QUANTITY);
+      if (maxOrder !== null && quantity > maxOrder) {
+        await conn.rollback();
+        return NextResponse.json(
+          { error: `You can order up to ${maxOrder} of this piece at a time` },
+          { status: 400 },
+        );
       }
 
       const [lineRows] = await conn.query<CartItemIdRow[]>(

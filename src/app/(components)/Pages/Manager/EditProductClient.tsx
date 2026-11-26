@@ -882,8 +882,8 @@ export default function EditProductClient({
                   checked={form.isFeatured}
                   onChange={(checked) => setField("isFeatured", checked)}
                   label="Is featured"
-                  hint="Ticked, this product appears in the featured picks on the home page."
-                  description="Extra visibility on the home page."
+                  hint="Ticked, this product appears in the featured picks at the top of the collections page."
+                  description="Extra visibility on the collections page."
                 />
                 <CheckboxRow
                   checked={form.mainShowcase}

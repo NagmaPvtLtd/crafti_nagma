@@ -23,9 +23,12 @@ import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 import getApiErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
+import {
+  BULK_AVAILABILITY_NOTICE,
+  needsAvailabilityNotice,
+} from "../../../utils/Cart/cartNotice.util";
+import { MAX_CART_QUANTITY } from "../../../utils/Cart/cartLimit.util";
 import type { CartItemView, CartResponse } from "../../../types/Cart.types";
-
-const MAX_QUANTITY = 99;
 
 /* -------------------------------------------------------------------------- */
 /*  /cart — login-first, so the proxy guarantees a signed-in user here        */
@@ -102,9 +105,14 @@ export default function CartClient() {
   }
 
   async function updateQuantity(item: CartItemView, quantity: number) {
-    /* Quantities are not capped by stock: the admin reviews and approves each
-       order before payment, so the requested amount is only bounded by 1–99. */
-    const next = Math.min(Math.max(quantity, 1), MAX_QUANTITY);
+    /* Only the variant's own order limits bound a line — stock never does, and
+       the shared cart ceiling applies when the maker set no maximum. */
+    const minimum = item.minOrderQty ?? 1;
+    const maximum = Math.min(
+      item.maxOrderQty ?? MAX_CART_QUANTITY,
+      MAX_CART_QUANTITY,
+    );
+    const next = Math.min(Math.max(quantity, minimum), maximum);
     if (next === item.quantity) return;
 
     await mutate(
@@ -149,6 +157,8 @@ export default function CartClient() {
 
   const items = cart?.items ?? [];
   const summary = cart?.summary ?? { itemCount: 0, quantity: 0, subtotal: 0 };
+  /** A line large enough that Crafti Nagma has to confirm it can be made. */
+  const availabilityNotice = needsAvailabilityNotice(items);
 
   return (
     <PageWrapper variant="form">
@@ -208,6 +218,13 @@ export default function CartClient() {
               <h2 className="text-lg font-semibold tracking-tight text-stone-900">
                 Order summary
               </h2>
+
+              {availabilityNotice && (
+                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+                  <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>{BULK_AVAILABILITY_NOTICE}</span>
+                </p>
+              )}
 
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-2">
@@ -376,7 +393,11 @@ function CartRow({
             <button
               type="button"
               onClick={() => onQuantity(item.quantity - 1)}
-              disabled={busy || !item.available || item.quantity <= 1}
+              disabled={
+                busy ||
+                !item.available ||
+                item.quantity <= (item.minOrderQty ?? 1)
+              }
               aria-label="Decrease quantity"
               className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -389,7 +410,13 @@ function CartRow({
               type="button"
               onClick={() => onQuantity(item.quantity + 1)}
               disabled={
-                busy || !item.available || item.quantity >= MAX_QUANTITY
+                busy ||
+                !item.available ||
+                item.quantity >=
+                  Math.min(
+                    item.maxOrderQty ?? MAX_CART_QUANTITY,
+                    MAX_CART_QUANTITY,
+                  )
               }
               aria-label="Increase quantity"
               className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-r-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"

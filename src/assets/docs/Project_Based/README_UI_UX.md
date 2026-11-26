@@ -44,6 +44,7 @@ project — it only exists to help the next click.
 ## Checklist (point-wise)
 
 - Form controls: `Field` + `TextInput` from `src\app\(components)\utils\Form` with `inputClass()` — do not invent new input styling.
+- **A `<select>` reuses `inputClass(false)` too.** Pad, font and border come from the same helper, so a select and an input placed side by side are the same height (`DimensionFields`, the category parent picker, the pricing quiz's min/hr unit). When a select must stay narrow, wrap it in a fixed-width div (`w-20 shrink-0`) instead of hand-rolling `px-*`/`py-*` — this repo has been bitten by a "small" custom select before.
 - Errors: `getAxiosErrorMessage(err, "fallback")` (`src\utils\Auth\Auth.axiosErrorHelper.util.ts`); success and transient failures go through `react-hot-toast` (the `Toaster` is already mounted in the root layout).
 - Each data page keeps four states: loading (`CustomLoader`), error (inline banner + Retry), empty (a CTA that teaches by example), loaded.
 - `CustomLoader` with `fullScreen={false}` for in-page loads; no bespoke skeletons or spinners.

@@ -326,6 +326,7 @@ export default function GlobalCategoriesClient() {
       {toDelete && (
         <ConfirmDelete
           category={toDelete}
+          subcategories={childrenByParent.get(toDelete.id) ?? []}
           busy={deleting}
           onCancel={() => setToDelete(null)}
           onConfirm={() => void confirmDelete()}
@@ -718,15 +719,25 @@ function CategoryModal({
 
 function ConfirmDelete({
   category,
+  subcategories,
   busy,
   onCancel,
   onConfirm,
 }: {
   category: GlobalCategory;
+  subcategories: GlobalCategory[];
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  /**
+   * A product assignment on the category or on any of its sub categories blocks
+   * the delete — the same rule the API applies. Sub categories nothing uses are
+   * removed with the parent, so their presence alone must not stop it.
+   */
+  const usedChildren = subcategories.filter((sub) => sub.productCount > 0);
+  const blocked = category.productCount > 0 || usedChildren.length > 0;
+
   return (
     <Overlay onClose={busy ? undefined : onCancel}>
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl shadow-stone-900/20 sm:rounded-3xl">
@@ -744,29 +755,33 @@ function ConfirmDelete({
             categories.
           </p>
 
-          {(category.subcategoryCount > 0 || category.productCount > 0) && (
+          {(category.subcategoryCount > 0 || blocked) && (
             <div className="mt-3 space-y-1 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               {category.subcategoryCount > 0 && (
                 <p>
-                  It still has{" "}
+                  Its{" "}
                   {plural(
                     category.subcategoryCount,
                     "sub category",
                     "sub categories",
-                  )}
-                  .
+                  )}{" "}
+                  will be deleted with it — every one that no product uses.
                 </p>
               )}
               {category.productCount > 0 && (
                 <p>
                   It is assigned to {plural(category.productCount, "product")}.
+                  Remove it from those products first.
                 </p>
               )}
-              <p>
-                {category.productCount > 0
-                  ? "Product assigned, cannot delete."
-                  : "Sub categories exist, cannot delete."}
-              </p>
+              {usedChildren.length > 0 && (
+                <p>
+                  {usedChildren.map((sub) => `“${sub.name}”`).join(", ")}{" "}
+                  {usedChildren.length === 1 ? "is" : "are"} assigned to
+                  products. Reassign {usedChildren.length === 1 ? "it" : "them"}{" "}
+                  before deleting “{category.name}”.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -783,7 +798,7 @@ function ConfirmDelete({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || blocked}
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? (

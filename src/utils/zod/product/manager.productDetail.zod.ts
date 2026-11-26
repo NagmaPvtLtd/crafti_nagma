@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MAX_CART_QUANTITY } from "../../Cart/cartLimit.util";
 import {
   dimensionFields,
   requireUnitWithDimensions,
@@ -163,6 +164,37 @@ export const variantUpdateSchema = z
     isFeatured: z.boolean().default(false),
     mainShowcase: z.boolean().default(false),
 
+    /**
+     * This variant's own snapshot of the base product's processing time, so one
+     * slow colour can say "2–3 weeks" while the rest stays "5–7 days".
+     */
+    processingTime: optionalText(100),
+
+    /**
+     * Show the variant as sold out on the storefront without changing the real
+     * `stock` number — no more zeroing stock just to hide a piece.
+     */
+    hideStock: z.boolean().default(false),
+
+    /** Smallest order the shopper may place. Empty means 1. */
+    minOrderQty: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_CART_QUANTITY)
+      .nullish(),
+
+    /**
+     * Largest order the shopper may place. Empty means no limit — only the
+     * database's own quantity ceiling applies, never the stock count.
+     */
+    maxOrderQty: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_CART_QUANTITY)
+      .nullish(),
+
     ...dimensionFields,
 
     /** Full replacement of the variant's own feature bullets; omit to leave them. */
@@ -184,7 +216,17 @@ export const variantUpdateSchema = z
   .refine(requireUnitWithDimensions, {
     message: "Pick a unit (cm or in) when a dimension is filled in",
     path: ["dimensionUnit"],
-  });
+  })
+  .refine(
+    (value) =>
+      value.minOrderQty == null ||
+      value.maxOrderQty == null ||
+      value.maxOrderQty >= value.minOrderQty,
+    {
+      message: "Maximum order must be at least the minimum order",
+      path: ["maxOrderQty"],
+    },
+  );
 
 export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
 
@@ -308,6 +350,10 @@ export interface ProductVariantSummary {
   price: number;
   compareAtPrice: number | null;
   stock: number;
+  /** Shown as out of stock on the storefront while the stock count stays. */
+  hideStock: boolean;
+  minOrderQty: number | null;
+  maxOrderQty: number | null;
   status: ProductStatus;
   optionValues: { option: string; value: string }[];
   /** `product_option_values.id` this variant fills — one per option. */
@@ -396,6 +442,12 @@ export interface VariantDetail {
   price: number;
   compareAtPrice: number | null;
   stock: number;
+  /** The real count is kept; the storefront reads this flag as "out of stock". */
+  hideStock: boolean;
+  /** This variant's own processing time (empty until synced from the base). */
+  processingTime: string;
+  minOrderQty: number | null;
+  maxOrderQty: number | null;
   weight: number | null;
   status: ProductStatus;
   isFeatured: boolean;
@@ -429,6 +481,8 @@ export interface VariantDetailResponse {
     name: string;
     briefDescription: string;
     description: string;
+    /** What the processing-time sync button copies into the variant. */
+    processingTime: string;
     dimensions: ProductDimensions;
     features: string[];
     careInstructions: string[];

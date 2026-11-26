@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import getAxiosErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.util";
+import { MAX_CART_QUANTITY } from "../../../../utils/Cart/cartLimit.util";
 import PageWrapper from "../../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import CustomLoader from "../../CustomLoader";
@@ -54,6 +55,11 @@ type FormState = {
   compareAtPrice: string;
   stock: string;
   weight: string;
+  processingTime: string;
+  /** Shown as out of stock on the storefront; the stock count stays as entered. */
+  hideStock: boolean;
+  minOrderQty: string;
+  maxOrderQty: string;
   status: "active" | "inactive";
   isFeatured: boolean;
   mainShowcase: boolean;
@@ -109,6 +115,16 @@ export default function VariantDetailClient({
           res.data.variant.weight === null
             ? ""
             : String(res.data.variant.weight),
+        processingTime: res.data.variant.processingTime,
+        hideStock: res.data.variant.hideStock,
+        minOrderQty:
+          res.data.variant.minOrderQty === null
+            ? ""
+            : String(res.data.variant.minOrderQty),
+        maxOrderQty:
+          res.data.variant.maxOrderQty === null
+            ? ""
+            : String(res.data.variant.maxOrderQty),
         status: res.data.variant.status,
         isFeatured: res.data.variant.isFeatured,
         mainShowcase: res.data.variant.mainShowcase,
@@ -152,6 +168,22 @@ export default function VariantDetailClient({
 
   async function persist(status: "active" | "inactive") {
     if (!form || saving) return;
+
+    const minOrderQty =
+      form.minOrderQty.trim() === "" ? null : Number(form.minOrderQty);
+    const maxOrderQty =
+      form.maxOrderQty.trim() === "" ? null : Number(form.maxOrderQty);
+
+    /* Mirrors the server's zod refine, so the manager sees it before the round trip. */
+    if (
+      minOrderQty !== null &&
+      maxOrderQty !== null &&
+      maxOrderQty < minOrderQty
+    ) {
+      setFormError("Maximum order must be at least the minimum order");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
@@ -167,6 +199,10 @@ export default function VariantDetailClient({
               ? null
               : Number(form.compareAtPrice),
           stock: Number(form.stock || 0),
+          hideStock: form.hideStock,
+          processingTime: form.processingTime.trim(),
+          minOrderQty,
+          maxOrderQty,
           weight: form.weight.trim() === "" ? null : Number(form.weight),
           length: dimensions.length,
           width: dimensions.width,
@@ -502,6 +538,86 @@ export default function VariantDetailClient({
                           value={form.weight}
                           onChange={(e) => setField("weight", e.target.value)}
                           placeholder="Optional"
+                        />
+                      </Field>
+                    </div>
+
+                    <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={form.hideStock}
+                        onChange={(e) =>
+                          setField("hideStock", e.target.checked)
+                        }
+                        className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-rose-500"
+                      />
+                      <span className="min-w-0">
+                        <span className="font-semibold">
+                          Show as out of stock
+                        </span>
+                        <span className="mt-0.5 block text-[10px] leading-relaxed text-stone-400">
+                          The storefront reads this variant as sold out and the
+                          cart refuses it. The stock count above is kept, so
+                          turning this off restores it instantly.
+                        </span>
+                      </span>
+                    </label>
+
+                    <Field
+                      label="Processing time"
+                      action={
+                        <SyncButton
+                          title="Copy the base product's processing time into this variant"
+                          disabled={!data.baseProduct.processingTime.trim()}
+                          onClick={() =>
+                            setField(
+                              "processingTime",
+                              data.baseProduct.processingTime,
+                            )
+                          }
+                        />
+                      }
+                      hint="Shown on this variant's product page. Empty means the product's own value is used."
+                    >
+                      <TextInput
+                        value={form.processingTime}
+                        onChange={(e) =>
+                          setField("processingTime", e.target.value)
+                        }
+                        placeholder="5–7 days"
+                        maxLength={100}
+                      />
+                    </Field>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field
+                        label="Minimum order"
+                        hint={`Leave blank for 1; at most ${MAX_CART_QUANTITY}.`}
+                      >
+                        <TextInput
+                          type="number"
+                          min={1}
+                          max={MAX_CART_QUANTITY}
+                          value={form.minOrderQty}
+                          onChange={(e) =>
+                            setField("minOrderQty", e.target.value)
+                          }
+                          placeholder="1"
+                        />
+                      </Field>
+                      <Field
+                        label="Maximum order"
+                        hint={`Leave blank for no limit; at most ${MAX_CART_QUANTITY}.`}
+                      >
+                        <TextInput
+                          type="number"
+                          min={1}
+                          max={MAX_CART_QUANTITY}
+                          value={form.maxOrderQty}
+                          onChange={(e) =>
+                            setField("maxOrderQty", e.target.value)
+                          }
+                          placeholder="No limit"
                         />
                       </Field>
                     </div>
