@@ -20,6 +20,8 @@ interface ProductRow extends RowDataPacket {
   name: string;
   brief_description: string | null;
   description: string | null;
+  /** Copied into every generated variant as its own starting processing time. */
+  processing_time: string | null;
   status: "active" | "inactive";
   length: number | string | null;
   width: number | string | null;
@@ -145,7 +147,9 @@ interface ExistingValueRow extends RowDataPacket {
  *   16. Begin a transaction
  *   17. Per new combination: build the label, truncate the name to 150 chars, build the SKU via
  *       `buildVariantSku`, retry with a `-N` suffix up to 60 times for uniqueness
- *   18. Insert into `product_variants` as `inactive` (copy inherited from the base product)
+ *   18. Insert into `product_variants` as `inactive`, with the copy inherited from the base
+ *       product, `processing_time` snapshotted from `products.processing_time`, `hide_stock = 0`
+ *       and both order limits `NULL`
  *   19. Insert the `variant_option_values` rows for the combination
  *   20. Touch `products.updated_at` and commit
  *   21. Write a CREATE / VARIANT audit entry with the generated SKUs, swallowing audit errors
@@ -190,7 +194,7 @@ export async function POST(
 
   try {
     const [productRows] = await conn.query<ProductRow[]>(
-      `SELECT id, code, name, brief_description, description, status,
+      `SELECT id, code, name, brief_description, description, processing_time, status,
               length, width, height, dimension_unit
          FROM products WHERE id = ? LIMIT 1`,
       [id],
@@ -461,18 +465,19 @@ export async function POST(
 
       await conn.query(
         `INSERT INTO product_variants
-           (id, product_id, name, description, brief_description, sku,
+           (id, product_id, name, description, processing_time, brief_description, sku,
             price, compare_at_price, stock, weight,
             length, width, height, dimension_unit, status,
             is_featured, main_showcase, orders_count,
             created_by, updated_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'inactive',
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'inactive',
                  0, 0, 0, ?, NULL, ?, NULL)`,
         [
           variantId,
           id,
           name,
           product.description,
+          product.processing_time,
           product.brief_description,
           sku,
           price,

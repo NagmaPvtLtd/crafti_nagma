@@ -46,13 +46,18 @@ interface VariantRow extends RowDataPacket {
   product_code: string;
   product_brief_description: string | null;
   product_description: string | null;
+  product_processing_time: string | null;
   name: string | null;
   brief_description: string | null;
   description: string | null;
+  processing_time: string | null;
   sku: string;
   price: number | string;
   compare_at_price: number | string | null;
   stock: number | string;
+  hide_stock: number | boolean;
+  min_order_qty: number | string | null;
+  max_order_qty: number | string | null;
   weight: number | string | null;
   length: number | string | null;
   width: number | string | null;
@@ -131,8 +136,10 @@ async function loadVariant(
             p.name AS product_name, p.code AS product_code,
             p.brief_description AS product_brief_description,
             p.description AS product_description,
-            v.name, v.brief_description, v.description, v.sku,
+            p.processing_time AS product_processing_time,
+            v.name, v.brief_description, v.description, v.processing_time, v.sku,
             v.price, v.compare_at_price, v.stock, v.weight,
+            v.hide_stock, v.min_order_qty, v.max_order_qty,
             v.length, v.width, v.height, v.dimension_unit,
             v.status, v.is_featured, v.main_showcase, v.orders_count,
             v.created_at, v.updated_at
@@ -291,15 +298,19 @@ async function unlinkAndHideEmptyVariants(
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
  *   - variant: `id`, `productId`, `productName`, `productCode`, `name`, `briefDescription`,
- *              `description`, `sku`, `price`, `compareAtPrice`, `stock`, `weight`, `status`,
- *              `isFeatured`, `mainShowcase`, `ordersCount`, `orderStats`, `createdAt`, `updatedAt`
+ *              `description`, `processingTime`, `sku`, `price`, `compareAtPrice`, `stock`,
+ *              `hideStock`, `minOrderQty`, `maxOrderQty`, `weight`, `status`, `isFeatured`,
+ *              `mainShowcase`, `ordersCount`, `orderStats`, `createdAt`, `updatedAt`. `hideStock`
+ *              is the "show as out of stock" toggle — `stock` keeps its real value; `minOrderQty`
+ *              and `maxOrderQty` are `null` when the manager left them empty
  *   - tags: `{ inherited, additional }` — the base product's tags and this variant's own tags,
  *           each `{ id, name, slug }` in name order
  *   - optionValues: `{ option, value }` pairs
  *   - media: media items with `isLinked`, `sourceImageId`, `ownerVariantName`, `ownerSku` and
  *            `linkedVariantCount`
- *   - baseProduct: `name`, `briefDescription`, `description`, `dimensions`, `features`,
- *                  `careInstructions` and `tags`
+ *   - baseProduct: `name`, `briefDescription`, `description`, `processingTime`, `dimensions`,
+ *                  `features`, `careInstructions` and `tags`; `processingTime` is what the
+ *                  variant form's sync button copies
  *
  * @throws {400} "Invalid product reference" or "Invalid variant reference"
  * @throws {401} Unauthorized - No session
@@ -442,6 +453,16 @@ export async function GET(
             ? null
             : Number(variant.compare_at_price),
         stock: Number(variant.stock ?? 0),
+        hideStock: Boolean(variant.hide_stock),
+        processingTime: variant.processing_time ?? "",
+        minOrderQty:
+          variant.min_order_qty === null
+            ? null
+            : Number(variant.min_order_qty),
+        maxOrderQty:
+          variant.max_order_qty === null
+            ? null
+            : Number(variant.max_order_qty),
         weight: variant.weight === null ? null : Number(variant.weight),
         dimensions: {
           length: variant.length === null ? null : Number(variant.length),
@@ -484,6 +505,7 @@ export async function GET(
         name: variant.product_name,
         briefDescription: variant.product_brief_description ?? "",
         description: variant.product_description ?? "",
+        processingTime: variant.product_processing_time ?? "",
         dimensions: {
           length:
             baseDimensions?.length === null ||
@@ -522,15 +544,20 @@ export async function GET(
 
 /* -------------------------------------------------------------------------- */
 /*  PUT /api/manager/product-studio/[id]/variants/[variantId]                 */
-/*  Edit the purchasable variant — price, stock, copy, badges.                */
+/*  Edit the purchasable variant — price, stock, visibility, order limits.    */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Edits a purchasable variant: copy, price, stock, weight, status and badges.
+ * Edits a purchasable variant: copy, price, stock, visibility, order limits, weight, status and
+ * badges.
  *
  * @async
  * @function PUT
- * @description Validates with `variantUpdateSchema`. Activating an inactive variant is gated on
+ * @description Validates with `variantUpdateSchema`, including the rule that `maxOrderQty` (when
+ *              both limits are set) is never below `minOrderQty`. `hideStock` only flags the
+ *              variant as out of stock for the storefront — `stock` is written as sent, so the
+ *              real count survives. `processingTime` is stored per variant. Activating an
+ *              inactive variant is gated on
  *              `VARIANT_ACTIVATION_RULES` (name ≥ 3, short description ≥ 10, description ≥ 20
  *              characters) and on at least one photo, uploaded or linked. Disabling is refused
  *              with 409 once the variant appears in `order_items`; otherwise its ImageKit files
@@ -547,7 +574,11 @@ export async function GET(
  * @body {string} [description] - Description (max 500 chars, default: "")
  * @body {number} price - Price, 0-10000000
  * @body {number|null} [compareAtPrice] - Compare-at price, 0-10000000
- * @body {number} stock - Stock, integer 0-100000
+ * @body {number} stock - Stock, integer 0-100000 (kept even when `hideStock` is on)
+ * @body {boolean} [hideStock] - Show the variant as out of stock without touching `stock`
+ * @body {string} [processingTime] - This variant's own processing time (max 100 chars)
+ * @body {number|null} [minOrderQty] - Smallest order, 1-100; empty means 1
+ * @body {number|null} [maxOrderQty] - Largest order, 1-100; empty means no limit
  * @body {number|null} [weight] - Weight, 0-100000
  * @body {string} [status] - `active` or `inactive` (default: "active")
  * @body {boolean} [isFeatured] - Featured flag (default: false); featuring one variant clears
@@ -559,7 +590,7 @@ export async function GET(
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
  *   - message: "Variant updated" or "Variant disabled"
- *   - variant: `id`, `price`, `stock`, `status`
+ *   - variant: `id`, `price`, `stock`, `hideStock`, `status`
  *   - removedImages: how many media rows were deleted while disabling
  *   - autoDisabledVariantIds: sibling variants left without photos and hidden
  *
@@ -574,7 +605,8 @@ export async function GET(
  * @description Workflow:
  *   1. Initialize the manager guard and read the manager id, returning 401 when missing
  *   2. Await `context.params` and validate both references (min 2 chars)
- *   3. Parse the JSON body and validate it with `variantUpdateSchema`
+ *   3. Parse the JSON body and validate it with `variantUpdateSchema` (including
+ *      `maxOrderQty >= minOrderQty` when both are set)
  *   4. Initialize the database pool and take a connection
  *   5. Resolve the product id and the variant id, returning 404 when either is missing
  *   6. Load the variant with `loadVariant`, returning 404 when missing
@@ -588,12 +620,13 @@ export async function GET(
  *   13. Begin a transaction
  *   14. On disabling: unlink and hide emptied sibling variants, count and delete the media rows
  *   15. When featuring: clear `is_featured` on the product's other variants
- *   16. Update `product_variants` (copy, price, compare-at, stock, weight, status, badges,
+ *   16. Update `product_variants` (copy, price, compare-at, stock, `hide_stock`,
+ *       `processing_time`, `min_order_qty`, `max_order_qty`, weight, status, badges,
  *       `updated_by`, `updated_at`)
  *   17. Touch `products.updated_by` and `updated_at`, then commit (rollback on error)
- *   18. Write an UPDATE / VARIANT audit entry with price, stock, status and media effects,
- *       swallowing audit errors
- *   19. Return 200 response with the new price, stock, status and media effects
+ *   18. Write an UPDATE / VARIANT audit entry with price, stock, hidden flag, order limits, status
+ *       and media effects, swallowing audit errors
+ *   19. Return 200 response with the new price, stock, `hideStock`, status and media effects
  *   20. Map `ER_DUP_ENTRY` to a field error; otherwise return 500
  *   21. Release the connection in `finally`
  */
@@ -817,6 +850,10 @@ export async function PUT(
                 price = ?,
                 compare_at_price = ?,
                 stock = ?,
+                hide_stock = ?,
+                processing_time = ?,
+                min_order_qty = ?,
+                max_order_qty = ?,
                 weight = ?,
                 length = ?,
                 width = ?,
@@ -835,6 +872,10 @@ export async function PUT(
           data.price,
           data.compareAtPrice ?? null,
           data.stock,
+          data.hideStock ? 1 : 0,
+          data.processingTime || null,
+          data.minOrderQty ?? null,
+          data.maxOrderQty ?? null,
           data.weight ?? null,
           data.length,
           data.width,
@@ -930,7 +971,7 @@ export async function PUT(
         action: "UPDATE",
         entityType: "VARIANT",
         entityId: variantId,
-        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, status=${data.status}${disabling ? `, removedImages=${removedImages}` : ""}${autoDisabledVariantIds.length > 0 ? `, autoDisabled=${autoDisabledVariantIds.join("|")}` : ""}]`,
+        description: `Variant updated. [id=${variantId}, sku=${variant.sku}, price=${data.price}, stock=${data.stock}, hidden=${data.hideStock ? 1 : 0}, minOrder=${data.minOrderQty ?? 1}, maxOrder=${data.maxOrderQty ?? "none"}, status=${data.status}${disabling ? `, removedImages=${removedImages}` : ""}${autoDisabledVariantIds.length > 0 ? `, autoDisabled=${autoDisabledVariantIds.join("|")}` : ""}]`,
       });
     } catch {
       /* audit must never break the response */
@@ -943,6 +984,7 @@ export async function PUT(
         id: variantId,
         price: data.price,
         stock: data.stock,
+        hideStock: data.hideStock,
         status: data.status,
       },
       removedImages,

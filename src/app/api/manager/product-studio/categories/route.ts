@@ -53,6 +53,12 @@ interface CountRow extends RowDataPacket {
   total: number | string;
 }
 
+interface ChildUsageRow extends RowDataPacket {
+  id: string;
+  name: string;
+  product_count: number | string;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -492,17 +498,19 @@ export async function PUT(req: NextRequest) {
 
 /* -------------------------------------------------------------------------- */
 /*  DELETE /api/manager/product-studio/categories?id=<id>                     */
-/*  Blocked while the category still has sub categories or products.          */
+/*  Refused only while products still use the category or a sub category;     */
+/*  unused sub categories are deleted together with their parent.             */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Deletes a category once it no longer has sub categories or products.
+ * Deletes a category once no product uses it, taking its unused sub categories along.
  *
  * @async
  * @function DELETE
  * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
- *              with `categoryDeleteSchema`, then refuses with 409 while the category still has
- *              sub categories or `product_categories` assignments. Nothing is cascaded.
+ *              with `categoryDeleteSchema`, then refuses with 409 while the category or any of
+ *              its sub categories is still assigned through `product_categories`. Unused sub
+ *              categories are deleted with the parent, so an unused branch never gets stuck.
  *
  * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
  * @query {string} id - Category id (10-40 chars); used when present, otherwise the body id wins
@@ -517,7 +525,7 @@ export async function PUT(req: NextRequest) {
  * @throws {401} Unauthorized - No session, role too low, or session without a user id
  * @throws {403} Forbidden - Account not active or no role assigned
  * @throws {404} "Category not found"
- * @throws {409} The category still has sub categories, or is assigned to products
+ * @throws {409} The category is assigned to products, or one of its sub categories is
  * @throws {500} `server_error` - Database failure while reading or deleting `categories`
  *
  * @description Workflow:
@@ -526,12 +534,14 @@ export async function PUT(req: NextRequest) {
  *   3. Validate with `categoryDeleteSchema`
  *   4. Initialize the database pool and take a connection
  *   5. Load the category through `CATEGORY_SELECT`, returning 404 when missing
- *   6. Return 409 with the sub category count when sub categories exist
- *   7. Return 409 with the product count when products still reference it
- *   8. Delete the row from `categories`
- *   9. Write a DELETE / CATEGORY audit entry with name and slug, swallowing audit errors
- *   10. Return 200 response with `ok`, `message` and `deletedId`
- *   11. Release the connection in `finally`
+ *   6. Return 409 with the product count when products still reference the category itself
+ *   7. When sub categories exist, load each child's `product_categories` count and return 409
+ *      naming the sub categories that are assigned to products
+ *   8. Delete the unused sub categories (`DELETE FROM categories WHERE parent_id = ?`)
+ *   9. Delete the row from `categories`
+ *   10. Write a DELETE / CATEGORY audit entry with name and slug, swallowing audit errors
+ *   11. Return 200 response with `ok`, `message` and `deletedId`
+ *   12. Release the connection in `finally`
  */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
@@ -573,16 +583,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const subCount = Number(existing.subcategory_count ?? 0);
-    if (subCount > 0) {
-      return NextResponse.json(
-        {
-          error: `"${existing.name}" still has ${subCount} sub categor${subCount === 1 ? "y" : "ies"}. Delete or move them first.`,
-        },
-        { status: 409 },
-      );
-    }
-
     const productCount = Number(existing.product_count ?? 0);
     if (productCount > 0) {
       return NextResponse.json(
@@ -591,6 +591,38 @@ export async function DELETE(req: NextRequest) {
         },
         { status: 409 },
       );
+    }
+
+    /*
+     * A main category goes away together with its sub categories, but only when
+     * none of them is used by a product — an unused sub category must never be
+     * a reason to keep the whole branch alive.
+     */
+    const subCount = Number(existing.subcategory_count ?? 0);
+    if (subCount > 0) {
+      const [childRows] = await conn.query<ChildUsageRow[]>(
+        `SELECT c.id, c.name,
+                (SELECT COUNT(*) FROM product_categories pc
+                  WHERE pc.category_id = c.id) AS product_count
+           FROM categories c
+          WHERE c.parent_id = ?`,
+        [id],
+      );
+
+      const usedChildren = childRows.filter(
+        (child) => Number(child.product_count ?? 0) > 0,
+      );
+      if (usedChildren.length > 0) {
+        const names = usedChildren.map((child) => `"${child.name}"`).join(", ");
+        return NextResponse.json(
+          {
+            error: `${names} ${usedChildren.length === 1 ? "is" : "are"} assigned to products. Reassign ${usedChildren.length === 1 ? "it" : "them"} before deleting "${existing.name}".`,
+          },
+          { status: 409 },
+        );
+      }
+
+      await conn.query(`DELETE FROM categories WHERE parent_id = ?`, [id]);
     }
 
     await conn.query(`DELETE FROM categories WHERE id = ?`, [id]);

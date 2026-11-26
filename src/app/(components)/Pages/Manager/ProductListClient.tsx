@@ -298,7 +298,7 @@ export default function ProductListClient() {
             {/* Sections */}
             <ProductSection
               title="Active products"
-              hint="Visible in the collections and on the home page."
+              hint="Visible on the collections page."
               tone="active"
               data={activeData}
               loading={loading}

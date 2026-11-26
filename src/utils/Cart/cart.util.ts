@@ -18,6 +18,10 @@ interface CartRow extends RowDataPacket {
 export interface CartVariantRow extends RowDataPacket {
   id: string;
   stock: number | string;
+  /** Manager hid the stock — reads as sold out while `stock` stays as entered. */
+  hide_stock: number | boolean;
+  min_order_qty: number | string | null;
+  max_order_qty: number | string | null;
   status: "active" | "inactive";
 }
 
@@ -39,6 +43,9 @@ interface CartItemRow extends RowDataPacket {
   price: number | string;
   compare_at_price: number | string | null;
   stock: number | string;
+  hide_stock: number | boolean;
+  min_order_qty: number | string | null;
+  max_order_qty: number | string | null;
   status: "active" | "inactive";
   image_url: string | null;
 }
@@ -120,7 +127,10 @@ export async function touchCart(
  * @description One query joins `cart_items → product_variants → products`. The
  *              photo follows README_THUMBNAILS: the variant's first photo
  *              (`sort_order`, `created_at`, `id`), falling back to the product's
- *              first photo, and `null` when neither exists.
+ *              first photo, and `null` when neither exists. A variant whose stock the
+ *              manager hid (`hide_stock = 1`) is reported as `available: false` while its
+ *              real `stock` count is passed through, and the variant's `min_order_qty` /
+ *              `max_order_qty` travel with the line so the UI can bound its stepper.
  */
 export async function loadCart(
   conn: PoolConnection,
@@ -134,6 +144,9 @@ export async function loadCart(
             v.price,
             v.compare_at_price,
             v.stock,
+            v.hide_stock,
+            v.min_order_qty,
+            v.max_order_qty,
             v.status,
             p.name AS product_name,
             p.code AS product_code,
@@ -165,6 +178,8 @@ export async function loadCart(
     const quantity = Number(row.quantity ?? 0);
     const stock = Number(row.stock ?? 0);
     const status = row.status === "inactive" ? "inactive" : "active";
+    /** A hidden variant is sold out as far as the shopper is concerned. */
+    const hidden = Boolean(row.hide_stock);
 
     return {
       variantId: row.variant_id,
@@ -178,8 +193,10 @@ export async function loadCart(
       quantity,
       lineTotal: Number((price * quantity).toFixed(2)),
       stock,
+      minOrderQty: toNumber(row.min_order_qty),
+      maxOrderQty: toNumber(row.max_order_qty),
       status,
-      available: status === "active" && stock > 0,
+      available: status === "active" && stock > 0 && !hidden,
     };
   });
 }

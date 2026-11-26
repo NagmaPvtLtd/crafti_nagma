@@ -782,6 +782,14 @@ function VariantRow({
                 {value.value}
               </span>
             ))}
+            {variant.hideStock && (
+              <span
+                title="Shown as out of stock on the storefront"
+                className="rounded-full border border-amber-200/70 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700"
+              >
+                Hidden
+              </span>
+            )}
             <span className="font-mono text-[9px] break-all text-stone-400">
               {variant.sku}
             </span>

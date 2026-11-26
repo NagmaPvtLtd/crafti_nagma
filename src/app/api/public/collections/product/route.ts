@@ -43,6 +43,8 @@ interface VariantRefRow extends RowDataPacket {
   id: string;
   sku: string;
   stock: number | string;
+  /** Manager hid the stock: the variant reads as sold out, stock stays intact. */
+  hide_stock: number | boolean;
   status: "active" | "inactive";
   is_featured: number | boolean;
 }
@@ -56,6 +58,10 @@ interface VariantRow extends RowDataPacket {
   price: number | string;
   compare_at_price: number | string | null;
   stock: number | string;
+  hide_stock: number | boolean;
+  processing_time: string | null;
+  min_order_qty: number | string | null;
+  max_order_qty: number | string | null;
   weight: number | string | null;
   length: number | string | null;
   width: number | string | null;
@@ -136,7 +142,10 @@ const ALL_SEGMENT = "all";
  *              Only the variant named by `?variant=` (its SKU or id) is loaded in full; without
  *              it the featured active variant is chosen (the one the collection card shows),
  *              then the first active variant with stock, then any active variant, then the first
- *              variant. `variants` ships the SKU skeleton (id, SKU, status and option
+ *              variant — variants whose stock the manager hid are skipped unless the URL asks
+ *              for that SKU. A hidden variant is returned with `stock: 0`, so the storefront
+ *              shows it as out of stock without the real count being lost.
+ *              `variants` ships the SKU skeleton (id, SKU, status and option
  *              value ids) so changing an option chip can request that SKU instead. A variant with
  *              no photos falls back to the product-level gallery.
  *
@@ -149,8 +158,11 @@ const ALL_SEGMENT = "all";
  *   - product: `id`, `code`, `name`, `slug`, `briefDescription`, `description`, `processingTime`,
  *              `deliveryCharges`, `isFeatured`, `images`, `options`, `reviews` (average, count),
  *              `features`, `careInstructions`, `giftIncluded`, `category`, `subcategory`, `href`
- *   - variant: the selected variant with copy, `price`, `compareAtPrice`, `stock`, `weight`,
- *              `status`, `isFeatured`, `images` and `optionValueIds`, or `null`
+ *   - variant: the selected variant with copy, `processingTime`, `price`, `compareAtPrice`,
+ *              `stock`, `minOrderQty`, `maxOrderQty`, `weight`, `status`, `isFeatured`,
+ *              `images` and `optionValueIds`, or `null`. `stock` is reported as `0` when the
+ *              manager hid it (`hide_stock = 1`), which is what makes the page say "Out of
+ *              stock"; the order limits are `null` when unset
  *   - variants: the SKU skeleton of every variant (`id`, `sku`, `status`, `optionValueIds`)
  *
  * @throws {400} Missing `code`, or a `code` / `variant` reference longer than 120 chars
@@ -170,8 +182,10 @@ const ALL_SEGMENT = "all";
  *   10. Load the product's category links with parent names
  *   11. Build the options list, dropping options without values
  *   12. Choose the variant: requested SKU/id, else the featured active variant, else first active
- *       in stock, else first active, else the first variant
- *   13. Load that variant in full plus its photos, falling back to the product gallery
+ *       in stock, else first active, else the first variant — every default step skips variants
+ *       whose stock is hidden, while an explicitly requested SKU is always honoured
+ *   13. Load that variant in full plus its photos, falling back to the product gallery, and
+ *       report its stock as `0` when it is hidden
  *   14. Build the category and subcategory refs and the product `href`
  *   15. Return 200 response with product, variant and variants
  *   16. Release the connection in `finally`
@@ -232,7 +246,7 @@ export async function GET(req: NextRequest) {
        Featured first, because the collection card shows that variant's photo
        and price, so opening the product must land on the same variant. */
     const [variantRefRows] = await conn.query<VariantRefRow[]>(
-      `SELECT v.id, v.sku, v.stock, v.status, v.is_featured
+      `SELECT v.id, v.sku, v.stock, v.hide_stock, v.status, v.is_featured
          FROM product_variants v
         WHERE v.product_id = ?
         ORDER BY v.is_featured DESC, v.status = 'active' DESC,
@@ -345,17 +359,24 @@ export async function GET(req: NextRequest) {
 
     /* The featured variant is the one the storefront advertised, so it wins
        over the cheapest-in-stock default even when another variant is cheaper. */
-    const featuredVariant = variantRefRows.find(
+    /* A hidden variant is not buyable, so it never becomes the default — but an
+       explicit `?variant=` SKU is still honoured so old links keep working. */
+    const defaultCandidates = variantRefRows.filter(
+      (item) => !Boolean(item.hide_stock),
+    );
+
+    const featuredVariant = defaultCandidates.find(
       (item) => item.status === "active" && Boolean(item.is_featured),
     );
 
     const chosen =
       requested ??
       featuredVariant ??
-      variantRefRows.find(
+      defaultCandidates.find(
         (item) => item.status === "active" && Number(item.stock) > 0,
       ) ??
-      variantRefRows.find((item) => item.status === "active") ??
+      defaultCandidates.find((item) => item.status === "active") ??
+      defaultCandidates[0] ??
       variantRefRows[0] ??
       null;
 
@@ -365,7 +386,8 @@ export async function GET(req: NextRequest) {
     if (chosen) {
       const [fullRows] = await conn.query<VariantRow[]>(
         `SELECT v.id, v.sku, v.name, v.brief_description, v.description,
-                v.price, v.compare_at_price, v.stock, v.weight,
+                v.processing_time, v.min_order_qty, v.max_order_qty,
+                v.price, v.compare_at_price, v.stock, v.hide_stock, v.weight,
                 v.length, v.width, v.height, v.dimension_unit,
                 v.status, v.is_featured
            FROM product_variants v
@@ -416,7 +438,12 @@ export async function GET(req: NextRequest) {
           description: full.description,
           price: Number(full.price ?? 0),
           compareAtPrice: toNumber(full.compare_at_price),
-          stock: Number(full.stock ?? 0),
+          /* A hidden variant reports zero stock — that is exactly how the
+             storefront already renders "Out of stock". */
+          stock: Boolean(full.hide_stock) ? 0 : Number(full.stock ?? 0),
+          processingTime: full.processing_time?.trim() || null,
+          minOrderQty: toNumber(full.min_order_qty),
+          maxOrderQty: toNumber(full.max_order_qty),
           weight: toNumber(full.weight),
           dimensions: {
             length: toNumber(full.length),

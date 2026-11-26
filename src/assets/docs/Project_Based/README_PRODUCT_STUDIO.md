@@ -55,13 +55,52 @@ Rules enforced in the APIs:
   `PUT` refuses to move a category that has children under another parent.
 - Slug is unique per table and generated from the name when left blank; the
   shared helper does the suffixing, the API does not.
-- Deleting an option cascades its own values. Everything else is refused with a
-  409 and a readable reason: a category with sub categories or products, an
-  option used by a product, a value used by a product option.
+- Deleting an option cascades its own values. A category, option or value is
+  refused with a 409 and a readable reason only while something still uses it.
+  An unused main category is deleted **together with its unused sub categories**;
+  a main category is never stuck just because sub categories exist. Dead links
+  left behind by an earlier product edit (`status = 'inactive'`) are cleaned up
+  first when no variant points at them, so they cannot block a delete.
 - Per-product options reference the global pools by id — the option/value labels
   are copied into `product_options`/`product_option_values` at creation time, but
   the ids still point at the global pool.
 - Audit entity types used here: `CATEGORY`, `OPTION`, `OPTION_VALUE`, `PRODUCT`.
+
+## Pricing quiz ("Suggest price")
+
+- Component: `src/app/(components)/Pages/Manager/PricingQuizModal.tsx`
+  (`PricingQuizButton`). Maths: `src/utils/Pricing/pricing.util.ts` — components
+  never re-derive it.
+- Step 1 — monthly salary, hours per day, working days per month → hourly labour
+  rate (`productiveHoursPerMonth` already applies `PRODUCTIVE_HOUR_SHARE = 0.85`).
+  Working days are clamped to **31** (digits only via `clampDaysPerMonth`), so a
+  month can never hold 45 days.
+- Step 2 — material, making time, packaging, margin → cost per piece and price.
+  Making time carries a small **min / hr** select next to the input; switching the
+  unit rewrites the shown number (90 → 1.5) while the cost model always receives
+  minutes.
+- Step 3 — floor / ceil / original ending, or a typed final price.
+- Step 1's three answers are remembered for the tab session in `sessionStorage`
+  under `crafti:pricing-quiz:labour`: written on every edit, read in `openQuiz`
+  when the dialog opens (never in a `useState` initialiser — that would mismatch
+  the server HTML).
+- Money inside the quiz uses `formatCurrency(value, { maximumFractionDigits: 2 })`
+  because it deals in paise-accurate amounts.
+
+## Variant fields beyond price and stock
+
+Every variant snapshots its own copy of the base product's presentational data.
+Three of those fields are set on the variant page (`/manager/product-studio/products/[product_id]/variants/[variant_id]`):
+
+| Field | Column | Behaviour |
+|---|---|---|
+| Show as out of stock | `hide_stock` | Storefront reads the variant as **0 stock** (badge "Out of stock", cart refuses it, collection cards ignore it in `totalStock`). The real `stock` number is never changed, so unticking restores it instantly. |
+| Processing time | `processing_time` | Copied from `products.processing_time` when variants are generated; the variant page has a **Sync** button plus its own input. The product page shows the variant's value, falling back to the product's. |
+| Minimum / maximum order | `min_order_qty`, `max_order_qty` | Optional, both 1–100 (`MAX_CART_QUANTITY`). Blank minimum = 1; blank maximum = no limit other than the shared 100-piece cart ceiling. Max must be ≥ min (zod `refine`). The product page and cart steppers start at the minimum and stop at the maximum; the cart API enforces the same bounds. Stock never caps a quantity. |
+
+- `hideStock` defaults to `false` on every existing and newly generated variant.
+- The product overview list shows a small **Hidden** chip on variants whose stock
+  is hidden, so the manager can see the state without opening each one.
 
 ## Global tags
 
@@ -98,9 +137,20 @@ Rules enforced in the APIs:
 - Creating one requires **at least one category** and **at least one option with
   at least one value** — that restriction lives in `baseProductCreateSchema` and
   is enforced again in the API.
+- **The add form survives a closed tab.** Every field, the dimensions, the
+  selected categories and tags and every selected option-value id are written to
+  `localStorage` (`crafti:add-product:draft`, helpers in
+  `src/utils/ProductStudio/productDraft.util.ts`) as the manager types, and
+  restored on the next visit. Stored ids are matched against the pools that load:
+  a deleted category or value is dropped (a restored sub category keeps its parent
+  added again), never left silently selected. A successful create clears the
+  draft, so the next Add a product starts blank. A blank form is never stored —
+  the key is removed instead. **Reset form** (top right of the heading) wipes
+  every field, every selection and the stored draft in one click.
 - `code` and `slug` are generated server-side from the name (unique via the
   shared slug helper + a random code suffix); the manager never types them.
-- `is_featured` puts the product in the home page's featured picks;
+- `is_featured` puts the product in the featured picks at the top of the
+  **collections page** (`/collections`) — the home page shows no products at all;
   `main_showcase` makes it the thumbnail shown for its category.
 - The write spans `products` + `product_categories` + `product_options` +
   `product_option_values` in a single transaction.

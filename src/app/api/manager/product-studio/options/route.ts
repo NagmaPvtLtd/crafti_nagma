@@ -35,6 +35,8 @@ interface OptionValueRow extends RowDataPacket {
   id: string;
   option_id: string;
   value: string;
+  /** Products whose variants still use this exact value. */
+  product_count: number | string;
 }
 
 interface OptionTotalsRow extends RowDataPacket {
@@ -58,7 +60,13 @@ const OPTION_SELECT = `
          (SELECT COUNT(*) FROM global_option_values v
            WHERE v.option_id = o.id)                          AS value_count,
          (SELECT COUNT(*) FROM product_options po
-           WHERE po.global_option_id = o.id)                  AS product_count
+           WHERE po.global_option_id = o.id
+             AND (po.status = 'active'
+                  OR EXISTS (SELECT 1 FROM product_option_values pov
+                              WHERE pov.option_id = po.id
+                                AND (pov.status = 'active'
+                                     OR EXISTS (SELECT 1 FROM variant_option_values vov
+                                                  WHERE vov.option_value_id = pov.id))))) AS product_count
     FROM global_options o`;
 
 /* -------------------------------------------------------------------------- */
@@ -80,7 +88,12 @@ const OPTION_SELECT = `
  *   - ok: `true`
  *   - counts: `options`, `values` and `productsUsing`
  *   - options: each with `id`, `name`, `description`, `valueCount`, `productCount`,
- *              `values` (`id`, `value`), `createdAt` and `updatedAt`, ordered by name
+ *              `values` (`id`, `value`, `productCount`), `createdAt` and `updatedAt`,
+ *              ordered by name. A value's `productCount` is its own usage, so a value
+ *              nobody assigned can be deleted even though the option is in use. Both
+ *              counts match exactly what `DELETE` will still find after its purge of
+ *              dead `inactive` links, so the delete dialogs never offer a row the API
+ *              would then refuse.
  *
  * @throws {401} Unauthorized - No session
  * @throws {403} Forbidden - Account not active, no role, or role below manager
@@ -90,7 +103,7 @@ const OPTION_SELECT = `
  *   1. Initialize the manager guard (session, active status, role rank)
  *   2. Initialize the database pool and take a connection
  *   3. Select options with `value_count` and `product_count` subqueries
- *   4. Select all global option values ordered by creation
+ *   4. Select all global option values with their own `product_option_values` usage
  *   5. Count total options, total values and distinct products using options
  *   6. Group values into a map keyed by `option_id`
  *   7. Return 200 response with counts and options (values nested)
@@ -111,10 +124,16 @@ export async function GET() {
        ORDER BY o.name ASC`,
     );
 
+    /** Each value carries its own usage so an unused value stays deletable. */
     const [valueRows] = await conn.query<OptionValueRow[]>(
-      `SELECT id, option_id, value
-         FROM global_option_values
-        ORDER BY created_at ASC, id ASC`,
+      `SELECT v.id, v.option_id, v.value,
+              (SELECT COUNT(*) FROM product_option_values pov
+                WHERE pov.global_option_value_id = v.id
+                  AND (pov.status = 'active'
+                       OR EXISTS (SELECT 1 FROM variant_option_values vov
+                                   WHERE vov.option_value_id = pov.id))) AS product_count
+         FROM global_option_values v
+        ORDER BY v.created_at ASC, v.id ASC`,
     );
 
     const [optionTotals] = await conn.query<OptionTotalsRow[]>(
@@ -125,14 +144,30 @@ export async function GET() {
       `SELECT COUNT(*) AS total FROM global_option_values`,
     );
 
+    /* Counted the same way as each option's own `product_count`: a dead link
+       that `DELETE` would purge is not a product using the option. */
     const [productsUsing] = await conn.query<CountRow[]>(
-      `SELECT COUNT(DISTINCT product_id) AS total FROM product_options`,
+      `SELECT COUNT(DISTINCT po.product_id) AS total
+         FROM product_options po
+        WHERE po.status = 'active'
+           OR EXISTS (SELECT 1 FROM product_option_values pov
+                       WHERE pov.option_id = po.id
+                         AND (pov.status = 'active'
+                              OR EXISTS (SELECT 1 FROM variant_option_values vov
+                                          WHERE vov.option_value_id = pov.id)))`,
     );
 
-    const valuesByOption = new Map<string, { id: string; value: string }[]>();
+    const valuesByOption = new Map<
+      string,
+      { id: string; value: string; productCount: number }[]
+    >();
     for (const v of valueRows) {
       const list = valuesByOption.get(v.option_id) ?? [];
-      list.push({ id: v.id, value: v.value });
+      list.push({
+        id: v.id,
+        value: v.value,
+        productCount: Number(v.product_count ?? 0),
+      });
       valuesByOption.set(v.option_id, list);
     }
 
@@ -408,14 +443,16 @@ export async function PUT(req: NextRequest) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Deletes a global option once no product uses it.
+ * Deletes a global option once no product still links to it.
  *
  * @async
  * @function DELETE
  * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
- *              with `optionDeleteSchema`, refuses with 409 while `product_options` still
- *              references the option, then deletes the row. The option's values are removed by
- *              the `global_option_values` foreign-key cascade.
+ *              with `optionDeleteSchema`, then clears the dead links an earlier product edit left
+ *              behind (`status = 'inactive'` rows no variant points at) before deciding. It still
+ *              refuses with 409 while `product_options` references the option for real — active,
+ *              or kept because a variant still resolves it — then deletes the row, with its
+ *              values removed by the `global_option_values` foreign-key cascade.
  *
  * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
  * @query {string} id - Option id (10-40 chars); used when present, otherwise the body id wins
@@ -430,8 +467,10 @@ export async function PUT(req: NextRequest) {
  * @throws {401} Unauthorized - No session, role too low, or session without a user id
  * @throws {403} Forbidden - Account not active or no role assigned
  * @throws {404} "Option not found"
- * @throws {409} The option is still used by products
- * @throws {500} `server_error` - Database failure while reading or deleting `global_options`
+ * @throws {409} The option is still linked to products — active links, or a link a disabled or
+ *               ordered variant still resolves
+ * @throws {500} `server_error` - Database failure while reading, cleaning or deleting
+ *               `global_options` and its `product_options` links
  *
  * @description Workflow:
  *   1. Initialize the manager guard and read the manager id, returning 401 when missing
@@ -439,11 +478,16 @@ export async function PUT(req: NextRequest) {
  *   3. Validate with `optionDeleteSchema`
  *   4. Initialize the database pool and take a connection
  *   5. Load the option through `OPTION_SELECT`, returning 404 when missing
- *   6. Return 409 with the using-product count while `product_options` still references it
- *   7. Delete the row from `global_options` (values cascade)
- *   8. Write a DELETE / OPTION audit entry with the value count, swallowing audit errors
- *   9. Return 200 response with `ok`, `message` and `deletedId`
- *   10. Release the connection in `finally`
+ *   6. Delete the option's `product_option_values` rows that are `status = 'inactive'` and not
+ *      referenced by `variant_option_values` — leftovers of an earlier product edit
+ *   7. Delete its `product_options` rows that are `status = 'inactive'` and no longer have any
+ *      value row
+ *   8. Count the remaining `product_options` rows for the option and return 409 with the count
+ *      while any link is left
+ *   9. Delete the row from `global_options` (its values cascade)
+ *   10. Write a DELETE / OPTION audit entry with the value count, swallowing audit errors
+ *   11. Return 200 response with `ok`, `message` and `deletedId`
+ *   12. Release the connection in `finally`
  */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
@@ -482,7 +526,42 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Option not found" }, { status: 404 });
     }
 
-    const productCount = Number(existing.product_count ?? 0);
+    /*
+     * Leftovers from an earlier product edit: when an option was removed from a
+     * product, its link was only marked `inactive`. Such a link is not real
+     * usage, but the foreign key would still refuse the delete, so dead links
+     * that no variant points at are cleared first.
+     */
+    await conn.query(
+      `DELETE pov FROM product_option_values pov
+        WHERE pov.global_option_value_id IN (
+                SELECT v.id FROM global_option_values v WHERE v.option_id = ?
+              )
+          AND pov.status = 'inactive'
+          AND NOT EXISTS (
+                SELECT 1 FROM variant_option_values vov
+                 WHERE vov.option_value_id = pov.id
+              )`,
+      [id],
+    );
+
+    await conn.query(
+      `DELETE po FROM product_options po
+        WHERE po.global_option_id = ?
+          AND po.status = 'inactive'
+          AND NOT EXISTS (
+                SELECT 1 FROM product_option_values pov
+                 WHERE pov.option_id = po.id
+              )`,
+      [id],
+    );
+
+    /* Anything still linked — active or kept for a variant — is real usage. */
+    const [linkRows] = await conn.query<CountRow[]>(
+      `SELECT COUNT(*) AS total FROM product_options WHERE global_option_id = ?`,
+      [id],
+    );
+    const productCount = Number(linkRows[0]?.total ?? 0);
     if (productCount > 0) {
       return NextResponse.json(
         {

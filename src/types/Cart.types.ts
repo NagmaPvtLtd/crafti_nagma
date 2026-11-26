@@ -17,8 +17,15 @@ export type CartItemView = {
   quantity: number;
   lineTotal: number;
   stock: number;
+  /** Smallest order the variant allows (null = 1). */
+  minOrderQty: number | null;
+  /** Largest order the variant allows (null = no limit). */
+  maxOrderQty: number | null;
   status: "active" | "inactive";
-  /** `status === "active" && stock > 0` — only these count towards the totals. */
+  /**
+   * `status === "active" && stock > 0` and the manager has not hidden the
+   * stock — only these count towards the totals.
+   */
   available: boolean;
 };
 

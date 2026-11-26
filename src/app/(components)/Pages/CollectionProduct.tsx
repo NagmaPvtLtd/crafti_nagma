@@ -32,6 +32,7 @@ import { WhatsAppIcon } from "../utils/SocialIcons";
 import { whatsappNumberLink } from "../../../utils/main.util";
 import getApiErrorMessage from "../../../utils/Auth/Auth.axiosErrorHelper.util";
 import { formatCurrency } from "../../../utils/Formator/formatCurrency.util";
+import { MAX_CART_QUANTITY } from "../../../utils/Cart/cartLimit.util";
 import type {
   CollectionOption,
   CollectionProductDetail,
@@ -183,7 +184,6 @@ export default function CollectionProduct({ code }: { code: string }) {
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [bulkNotice, setBulkNotice] = useState(false);
   const [adding, setAdding] = useState(false);
 
   /** `code|sku` already on screen — keeps the URL normalisation from refetching. */
@@ -275,7 +275,7 @@ export default function CollectionProduct({ code }: { code: string }) {
 
     const requested = Number.parseInt(searchParams.get("qty") ?? "", 10);
     const quantityToAdd = Number.isFinite(requested)
-      ? Math.min(Math.max(requested, 1), 99)
+      ? Math.min(Math.max(requested, 1), MAX_CART_QUANTITY)
       : 1;
 
     void (async () => {
@@ -366,10 +366,23 @@ export default function CollectionProduct({ code }: { code: string }) {
   const compareAt = variant?.compareAtPrice ?? null;
   const stock = variant?.stock ?? null;
   const soldOut = stock !== null && stock <= 0;
-  /** Stock caps the stepper; 99 is the hard ceiling on every request. */
-  const quantityCeiling =
-    stock === null ? 99 : Math.max(1, Math.min(99, stock));
-  const effectiveQuantity = Math.min(quantity, quantityCeiling);
+  /** Minimum the maker accepts for this piece; 1 unless the manager set more. */
+  const minOrder = Math.max(1, variant?.minOrderQty ?? 1);
+  /**
+   * Maximum the maker accepts; `null` means unlimited, bounded only by the
+   * database's own quantity ceiling. Stock never caps the stepper.
+   */
+  const maxOrder =
+    variant?.maxOrderQty == null
+      ? null
+      : Math.min(variant.maxOrderQty, MAX_CART_QUANTITY);
+  const quantityCeiling = maxOrder ?? MAX_CART_QUANTITY;
+  const effectiveQuantity = Math.min(
+    Math.max(quantity, minOrder),
+    quantityCeiling,
+  );
+  /** Above 99 pieces the bulk note explains the terms; it limits nothing. */
+  const bulkNotice = !soldOut && effectiveQuantity > 99;
 
   const description =
     variant?.description?.trim() || product?.description || null;
@@ -513,19 +526,19 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
     whatsappMessage,
   )}`;
 
-  /** Quantity is capped by the variant's stock, and at 99 in any case. */
+  /**
+   * Quantity stays between the variant's minimum order and its maximum order,
+   * and is unlimited past the minimum when no maximum is set. Stock is not a
+   * bound: a shopper may order past it, and the maker reviews every order first.
+   */
   function changeQuantity(delta: -1 | 1) {
     setQuantity((current) => {
-      /* A variant switch can leave the stored value above the new ceiling. */
-      const from = Math.min(current, quantityCeiling);
+      /* A variant switch can leave the stored value outside the new bounds. */
+      const from = Math.min(Math.max(current, minOrder), quantityCeiling);
       const next = from + delta;
 
-      if (next > quantityCeiling) {
-        if (quantityCeiling === 99) setBulkNotice(true);
-        return quantityCeiling;
-      }
-      if (next < 1) return 1;
-      if (next < quantityCeiling) setBulkNotice(false);
+      if (next > quantityCeiling) return quantityCeiling;
+      if (next < minOrder) return minOrder;
       return next;
     });
   }
@@ -920,7 +933,7 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                         <button
                           type="button"
                           onClick={() => changeQuantity(-1)}
-                          disabled={effectiveQuantity <= 1}
+                          disabled={effectiveQuantity <= minOrder}
                           aria-label="Decrease quantity"
                           className="inline-flex h-10 w-9 cursor-pointer items-center justify-center rounded-l-xl text-stone-600 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                         >
@@ -977,6 +990,16 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                       <WhatsAppIcon className="h-4 w-4" />
                     </a>
                   </div>
+
+                  {!soldOut && (minOrder > 1 || maxOrder !== null) && (
+                    <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
+                      {maxOrder === null
+                        ? `Minimum order: ${minOrder} pieces.`
+                        : minOrder > 1
+                          ? `Order ${minOrder}–${maxOrder} pieces.`
+                          : `Up to ${maxOrder} pieces per order.`}
+                    </p>
+                  )}
 
                   {bulkNotice && (
                     <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
@@ -1091,7 +1114,9 @@ Product ID: ${variant?.sku ?? product?.code ?? code}`;
                 )}
                 <SpecRow
                   label="Processing time"
-                  value={product.processingTime ?? "—"}
+                  value={
+                    variant?.processingTime || product.processingTime || "—"
+                  }
                 />
               </dl>
             </div>

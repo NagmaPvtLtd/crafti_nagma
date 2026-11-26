@@ -1,17 +1,23 @@
-# File Tree: crafti_nagma
+# File tree: crafti_nagma
+
+Generated from the working tree (directories first, then files, both alphabetical).
+`node_modules`, `.next`, `.git`, `.vercel`, `coverage`, `.env*` files and
+`src/assets/TODO/Brainstorming` are skipped.
 
 ```
 ├── 📁 .freebuff
-│   ├── ⚙️ .gitignore
+│   ├── 📄 .gitignore
 │   └── 📄 project-id
+├── 📁 .vscode
+│   └── ⚙️ settings.json
 ├── 📁 public
 │   ├── 📁 assets
 │   │   ├── 🖼️ avatar_v1.png
 │   │   ├── 🖼️ bg_white.jpg
 │   │   └── 🖼️ logo_v1.png
-│   ├── 📝 Flow.md
-│   ├── 📘 admin_product_management_flow.docx
+│   ├── 📄 admin_product_management_flow.docx
 │   ├── 📝 dynamic-product.md
+│   ├── 📝 Flow.md
 │   └── 📄 rbac.excalidraw
 ├── 📁 src
 │   ├── 📁 app
@@ -26,7 +32,8 @@
 │   │   │   ├── 📁 Pages
 │   │   │   │   ├── 📁 Admin
 │   │   │   │   │   ├── 📄 AuditLogClient.tsx
-│   │   │   │   │   └── 📄 DashboardClient.tsx
+│   │   │   │   │   ├── 📄 DashboardClient.tsx
+│   │   │   │   │   └── 📄 UserManagerClient.tsx
 │   │   │   │   ├── 📁 Dashboard
 │   │   │   │   │   ├── 📄 OrdersClient.tsx
 │   │   │   │   │   ├── 📄 ProfileClient.tsx
@@ -62,15 +69,16 @@
 │   │   │   │   ├── 📁 Form
 │   │   │   │   │   ├── 📄 DimensionFields.tsx
 │   │   │   │   │   ├── 📄 Field.tsx
-│   │   │   │   │   ├── 📄 PasswordInput.tsx
-│   │   │   │   │   ├── 📄 TextInput.tsx
-│   │   │   │   │   ├── 📄 Textarea.tsx
 │   │   │   │   │   ├── 📄 fieldStyles.ts
-│   │   │   │   │   └── 📄 formErrors.ts
+│   │   │   │   │   ├── 📄 formErrors.ts
+│   │   │   │   │   ├── 📄 PasswordInput.tsx
+│   │   │   │   │   ├── 📄 Textarea.tsx
+│   │   │   │   │   └── 📄 TextInput.tsx
 │   │   │   │   ├── 📁 Hooks
 │   │   │   │   │   └── 📄 useDebouncedValue.ts
 │   │   │   │   ├── 📄 ConfirmDialog.tsx
 │   │   │   │   ├── 📄 ErrorState.tsx
+│   │   │   │   ├── 📄 ogImage.tsx
 │   │   │   │   ├── 📄 PageWrapper.tsx
 │   │   │   │   ├── 📄 PhotoViewer.tsx
 │   │   │   │   ├── 📄 ScrollToTop.tsx
@@ -78,18 +86,21 @@
 │   │   │   │   ├── 📄 SocialIcons.tsx
 │   │   │   │   ├── 📄 TagInput.tsx
 │   │   │   │   ├── 📄 TrendChart.tsx
-│   │   │   │   ├── 📄 WhatsappFloating.tsx
-│   │   │   │   └── 📄 ogImage.tsx
+│   │   │   │   └── 📄 WhatsappFloating.tsx
 │   │   │   ├── 📄 CustomLoader.tsx
 │   │   │   ├── 📄 Footer.tsx
 │   │   │   ├── 📄 GoBack.tsx
 │   │   │   └── 📄 MetricChartCard.tsx
+│   │   ├── 📁 about
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 admin
 │   │   │   ├── 📁 audit-logs
 │   │   │   │   └── 📄 page.tsx
 │   │   │   ├── 📁 dashboard
 │   │   │   │   └── 📄 page.tsx
 │   │   │   ├── 📁 settings
+│   │   │   │   └── 📄 page.tsx
+│   │   │   ├── 📁 user-manager
 │   │   │   │   └── 📄 page.tsx
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 api
@@ -98,8 +109,12 @@
 │   │   │   │   │   └── 📄 route.ts
 │   │   │   │   ├── 📁 dashboard
 │   │   │   │   │   └── 📄 route.ts
-│   │   │   │   └── 📁 settings
-│   │   │   │       ├── 📁 [fieldName]
+│   │   │   │   ├── 📁 settings
+│   │   │   │   │   ├── 📁 [fieldName]
+│   │   │   │   │   │   └── 📄 route.ts
+│   │   │   │   │   └── 📄 route.ts
+│   │   │   │   └── 📁 users
+│   │   │   │       ├── 📁 [userId]
 │   │   │   │       │   └── 📄 route.ts
 │   │   │   │       └── 📄 route.ts
 │   │   │   ├── 📁 admin-super
@@ -153,8 +168,6 @@
 │   │   │           │   │   └── 📄 route.ts
 │   │   │           │   └── 📄 route.ts
 │   │   │           └── 📄 route.ts
-│   │   ├── 📁 about
-│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 care-guide
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 cart
@@ -216,15 +229,13 @@
 │   │   │       └── 📄 page.tsx
 │   │   ├── 📁 search
 │   │   │   └── 📄 page.tsx
-│   │   ├── 📄 favicon.ico
+│   │   ├── 🖼️ favicon.ico
 │   │   ├── 🎨 globals.css
 │   │   ├── 📄 layout.tsx
 │   │   ├── 📄 not-found.tsx
 │   │   ├── 📄 opengraph-image.tsx
 │   │   └── 📄 page.tsx
 │   ├── 📁 assets
-│   │   ├── 📁 TODO
-│   │   │   └── 📝 README.md
 │   │   ├── 📁 docs
 │   │   │   ├── 📁 Project_Based
 │   │   │   │   ├── 📝 PROJECT_STRUCTURE.md
@@ -237,19 +248,21 @@
 │   │   │   │   ├── 📝 README_THUMBNAILS.md
 │   │   │   │   ├── 📝 README_UI_UX.md
 │   │   │   │   └── 📝 README_USER_MANAGER.md
-│   │   │   ├── 📝 README.md
 │   │   │   ├── 📝 README_API_DOCUMENTATION.md
 │   │   │   ├── 📝 README_PROJECT_HABIT.md
 │   │   │   ├── 📝 README_PROPER_IMPORT_INSTRUCTION.md
-│   │   │   └── 📝 README_TYPESAFETY.md
-│   │   └── 📁 images
-│   │       ├── 🖼️ avatar_png_v1.png
-│   │       ├── 🖼️ avatar_ty_png_v1.png
-│   │       ├── 🖼️ avatar_ty_v1.png
-│   │       ├── 🖼️ avatar_v1.png
-│   │       ├── 🖼️ logo_png_v1.png
-│   │       ├── 🖼️ logo_svg_v1.svg
-│   │       └── 🖼️ logo_v1.png
+│   │   │   ├── 📝 README_TYPESAFETY.md
+│   │   │   └── 📝 README.md
+│   │   ├── 📁 images
+│   │   │   ├── 🖼️ avatar_png_v1.png
+│   │   │   ├── 🖼️ avatar_ty_png_v1.png
+│   │   │   ├── 🖼️ avatar_ty_v1.png
+│   │   │   ├── 🖼️ avatar_v1.png
+│   │   │   ├── 🖼️ logo_png_v1.png
+│   │   │   ├── 🖼️ logo_svg_v1.svg
+│   │   │   └── 🖼️ logo_v1.png
+│   │   └── 📁 TODO
+│   │       └── 📝 README.md
 │   ├── 📁 hooks
 │   │   └── 📄 Heartbeat.hook.tsx
 │   ├── 📁 lib
@@ -257,24 +270,20 @@
 │   │   │   ├── 📁 Dump
 │   │   │   │   ├── 📁 Important
 │   │   │   │   │   └── 📄 setting_toggle.csv
-│   │   │   │   └── 📄 LATEST_SCHEMA.sql
+│   │   │   │   └── 📝 LATEST_SCHEMA.sql
 │   │   │   ├── 📁 Index
 │   │   │   │   ├── 📄 Indexing.ts
 │   │   │   │   └── 📝 README.md
 │   │   │   ├── 📁 Migrations
-│   │   │   │   ├── 📄 20261107161717980_initial_schema.sql
-│   │   │   │   ├── 📄 20261118175244390_imagekit_files_entity.sql
-│   │   │   │   ├── 📄 20261118175253093_product_media_reviews.sql
-│   │   │   │   ├── 📄 20261119191754844_product_variant_image_links.sql
-│   │   │   │   ├── 📄 20261123061227512_variant_dimensions_features_care.sql
-│   │   │   │   └── 📄 20261123082957485_product_tags.sql
-│   │   │   ├── 📝 README.md
+│   │   │   │   ├── 📝 20261125103548610_initial_schema.sql
+│   │   │   │   └── 📝 20261126120000000_variant_visibility_and_order_limits.sql
 │   │   │   ├── 📄 connection.db.ts
 │   │   │   ├── 📄 create.index.db.ts
 │   │   │   ├── 📄 init.db.ts
 │   │   │   ├── 📄 main.db.ts
 │   │   │   ├── 📄 migration.runner.db.ts
-│   │   │   └── 📄 migration.table.db.ts
+│   │   │   ├── 📄 migration.table.db.ts
+│   │   │   └── 📝 README.md
 │   │   ├── 📁 ImageKit
 │   │   │   └── 📄 imagekit.config.ts
 │   │   └── 📁 Redis
@@ -308,10 +317,13 @@
 │   │   ├── 📁 Auth
 │   │   │   ├── 📄 Auth.axiosErrorHelper.util.ts
 │   │   │   ├── 📄 Auth.isFromIndia.util.ts
+│   │   │   ├── 📄 Auth.loginCooldown.util.ts
+│   │   │   ├── 📄 Auth.loginGuard.util.ts
 │   │   │   ├── 📄 Auth.requireRole.util.ts
 │   │   │   └── 📄 AuthErrors.ts
 │   │   ├── 📁 Cart
-│   │   │   └── 📄 cart.util.ts
+│   │   │   ├── 📄 cart.util.ts
+│   │   │   └── 📄 cartNotice.util.ts
 │   │   ├── 📁 Formator
 │   │   │   ├── 📄 capitalize.util.ts
 │   │   │   ├── 📄 formatCurrency.util.ts
@@ -334,10 +346,12 @@
 │   │   ├── 📁 Tags
 │   │   │   └── 📄 tag.util.ts
 │   │   ├── 📁 ValueFetcher
-│   │   │   ├── 📄 getDBName.util.ts
 │   │   │   ├── 📄 getDateTime.util.ts
+│   │   │   ├── 📄 getDBName.util.ts
 │   │   │   └── 📄 getProduction.util.ts
 │   │   ├── 📁 zod
+│   │   │   ├── 📁 admin
+│   │   │   │   └── 📄 userManager.zod.ts
 │   │   │   ├── 📁 cart
 │   │   │   │   └── 📄 cart.zod.ts
 │   │   │   ├── 📁 product
@@ -353,24 +367,54 @@
 │   │   │   └── 📄 setting.validator.zod.ts
 │   │   ├── 📁 zod-schema
 │   │   │   └── 📄 imagekit.schemas.zod.ts
-│   │   ├── 📄 TTL.util.ts
 │   │   ├── 📄 generateULID.util.ts
-│   │   └── 📄 main.util.ts
+│   │   ├── 📄 main.util.ts
+│   │   └── 📄 TTL.util.ts
 │   └── 📄 proxy.ts
-├── ⚙️ .env.prince
-├── ⚙️ .gitignore
+├── 📄 .gitignore
 ├── 📝 AGENTS.md
 ├── 📝 CLAUDE.md
-├── 📝 README.md
-├── 📄 eslint.config.mjs
+├── ⚙️ eslint.config.mjs
+├── 📄 next-env.d.ts
 ├── 📄 next.config.ts
 ├── ⚙️ package-lock.json
 ├── ⚙️ package.json
-├── 📄 postcss.config.mjs
+├── ⚙️ postcss.config.mjs
+├── 📝 README.md
+├── 📄 tsconfig.check.tsbuildinfo
 ├── ⚙️ tsconfig.json
+├── 📄 tsconfig.tsbuildinfo
 └── ⚙️ vercel.json
 ```
 
 ---
 
-_Generated by FileTree Pro Extension_
+## Where things live
+
+| What | Path |
+| --- | --- |
+| Page routes (thin `page.tsx` → one client component) | `src/app/<segment>/page.tsx` |
+| Public storefront clients | `src/app/(components)/Pages/` — `Landing`, `Collections`, `CollectionBrowse`, `CollectionProduct`, `CollectionCard`, `CartClient`, `SearchProducts`, `LoginClient` |
+| Manager clients | `src/app/(components)/Pages/Manager/` |
+| Admin clients | `src/app/(components)/Pages/Admin/` |
+| Customer dashboard clients | `src/app/(components)/Pages/Dashboard/` |
+| Shared shells / chrome | `src/app/(components)/` — `Footer`, `GoBack`, `CustomLoader`, `MetricChartCard`, `Navbar/`, `About/AboutLayout`, `Policy/PolicyLayout` |
+| Reusable UI + hooks | `src/app/(components)/utils/` — `PageWrapper`, `SectionDiv`, `ErrorState`, `ConfirmDialog`, `PhotoViewer`, `Form/`, `Hooks/useDebouncedValue`, `SocialIcons`, `WhatsappFloating` |
+| APIs | `src/app/api/{public,user,auth,manager,admin}/…/route.ts` |
+| Database | `src/lib/Database/` — `main.db.ts` (`getPool`), `connection.db.ts`, `index.db.ts`, `Migrations/*.sql`, `Dump/LATEST_SCHEMA.sql` |
+| Server utilities | `src/utils/` — `Auth`, `Api`, `Formator`, `Cart`, `Pricing`, `Slug`, `Tags`, `Imagekit`, `ValueFetcher`, `zod/` |
+| Shared types | `src/types/` |
+| Docs | `src/assets/docs/` (+ `Project_Based/` for project-specific notes) |
+
+### Rules that apply to everything here
+
+- `LATEST_SCHEMA.sql` is the **current** schema, not a history. A new migration is
+  added as `Migrations/<timestamp>_<name>.sql` **and** the dump is edited in
+  place so it reads as the post-migration table — the runner applies pending
+  files at boot (`runMigrations`), never the dump.
+- Every page container is `max-w-7xl` inside `PageWrapper`; the page header nav
+  bars (`PolicyLayout`, `AboutLayout`) share one height (`README_UI_UX.md`).
+- Selects and inputs take the same `inputClass()` so a row of controls never
+  has mismatched heights.
+- Reuse before adding: search the concept in `utils/`, `types/`, `zod/` and
+  `(components)/utils/` first (`README_PROJECT_HABIT.md`).

@@ -294,8 +294,11 @@ export async function PUT(req: NextRequest) {
  * @async
  * @function DELETE
  * @description Reads the id from `?id=` first and falls back to a JSON body `id`, validates it
- *              with `optionValueDeleteSchema`, refuses with 409 while
- *              `product_option_values.global_option_value_id` still references the value, then
+ *              with `optionValueDeleteSchema`, then clears the dead links an earlier product edit
+ *              left behind (`status = 'inactive'` rows no variant points at) so an unused value
+ *              is never blocked by them. It still refuses with 409 — naming the value and the
+ *              number of product options using it — while
+ *              `product_option_values.global_option_value_id` references the value for real, then
  *              deletes the row and audits it.
  *
  * @param {NextRequest} req - The incoming HTTP request with `?id=` or a JSON body
@@ -311,8 +314,10 @@ export async function PUT(req: NextRequest) {
  * @throws {401} Unauthorized - No session, role too low, or session without a user id
  * @throws {403} Forbidden - Account not active or no role assigned
  * @throws {404} "Value not found"
- * @throws {409} The value is still used by product options
- * @throws {500} `server_error` - Database failure while reading or deleting option values
+ * @throws {409} The value is still used by product option rows — active ones, or one a disabled or
+ *               ordered variant still resolves
+ * @throws {500} `server_error` - Database failure while reading, cleaning or deleting
+ *               `global_option_values` and its `product_option_values` links
  *
  * @description Workflow:
  *   1. Initialize the manager guard and read the manager id, returning 401 when missing
@@ -320,11 +325,14 @@ export async function PUT(req: NextRequest) {
  *   3. Validate with `optionValueDeleteSchema`
  *   4. Initialize the database pool and take a connection
  *   5. Load the value through `VALUE_SELECT`, returning 404 when missing
- *   6. Count `product_option_values` rows using the value and return 409 when non-zero
- *   7. Delete the row from `global_option_values`
- *   8. Write a DELETE / OPTION_VALUE audit entry with the option name and value
- *   9. Return 200 response with `ok`, `message` and `deletedId`
- *   10. Release the connection in `finally`
+ *   6. Delete this value's `product_option_values` rows that are `status = 'inactive'` and not
+ *      referenced by `variant_option_values` — leftovers of an earlier product edit
+ *   7. Count the remaining `product_option_values` rows and return 409, naming the value and the
+ *      count, while any link is left
+ *   8. Delete the row from `global_option_values`
+ *   9. Write a DELETE / OPTION_VALUE audit entry with the option name and value
+ *   10. Return 200 response with `ok`, `message` and `deletedId`
+ *   11. Release the connection in `finally`
  */
 export async function DELETE(req: NextRequest) {
   const guard = await requireManager({
@@ -363,6 +371,23 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Value not found" }, { status: 404 });
     }
 
+    /*
+     * A value removed from a product only had its link marked `inactive`. That
+     * link is not real usage, but the foreign key would still refuse the
+     * delete, so unreferenced dead links are cleared first.
+     */
+    await conn.query(
+      `DELETE pov FROM product_option_values pov
+        WHERE pov.global_option_value_id = ?
+          AND pov.status = 'inactive'
+          AND NOT EXISTS (
+                SELECT 1 FROM variant_option_values vov
+                 WHERE vov.option_value_id = pov.id
+              )`,
+      [id],
+    );
+
+    /* Whatever is left — active, or kept for a variant — is real usage. */
     const [usage] = await conn.query<CountRow[]>(
       `SELECT COUNT(*) AS total FROM product_option_values
         WHERE global_option_value_id = ?`,

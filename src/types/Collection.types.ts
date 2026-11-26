@@ -98,7 +98,14 @@ export type CollectionVariant = {
   description: string | null;
   price: number;
   compareAtPrice: number | null;
+  /** Always `0` when the manager hid the stock, so the page reads as sold out. */
   stock: number;
+  /** This variant's own processing time, falling back to the product's. */
+  processingTime: string | null;
+  /** Smallest order the shopper may place (null = 1). */
+  minOrderQty: number | null;
+  /** Largest order the shopper may place (null = no limit). */
+  maxOrderQty: number | null;
   /** Grams, as entered in the studio. */
   weight: number | null;
   /** This variant's own snapshot of the product dimensions. */
