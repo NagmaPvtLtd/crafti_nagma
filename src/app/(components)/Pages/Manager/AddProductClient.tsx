@@ -450,7 +450,7 @@ export default function AddProductClient() {
           <CustomLoader
             fullScreen={false}
             label="Laying out the product form…"
-            hint="Categories, options and their values."
+            hint="Loading your categories and options."
           />
         )}
 
@@ -475,14 +475,14 @@ export default function AddProductClient() {
               step="1"
               eyebrow="The basics"
               title="Product information"
-              hint="The shared story of this base product. Its variants start from this copy."
+              hint="Tell shoppers what this product is. These details are shared by all of its variants."
             >
               <div className="space-y-4">
                 <Field
                   label="Product name"
                   required
                   error={errors.name}
-                  hint="How the base is labelled in the studio and on the website."
+                  hint="The name shown on the website and in the studio."
                 >
                   <TextInput
                     value={form.name}
@@ -495,7 +495,7 @@ export default function AddProductClient() {
                 <Field
                   label="Brief description"
                   error={errors.briefDescription}
-                  hint="One or two lines for cards and listings — keep it short."
+                  hint="A short line for product cards. One or two lines is enough."
                 >
                   <Textarea
                     value={form.briefDescription}
@@ -511,7 +511,7 @@ export default function AddProductClient() {
                 <Field
                   label="Description"
                   error={errors.description}
-                  hint="The full story — materials, size, care, anything the customer should know."
+                  hint="Everything about the product — material, size, care, and anything else a customer should know."
                 >
                   <Textarea
                     value={form.description}
@@ -527,7 +527,7 @@ export default function AddProductClient() {
               step="2"
               eyebrow="Search & sharing"
               title="Meta details"
-              hint="What search engines and link previews show. Leave blank to fall back to the product name and brief."
+              hint="Optional. This is what Google and shared links show. Leave it blank to use the product name and brief instead."
             >
               <div className="space-y-4">
                 <Field
@@ -540,7 +540,7 @@ export default function AddProductClient() {
                       onClick={() => setField("metaTitle", form.name)}
                     />
                   }
-                  hint="The blue line in Google results. Around 60 characters is plenty."
+                  hint="The headline in Google results. About 60 characters is enough."
                 >
                   <TextInput
                     value={form.metaTitle}
@@ -571,7 +571,7 @@ export default function AddProductClient() {
                       }
                     />
                   }
-                  hint="The grey snippet under the title in search results. Around 155 characters."
+                  hint="The text under the headline in search results. About 155 characters is enough."
                 >
                   <Textarea
                     value={form.metaDescription}
@@ -590,7 +590,7 @@ export default function AddProductClient() {
               step="3"
               eyebrow="Where it lives"
               title="Categories"
-              hint="Pick at least one category or sub category. A product can sit in many, so shoppers can find it from more than one aisle."
+              hint="Tick at least one category or sub category. You can tick more than one, so shoppers can find this product in different places."
               error={errors.categoryIds}
               action={
                 <RefreshButton
@@ -658,7 +658,7 @@ export default function AddProductClient() {
               step="4"
               eyebrow="Discovery"
               title="Product Tags"
-              hint="Add relevant keywords to help customers discover this product through search. Every variant inherits these tags automatically."
+              hint="Add a few keywords so customers can find this product in search. All of its variants get these tags too."
               error={errors.tagIds}
             >
               <TagInput value={selectedTags} onChange={setSelectedTags} />
@@ -673,7 +673,7 @@ export default function AddProductClient() {
               step="5"
               eyebrow="Choices"
               title="Options & Values"
-              hint="Options are the pools a variant is built from — Colour, Size, Material. Tick a pool, then pick its values. The first value is selected for you as the default."
+              hint="Every option you have created is listed below, like Colour or Size. Tick the options this product should have, then choose the values available for it, like Red, Blue or Small. The first value is picked as the default."
               error={errors.options}
               action={
                 <RefreshButton
@@ -686,8 +686,8 @@ export default function AddProductClient() {
               {availableOptions.length === 0 ? (
                 <PoolHint
                   href="/manager/product-studio/options"
-                  label="Create an option pool"
-                  text="No options yet — a base product needs at least one option with a value."
+                  label="Create an option"
+                  text="No options yet — create at least one option with a value first."
                 />
               ) : (
                 <div className="space-y-2">
@@ -730,8 +730,8 @@ export default function AddProductClient() {
                           <div className="mt-2 flex flex-wrap gap-1.5 border-t border-dashed border-stone-100 pt-2">
                             {option.values.length === 0 ? (
                               <p className="text-[11px] text-amber-700">
-                                This pool has no values yet — add them in Global
-                                Options.
+                                This option has no values yet — add them on the
+                                Options page.
                               </p>
                             ) : (
                               option.values.map((value) => (
@@ -767,7 +767,7 @@ export default function AddProductClient() {
               step="6"
               eyebrow="Measurements"
               title="Product dimensions"
-              hint="Optional. When the base product has dimensions, every generated variant takes a snapshot of them and can be edited on its own."
+              hint="Optional. These sizes are copied to every new variant, and you can change them on each variant later."
               error={errors.dimensionUnit}
             >
               <DimensionFields
@@ -807,7 +807,7 @@ export default function AddProductClient() {
                     >
                       Status
                     </label>
-                    <Hint text="Active products are visible on the website. Inactive ones stay in the studio but disappear from the collections." />
+                    <Hint text="Active products show on the website. Inactive ones stay in the studio but are hidden from shoppers." />
                   </div>
                   <select
                     id="product-status"
@@ -831,21 +831,21 @@ export default function AddProductClient() {
               step="8"
               eyebrow="Showcase"
               title="Where this product is featured"
-              hint="Both are optional. They decide whether this product is pushed forward on the website."
+              hint="Optional. These decide where this product gets extra attention on the website."
             >
               <div className="space-y-2">
                 <CheckboxRow
                   checked={form.isFeatured}
                   onChange={(checked) => setField("isFeatured", checked)}
                   label="Is featured"
-                  hint="Ticked, this product appears in the featured picks at the top of the collections page."
+                  hint="Shows this product in the featured picks at the top of the collections page."
                   description="Extra visibility on the collections page."
                 />
                 <CheckboxRow
                   checked={form.mainShowcase}
                   onChange={(checked) => setField("mainShowcase", checked)}
                   label="Main showcase"
-                  hint="Ticked, this product becomes the thumbnail of its category — the image shoppers see before they open the category."
+                  hint="Uses this product as the cover image of its category on the website."
                   description="Represent its category on the website."
                 />
               </div>
@@ -952,7 +952,7 @@ function PoolWarnings({
     missing.push({
       href: "/manager/product-studio/options",
       label: "Create an option",
-      text: "No option pools exist yet — every base product needs at least one option with a value.",
+      text: "No options created yet — every product needs at least one option with a value.",
     });
   }
 

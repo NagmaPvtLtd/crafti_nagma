@@ -6,6 +6,7 @@ import NextAuth, {
 import Google, { GoogleProfile } from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { headers } from "next/headers";
+import type { RowDataPacket } from "mysql2";
 import bcrypt from "bcryptjs";
 
 import {
@@ -89,6 +90,10 @@ function splitFullName(fullName: string): {
  */
 function loginRedirect(code: string): string {
   return `/login?error=${encodeURIComponent(code)}`;
+}
+
+interface SessionRow extends RowDataPacket {
+  session_id: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -481,17 +486,25 @@ const authOptions: NextAuthOptions = {
           t.profile_completed = Boolean(dbUser.profile_completed);
 
           if (account) {
-            /* A fresh sign-in claims the account's single session slot,
-               revoking whatever device held it before. */
-            const sessionId = generateULID({
-              prefix: "sess",
-              maxLength: 40,
-            });
+            /* Every device on one account shares a single session
+               generation. A fresh sign-in joins the existing value instead
+               of replacing it, so signing in elsewhere never signs the other
+               devices out. Only a password change rotates this value. */
             await conn.execute(
-              `UPDATE users SET session_id = ? WHERE id = ?`,
-              [sessionId, dbUser.id],
+              `UPDATE users
+                  SET session_id = COALESCE(session_id, ?)
+                WHERE id = ?`,
+              [
+                generateULID({ prefix: "sess", maxLength: 40 }),
+                dbUser.id,
+              ],
             );
-            t.session_id = sessionId;
+            const [sessionRows] = await conn.query<SessionRow[]>(
+              `SELECT session_id FROM users WHERE id = ? LIMIT 1`,
+              [dbUser.id],
+            );
+            const sharedSessionId = sessionRows[0]?.session_id ?? null;
+            if (sharedSessionId) t.session_id = sharedSessionId;
           }
         }
       } catch (err) {

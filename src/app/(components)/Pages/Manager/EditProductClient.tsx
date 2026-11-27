@@ -451,7 +451,7 @@ export default function EditProductClient({
               step="1"
               eyebrow="The basics"
               title="Product information"
-              hint="The shared story of this base product. Its variants start from this copy."
+              hint="Tell shoppers what this product is. These details are shared by all of its variants."
             >
               <div className="space-y-4">
                 <Field
@@ -650,7 +650,7 @@ export default function EditProductClient({
               step="4"
               eyebrow="Discovery"
               title="Product Tags"
-              hint="Add relevant keywords to help customers discover this product through search. Every variant inherits these tags automatically."
+              hint="Add a few keywords so customers can find this product in search. All of its variants get these tags too."
               error={errors.tagIds}
             >
               <TagInput value={selectedTags} onChange={setSelectedTags} />
@@ -665,7 +665,7 @@ export default function EditProductClient({
               step="5"
               eyebrow="Choices"
               title="Options & Values"
-              hint="Options are the pools this product's variants are built from. Removing a value disables the variants that use it — or deletes them when they never sold."
+              hint="Tick the options this product should have, then choose the values available. Removing a value turns off the variants that use it, or deletes them if they were never sold."
               error={errors.options}
               action={
                 <RefreshButton
@@ -678,8 +678,8 @@ export default function EditProductClient({
               {(options ?? []).length === 0 ? (
                 <PoolHint
                   href="/manager/product-studio/options"
-                  label="Create an option pool"
-                  text="No options exist yet — a product needs at least one option with a value."
+                  label="Create an option"
+                  text="No options yet — create at least one option with a value first."
                 />
               ) : (
                 <div className="space-y-2">
@@ -722,8 +722,8 @@ export default function EditProductClient({
                           <div className="mt-2 flex flex-wrap gap-1.5 border-t border-dashed border-stone-100 pt-2">
                             {option.values.length === 0 ? (
                               <p className="text-[11px] text-amber-700">
-                                This pool has no values yet — add them in Global
-                                Options.
+                                This option has no values yet — add them on the
+                                Options page.
                               </p>
                             ) : (
                               option.values.map((value) => {
@@ -830,7 +830,7 @@ export default function EditProductClient({
               step="7"
               eyebrow="Measurements"
               title="Product dimensions"
-              hint="Optional. Existing variants keep their own snapshot; new variants copy these values when generated."
+              hint="Optional. Existing variants keep their own sizes; new variants copy these the first time they are created."
               error={errors.dimensionUnit}
             >
               <DimensionFields value={dimensions} onChange={setDimensions} />
@@ -840,7 +840,7 @@ export default function EditProductClient({
               step="8"
               eyebrow="What shoppers read"
               title="Features & care instructions"
-              hint="The base lists. Each variant starts from these and can be edited on its own variant page."
+              hint="These are the starting lists. Each variant gets them first and can be edited on its own variant page."
             >
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>

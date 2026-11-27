@@ -8,27 +8,26 @@ Migration: `src/lib/Database/Migrations/20261124120000000_user_session_and_coold
 
 | Column | Type | Meaning |
 | --- | --- | --- |
-| `users.session_id` | `CHAR(40) NULL` | The one session currently allowed for the account |
+| `users.session_id` | `CHAR(40) NULL` | Shared session generation for the account; rotated only by a password change |
 | `users.cooldown_till` | `DATETIME NULL` | UTC moment password sign-in is allowed again |
 
 `LATEST_SCHEMA.sql` and `UserRow.types.ts` carry the same fields.
 
-## Single active session
+## Many devices, one session generation
 
-1. On every fresh sign-in (Google or password), the `jwt` callback creates
-   `sess_<ulid>` and writes it to `users.session_id`; the token stores the same id in
-   its `session_id` claim (also copied to `session.user.session_id`).
-2. `requireRole` / `requireAuth` / `requireAdmin` / `requireManager` now compare the
-   token claim with the database value on every guarded call. A mismatch (newer
-   sign-in elsewhere, password change) returns
+1. `users.session_id` is the account's shared session generation. `sess_<ulid>` is
+   created on the first sign-in that finds the column empty; every later sign-in
+   (Google or password) adopts the existing value, so all devices hold the same
+   `session_id` claim (also copied to `session.user.session_id`).
+2. `requireRole` / `requireAuth` / `requireAdmin` / `requireManager` compare the
+   token claim with the database value on every guarded call. A mismatch returns
    `401 { "error": "Your session is no longer active. Please sign in again." }`.
-3. Tokens issued before this change have no claim, so they are signed out on their
-   next protected request.
-4. Changing the password in `/dashboard/profile` rotates `session_id`, which signs
-   out every device, including the one that made the change. Sign in again after a
-   password change.
-5. Because the column holds one id, signing in on a second device signs the first
-   device out. That is the intended single-session behaviour of this design.
+3. Signing in on another device does **not** affect sessions already open — the
+   same account may be used from anywhere at the same time.
+4. Changing the password in `/dashboard/profile` rotates `session_id`. That is the
+   only action that revokes sessions: every device, including the one that made the
+   change, is signed out on its next protected request, so the changer must sign in
+   again.
 
 Files: `src/app/api/auth/[...nextauth]/route.ts`,
 `src/utils/Auth/Auth.requireRole.util.ts`,
