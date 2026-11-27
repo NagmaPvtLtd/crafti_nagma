@@ -668,7 +668,7 @@ export default function VariantDetailClient({
                             Features
                           </p>
                           <p className="mt-0.5 text-[10px] text-stone-400">
-                            This variant&apos;s own snapshot — edit it freely.
+                            This variant has its own list — edit it freely.
                           </p>
                         </div>
                         <SyncButton
@@ -725,13 +725,13 @@ export default function VariantDetailClient({
 
                       <div className="mt-2 rounded-lg border border-stone-200/80 bg-stone-50/70 p-2.5">
                         <p className="text-[10px] font-semibold tracking-wide text-stone-400 uppercase">
-                          Inherited from {data.variant.productName}
+                          Taken from {data.variant.productName}
                         </p>
 
                         {data.tags.inherited.length === 0 ? (
                           <p className="mt-1 text-[11px] text-stone-400">
-                            No inherited tags yet — add them on the base
-                            product.
+                            No tags from the base product yet — add them on the
+                            base product.
                           </p>
                         ) : (
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

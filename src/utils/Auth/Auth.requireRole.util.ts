@@ -213,8 +213,10 @@ export async function requireRole(
   }
 
   /* ---- 6. session revocation check ------------------------------ */
-  /* A password change or a newer sign-in rotates `users.session_id`, so a
-     token that no longer matches is treated as signed out. */
+  /* `users.session_id` is the account's shared session generation: every
+     device carries the same value and a password change rotates it, so a
+     token that no longer matches is treated as signed out. Signing in on
+     another device leaves the value untouched. */
   const sessionId = session.user.session_id ?? null;
   if (!sessionId) {
     console.warn(`[AUTH - DENY] ✕ ${label} — token has no session id | ${who}`);

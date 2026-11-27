@@ -216,8 +216,9 @@ export async function POST(req: NextRequest) {
     );
 
     if (wantsPasswordChange) {
-      /* Rotate the account's session slot: every device holding the previous
-         id is signed out on its next protected request. */
+      /* A password change is the only thing that rotates the shared session
+         generation: every device signed into the account (including this
+         one) is signed out on its next protected request. */
       await conn.query(`UPDATE users SET session_id = ? WHERE id = ?`, [
         generateULID({ prefix: "sess", maxLength: 40 }),
         dbUser.id,

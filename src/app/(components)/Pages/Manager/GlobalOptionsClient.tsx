@@ -226,8 +226,8 @@ export default function GlobalOptionsClient() {
               Global Options
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">
-              Create the pool of options your products can have — Colour, Size,
-              Material — and fill each one with its values.
+              Create the options your products can have — Colour, Size, Material
+              — and fill each one with its values.
             </p>
           </div>
 
@@ -258,7 +258,7 @@ export default function GlobalOptionsClient() {
         {loading && !data && (
           <CustomLoader
             fullScreen={false}
-            label="Gathering the option pool…"
+            label="Loading your options…"
             hint="Colours, sizes, materials and their values."
           />
         )}
@@ -281,7 +281,7 @@ export default function GlobalOptionsClient() {
               <div className="space-y-3">
                 <div className="mb-1 flex items-end justify-between gap-3">
                   <div>
-                    <SectionEyebrow>The pool</SectionEyebrow>
+                    <SectionEyebrow>Your options</SectionEyebrow>
                     <h2 className="mt-2 text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
                       Options &amp; values
                     </h2>
@@ -362,7 +362,7 @@ function StatStrip({ counts }: { counts: GlobalOptionsResponse["counts"] }) {
     {
       label: "In use",
       value: counts.productsUsing,
-      hint: "Products using an option pool",
+      hint: "Products using this option",
       icon: <Check className="h-3.5 w-3.5" />,
     },
   ];
@@ -695,7 +695,7 @@ function OptionModal({
           <Field
             label="Description"
             error={errors.description?.[0]}
-            hint="Optional — a short note about how this pool is used."
+            hint="Optional — a short note about what this option is for."
           >
             <TextInput
               value={description}
@@ -900,7 +900,7 @@ function ConfirmDelete({
           </div>
           <p className="mt-3 text-sm leading-relaxed text-stone-600">
             {isOption
-              ? "This removes the option pool and everything inside it."
+              ? "This removes the option and all of its values."
               : `This removes the value from ${target.option.name}.`}
           </p>
 
@@ -978,7 +978,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         <ListChecks className="h-5 w-5" />
       </div>
       <h2 className="mt-3 text-base font-semibold text-stone-900">
-        The option pool is empty
+        No options yet
       </h2>
       <p className="mt-1 max-w-sm text-sm text-stone-600">
         Start with “Colour”, then add Yellow, Red and Blue inside it. Size and

@@ -16,6 +16,14 @@ const TAGS_URL = "/api/manager/product-studio/tags";
 const MAX_TAGS = 15;
 const MAX_TAG_LENGTH = 100;
 
+/** Splits a pasted list on commas and line breaks, then normalizes each name. */
+function parsePastedTags(text: string): string[] {
+  return text
+    .split(/[,\n\r]+/)
+    .map((part) => part.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH))
+    .filter(Boolean);
+}
+
 /**
  * YouTube-style tag input.
  *
@@ -44,6 +52,7 @@ export default function TagInput({
   const [pool, setPool] = useState<TagListItem[]>([]);
   const [loadingPool, setLoadingPool] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -55,6 +64,7 @@ export default function TagInput({
     [value],
   );
   const atLimit = value.length >= max;
+  const busy = creating || pasting;
 
   const loadPool = useCallback(async () => {
     setLoadingPool(true);
@@ -82,11 +92,11 @@ export default function TagInput({
    * Put the caret back in the same field so typing can continue.
    */
   useEffect(() => {
-    if (creating || !shouldRefocusRef.current) return;
+    if (busy || !shouldRefocusRef.current) return;
     shouldRefocusRef.current = false;
     if (disabled || atLimit) return;
     inputRef.current?.focus();
-  }, [creating, disabled, atLimit]);
+  }, [busy, disabled, atLimit]);
 
   useEffect(() => {
     function onDown(event: MouseEvent) {
@@ -132,7 +142,7 @@ export default function TagInput({
   }
 
   async function commitInput(preferFirstSuggestion = false) {
-    if (disabled || creating) return;
+    if (disabled || busy) return;
 
     const name = input.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH);
     if (!name) return;
@@ -184,6 +194,99 @@ export default function TagInput({
     }
   }
 
+  /**
+   * Adds a pasted comma/newline separated list in one go.
+   * Known names are reused from the pool; missing ones go through the same
+   * create endpoint as the single-tag path, so ids stay canonical.
+   */
+  async function addPastedTags(names: string[]) {
+    if (disabled || busy) return;
+
+    const seenNames = new Set<string>();
+    const wanted: string[] = [];
+    for (const name of names) {
+      const key = name.toLowerCase();
+      if (seenNames.has(key)) continue;
+      seenNames.add(key);
+      wanted.push(name);
+    }
+    if (wanted.length === 0) return;
+
+    const room = max - value.length;
+    if (room <= 0) {
+      toast.error(`A product can carry at most ${max} tags`);
+      return;
+    }
+    if (wanted.length > room) {
+      toast.error(`A product can carry at most ${max} tags`);
+    }
+
+    shouldRefocusRef.current = inputRef.current === document.activeElement;
+    setPasting(true);
+
+    const poolByName = new Map(
+      pool.map((tag) => [tag.name.toLowerCase(), tag] as const),
+    );
+    const chosenIds = new Set(value.map((tag) => tag.id));
+    const added: TagRef[] = [];
+    const poolAdditions: TagListItem[] = [];
+    let failures = 0;
+
+    try {
+      for (const name of wanted.slice(0, room)) {
+        const known = poolByName.get(name.toLowerCase());
+        if (known) {
+          if (!chosenIds.has(known.id)) {
+            chosenIds.add(known.id);
+            added.push({ id: known.id, name: known.name, slug: known.slug });
+          }
+          continue;
+        }
+
+        try {
+          const res = await axios.post<{
+            ok: true;
+            message: string;
+            tag: TagRef;
+          }>(TAGS_URL, { name }, { withCredentials: true });
+          const created = res.data.tag;
+          if (!chosenIds.has(created.id)) {
+            chosenIds.add(created.id);
+            added.push(created);
+          }
+          const item: TagListItem = {
+            ...created,
+            createdAt: new Date().toISOString(),
+            usage: { productCount: 0, variantCount: 0, totalUsage: 0 },
+          };
+          poolByName.set(created.name.toLowerCase(), item);
+          poolAdditions.push(item);
+        } catch {
+          failures += 1;
+        }
+      }
+
+      if (poolAdditions.length > 0) {
+        setPool((prev) => [
+          ...prev,
+          ...poolAdditions.filter(
+            (tag) => !prev.some((existing) => existing.id === tag.id),
+          ),
+        ]);
+      }
+      if (added.length > 0) onChange([...value, ...added]);
+      if (failures > 0) {
+        toast.error(
+          failures === 1
+            ? "Could not create one of the pasted tags"
+            : `Could not create ${failures} of the pasted tags`,
+        );
+      }
+    } finally {
+      setPasting(false);
+    }
+  }
+
   return (
     <div ref={boxRef} className="relative">
       <div
@@ -223,6 +326,14 @@ export default function TagInput({
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
+            onPaste={(event) => {
+              const text = event.clipboardData.getData("text");
+              if (!text || !/[,\n\r]/.test(text)) return;
+              const names = parsePastedTags(text);
+              if (names.length === 0) return;
+              event.preventDefault();
+              void addPastedTags(names);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === ",") {
                 event.preventDefault();
@@ -252,13 +363,13 @@ export default function TagInput({
               }
             }}
             placeholder={value.length === 0 ? placeholder : "Add another tag…"}
-            disabled={disabled || creating}
+            disabled={disabled || busy}
             aria-label="Add a tag"
             className="min-w-32 flex-1 border-0 bg-transparent px-1 py-0.5 text-xs text-stone-900 outline-none placeholder:text-stone-400"
           />
         )}
 
-        {creating && (
+        {busy && (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-rose-400" />
         )}
       </div>
@@ -311,10 +422,10 @@ export default function TagInput({
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => void commitInput(false)}
-                    disabled={creating}
+                    disabled={busy}
                     className="flex w-full cursor-pointer items-center gap-1.5 border-t border-stone-100 px-3 py-2 text-left text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {creating ? (
+                    {busy ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
                       <Plus className="h-3 w-3" />
