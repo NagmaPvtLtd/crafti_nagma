@@ -3,30 +3,49 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { GoogleIcon } from "../utils/SocialIcons";
 import {
   FALLBACK_ERROR,
   resolveAuthError,
 } from "../../../utils/Auth/AuthErrors";
-import { parseCooldownError } from "../../../utils/Auth/Auth.loginCooldown.util";
+import {
+  parseCooldownError,
+  parseWrongPasswordError,
+} from "../../../utils/Auth/Auth.loginCooldown.util";
 import Field from "../utils/Form/Field";
 import TextInput from "../utils/Form/TextInput";
 import PasswordInput from "../utils/Form/PasswordInput";
 import PageWrapper from "../utils/PageWrapper";
 import { SectionDivider, SectionEyebrow } from "../utils/SectionDiv";
 
+type LoginError = {
+  message: string;
+  tone: "error" | "warning";
+};
+
+function resolveLoginError(raw: string | null | undefined): LoginError | null {
+  const cooldown = parseCooldownError(raw);
+  if (cooldown) return { message: cooldown, tone: "error" };
+
+  const wrongPassword = parseWrongPasswordError(raw);
+  if (wrongPassword) return { message: wrongPassword, tone: "warning" };
+
+  const message = resolveAuthError(raw);
+  return message ? { message, tone: "error" } : null;
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
 
   const callbackUrl = sp.get("callbackUrl") || "/";
-  const queryError = resolveAuthError(sp.get("error"));
+  const queryError = resolveLoginError(sp.get("error"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"credentials" | "google" | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<LoginError | null>(null);
 
   const message = formError ?? queryError;
   const isBusy = busy !== null;
@@ -45,14 +64,12 @@ export default function LoginForm() {
       });
 
       if (!result) {
-        setFormError(FALLBACK_ERROR);
+        setFormError({ message: FALLBACK_ERROR, tone: "error" });
         return;
       }
 
       if (result.error) {
-        setFormError(
-          parseCooldownError(result.error) ?? resolveAuthError(result.error),
-        );
+        setFormError(resolveLoginError(result.error));
         return;
       }
 
@@ -60,7 +77,7 @@ export default function LoginForm() {
       router.replace(destination);
       router.refresh();
     } catch {
-      setFormError(FALLBACK_ERROR);
+      setFormError({ message: FALLBACK_ERROR, tone: "error" });
     } finally {
       setBusy(null);
     }
@@ -88,11 +105,19 @@ export default function LoginForm() {
             <div
               role="alert"
               aria-live="polite"
-              className="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
+              className={`mt-4 flex items-start gap-2 rounded-2xl border px-3 py-2.5 text-sm ${
+                message.tone === "warning"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
             >
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              {message.tone === "warning" ? (
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              ) : (
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              )}
               <div className="space-y-1.5">
-                <p>{message}</p>
+                <p>{message.message}</p>
               </div>
             </div>
           )}

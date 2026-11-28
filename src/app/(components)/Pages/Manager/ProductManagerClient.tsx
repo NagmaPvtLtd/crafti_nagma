@@ -104,7 +104,7 @@ const GLOBAL_ITEMS: MenuItem[] = [
   {
     title: "Global Options",
     description:
-      "Create all the pool of options you want to give your product to have.",
+      "Create the options you want your products to have, like Colour or Size.",
     href: "/manager/product-studio/options",
     icon: <ListChecks className="h-5 w-5" />,
     badge: (d) =>
@@ -204,7 +204,7 @@ export default function ProductManagerHubClient() {
             <MenuSection
               eyebrow="Shape the catalogue"
               title="Organise & curate"
-              subtitle="The shared pools every product draws from — categories and options."
+              subtitle="Shared categories and options every product uses."
               items={GLOBAL_ITEMS}
               data={data}
             />

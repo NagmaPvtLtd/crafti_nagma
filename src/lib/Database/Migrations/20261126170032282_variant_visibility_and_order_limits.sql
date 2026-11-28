@@ -16,15 +16,15 @@
 -- `ADD COLUMN hide_stock …, ADD COLUMN min_order_qty … AFTER hide_stock` fails
 -- with ER_BAD_FIELD_ERROR (1054). Local MySQL accepts it, TiDB Cloud does not.
 -- ---------------------------------------------------------------------------
-
 ALTER TABLE product_variants
-  ADD COLUMN processing_time VARCHAR(100) DEFAULT NULL AFTER description;
-
+ADD COLUMN processing_time VARCHAR(100) DEFAULT NULL
+AFTER description;
 ALTER TABLE product_variants
-  ADD COLUMN hide_stock BOOLEAN NOT NULL DEFAULT FALSE AFTER stock;
-
+ADD COLUMN hide_stock BOOLEAN NOT NULL DEFAULT FALSE
+AFTER stock;
 ALTER TABLE product_variants
-  ADD COLUMN min_order_qty INT DEFAULT NULL AFTER hide_stock;
-
+ADD COLUMN min_order_qty INT DEFAULT NULL
+AFTER hide_stock;
 ALTER TABLE product_variants
-  ADD COLUMN max_order_qty INT DEFAULT NULL AFTER min_order_qty;
+ADD COLUMN max_order_qty INT DEFAULT NULL
+AFTER min_order_qty;

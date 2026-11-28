@@ -14,7 +14,10 @@ import {
   UserStatus,
 } from "../../../../types/User/UserRow.types";
 import { MyJWT } from "../../../../types/User/JWT.types";
-import { getCurrentDateTime } from "../../../../utils/ValueFetcher/getDateTime.util";
+import {
+  formatSqlDateTime,
+  getCurrentDateTime,
+} from "../../../../utils/ValueFetcher/getDateTime.util";
 import { generateULID } from "../../../../utils/generateULID.util";
 import { auditLog } from "../../../../services/AuditLog.service";
 import { setting } from "../../../../services/Setting.service";
@@ -23,14 +26,16 @@ import { googleProfileSchema } from "../../../../utils/zod/auth.valildator.zod";
 import { getPool } from "../../../../lib/Database/main.db";
 import { credentialsSchema } from "../../../../utils/zod/auth.credentialsLogin.schemas.zod";
 import {
-  applyCooldownIfNeeded,
-  clearFailedPassword,
-  countFailedPassword,
+  clearPasswordAttempts,
+  recordFailedPasswordAttempt,
 } from "../../../../utils/Auth/Auth.loginGuard.util";
 import {
   cooldownError,
   loginCooldownMessage,
   LOGIN_COOLDOWN_PREFIX,
+  LOGIN_WRONG_PASSWORD_PREFIX,
+  WRONG_PASSWORD_WARNING_AFTER,
+  wrongPasswordError,
 } from "../../../../utils/Auth/Auth.loginCooldown.util";
 
 /* -------------------------------------------------------------------------- */
@@ -39,6 +44,7 @@ import {
 
 const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET: string = process.env.GOOGLE_CLIENT_SECRET!;
+const SESSION_MAX_AGE_SECONDS = 60 * 24 * 30 * 6;
 
 /* -------------------------------------------------------------------------- */
 /*  Feature toggle keys                                                       */
@@ -129,7 +135,7 @@ declare module "next-auth" {
  * NextAuth configuration for Google OAuth and email/password sign-in
  *
  * @const {NextAuthOptions} authOptions
- * @description JWT sessions last 60 days (`60 * 24 * 30 * 6` seconds). The Credentials provider
+ * @description JWT sessions use `SESSION_MAX_AGE_SECONDS`. The Credentials provider
  *              validates the body with `credentialsSchema` and rejects banned, inactive or
  *              password-less accounts with typed errors; the Google provider runs geo, global
  *              lock, profile, signup lock and account-status gates in `signIn`, then upserts the
@@ -138,7 +144,7 @@ declare module "next-auth" {
  *              those claims onto the session user.
  */
 const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 60 * 24 * 30 * 6 },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
 
   providers: [
     Google({
@@ -165,6 +171,7 @@ const authOptions: NextAuthOptions = {
        *  - valid user  → return user object (NextAuth signs in)
        *  - banned / inactive / no password → throw typed error so NextAuth
        *    surfaces it as `?error=<code>` on /login
+       *  - wrong password near the limit → throw an attempt warning
        *  - any other failure → return null (becomes generic CredentialsSignin)
        */
       async authorize(credentials) {
@@ -214,29 +221,22 @@ const authOptions: NextAuthOptions = {
             const valid = await bcrypt.compare(password, dbUser.password_hash);
 
             if (!valid) {
-              const attempts = await countFailedPassword(dbUser.id);
-              const till = await applyCooldownIfNeeded(
-                conn,
-                dbUser.id,
-                attempts,
-              );
+              const result = await recordFailedPasswordAttempt(conn, dbUser.id);
+              if (!result) return null;
 
-              /* The attempt that trips the threshold already reports the wait. */
-              if (till) {
+              if (result.cooldownTill) {
                 throw new Error(
-                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}`,
+                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(result.cooldownTill)}`,
                 );
+              }
+              if (result.attempts >= WRONG_PASSWORD_WARNING_AFTER) {
+                throw new Error(wrongPasswordError(result.attempts));
               }
               return null;
             }
 
             /* A good password ends the streak and clears a stale cooldown. */
-            await conn.execute(
-              `UPDATE users SET cooldown_till = NULL
-                WHERE id = ? AND cooldown_till IS NOT NULL`,
-              [dbUser.id],
-            );
-            await clearFailedPassword(dbUser.id);
+            await clearPasswordAttempts(conn, dbUser.id);
 
             return {
               id: dbUser.id,
@@ -256,7 +256,8 @@ const authOptions: NextAuthOptions = {
             (["account_banned", "account_inactive", "password_not_set"].includes(
               err.message,
             ) ||
-              err.message.startsWith(LOGIN_COOLDOWN_PREFIX))
+              err.message.startsWith(LOGIN_COOLDOWN_PREFIX) ||
+              err.message.startsWith(LOGIN_WRONG_PASSWORD_PREFIX))
           ) {
             throw err;
           }
@@ -269,6 +270,24 @@ const authOptions: NextAuthOptions = {
 
   pages: { signIn: "/login", error: "/login" },
 
+  events: {
+    async signOut({ token }) {
+      const t = token as MyJWT;
+      if (!t.id || !t.session_id) return;
+
+      try {
+        const pool = await getPool();
+        await pool.execute(
+          `DELETE FROM user_sessions
+            WHERE user_id = ? AND session_id = ?`,
+          [t.id, t.session_id],
+        );
+      } catch (err) {
+        console.error("[AUTH - SIGNOUT] session cleanup failed:", err);
+      }
+    },
+  },
+
   callbacks: {
     /**
      * Gate order (Google only — Credentials already validated in authorize):
@@ -279,7 +298,8 @@ const authOptions: NextAuthOptions = {
      *   4. Signup lock     — new_user_not_allowed    → `signups_closed`
      *                          (only fires when the user does not exist)
      *   5. Ban / inactive  — status checks           → `account_banned` / `account_inactive`
-     *   6. Upsert          — refresh existing / create new
+     *   6. Cooldown        — active password lock    → cooldown wait message
+     *   7. Upsert          — refresh existing / create new
      */
     async signIn({ account, profile }) {
       /* ---- Credentials: already vetted in authorize() ---- */
@@ -341,7 +361,7 @@ const authOptions: NextAuthOptions = {
       try {
         /* 4. Existing user? */
         const [rows] = await conn.query<UserRow[]>(
-          `SELECT id, role, status FROM users
+          `SELECT id, role, status, cooldown_till FROM users
             WHERE email = ? OR google_id = ?
             LIMIT 1`,
           [email, googleId],
@@ -378,6 +398,12 @@ const authOptions: NextAuthOptions = {
           if (rows[0].status === "inactive") {
             console.warn(`[AUTH - SIGNIN] ✕ account_inactive | ${email}`);
             return loginRedirect("account_inactive");
+          }
+
+          const cooling = cooldownError(rows[0].cooldown_till);
+          if (cooling) {
+            console.warn(`[AUTH - SIGNIN] ✕ cooldown active | ${email}`);
+            return loginRedirect(cooling);
           }
 
           await conn.query(
@@ -481,15 +507,24 @@ const authOptions: NextAuthOptions = {
           t.profile_completed = Boolean(dbUser.profile_completed);
 
           if (account) {
-            /* A fresh sign-in claims the account's single session slot,
-               revoking whatever device held it before. */
             const sessionId = generateULID({
               prefix: "sess",
               maxLength: 40,
             });
+            const now = getCurrentDateTime();
+            const staleBefore = formatSqlDateTime(
+              new Date(Date.now() - SESSION_MAX_AGE_SECONDS * 1000),
+            );
+
             await conn.execute(
-              `UPDATE users SET session_id = ? WHERE id = ?`,
-              [sessionId, dbUser.id],
+              `DELETE FROM user_sessions
+                WHERE user_id = ? AND created_at < ?`,
+              [dbUser.id, staleBefore],
+            );
+            await conn.execute(
+              `INSERT INTO user_sessions (user_id, session_id, created_at)
+               VALUES (?, ?, ?)`,
+              [dbUser.id, sessionId, now],
             );
             t.session_id = sessionId;
           }

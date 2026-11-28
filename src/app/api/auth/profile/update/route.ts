@@ -5,8 +5,15 @@ import { profileUpdateSchema } from "../../../../../utils/zod/auth.profile.zod";
 import { getPool } from "../../../../../lib/Database/main.db";
 import { UserRow } from "../../../../../types/User/UserRow.types";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
-import { generateULID } from "../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../services/AuditLog.service";
+import {
+  clearPasswordAttempts,
+  recordFailedPasswordAttempt,
+} from "../../../../../utils/Auth/Auth.loginGuard.util";
+import {
+  activeCooldown,
+  loginCooldownMessage,
+} from "../../../../../utils/Auth/Auth.loginCooldown.util";
 
 /* Indian mobile — same shape as the zod preprocess step, kept local so the
    backend can flip phone_verified only on a real validated number. */
@@ -39,6 +46,8 @@ function isValidIndianMobile(phone: string): boolean {
  *              while any password field is filled) and writes the caller's own `users` row.
  *              A password change requires the current password when one already exists, is
  *              compared with bcrypt, and is stored as a bcrypt hash with cost 12.
+ *              A password change revokes the account's other device sessions and keeps
+ *              the current device signed in.
  *              `phone_verified` becomes true only for a valid new Indian mobile, false when the
  *              phone is cleared, and otherwise keeps its stored value.
  *
@@ -63,6 +72,7 @@ function isValidIndianMobile(phone: string): boolean {
  *
  * @throws {400} `invalid_input` (schema details), `current_password_required`,
  *               `invalid_current_password`
+ * @throws {429} Password verification cooldown with `Retry-After`
  * @throws {401} Unauthorized - No session, role below customer, or session without a user id
  * @throws {403} Forbidden - Account not active or no role assigned
  * @throws {404} `user_not_found` - The session id no longer exists in `users`
@@ -74,16 +84,19 @@ function isValidIndianMobile(phone: string): boolean {
  *   3. Parse the JSON body and validate it with `profileUpdateSchema`
  *   4. Initialize the database pool and take a connection
  *   5. Load the stored `password_hash`, `phone` and `phone_verified`, returning 404 if absent
- *   6. When a new password is set: require the current password if a hash exists, verify it
- *      with `bcrypt.compare`, then hash the new one with `bcrypt.hash(..., 12)`
+ *   6. When a new password is set: require the current password if a hash exists, enforce
+ *      the shared cooldown, verify with `bcrypt.compare`, record failures, then hash the
+ *      new one with `bcrypt.hash(..., 12)`
  *   7. Derive `full_name` from first and last name
  *   8. Derive `phone_verified`: true for a valid Indian mobile, false when cleared, else keep
  *   9. Timestamp the update with `getCurrentDateTime`
  *   10. Update the profile columns on `users` (empty values stored as `NULL`)
- *   11. Write an UPDATE / USER audit entry listing the changed `phone` / `password` fields,
+ *   11. On a password change, delete every other row from `user_sessions` while keeping
+ *       the current device's row; a legacy token without a session id clears them all
+ *   12. Write an UPDATE / USER audit entry listing the changed `phone` / `password` fields,
  *       swallowing any audit error
- *   12. Return 200 response with `{ ok: true }`
- *   13. Release the connection in `finally`
+ *   13. Return 200 response with `{ ok: true }`
+ *   14. Release the connection in `finally`
  */
 export async function POST(req: NextRequest) {
   /* ---- auth ---- */
@@ -120,7 +133,7 @@ export async function POST(req: NextRequest) {
   try {
     /* ---- fetch current user ---- */
     const [rows] = await conn.query<UserRow[]>(
-      `SELECT id, password_hash, phone, phone_verified
+      `SELECT id, password_hash, phone, phone_verified, cooldown_till
          FROM users
         WHERE id = ?
         LIMIT 1`,
@@ -145,16 +158,56 @@ export async function POST(req: NextRequest) {
             { status: 400 },
           );
         }
+
+        const cooldownTill = activeCooldown(dbUser.cooldown_till);
+        if (cooldownTill) {
+          return NextResponse.json(
+            { error: loginCooldownMessage(cooldownTill) },
+            {
+              status: 429,
+              headers: {
+                "Retry-After": String(
+                  Math.max(
+                    1,
+                    Math.ceil((cooldownTill.getTime() - Date.now()) / 1000),
+                  ),
+                ),
+              },
+            },
+          );
+        }
+
         const ok = await bcrypt.compare(
           data.currentPassword,
           dbUser.password_hash,
         );
         if (!ok) {
+          const result = await recordFailedPasswordAttempt(conn, dbUser.id);
+          if (result?.cooldownTill) {
+            return NextResponse.json(
+              { error: loginCooldownMessage(result.cooldownTill) },
+              {
+                status: 429,
+                headers: {
+                  "Retry-After": String(
+                    Math.max(
+                      1,
+                      Math.ceil(
+                        (result.cooldownTill.getTime() - Date.now()) / 1000,
+                      ),
+                    ),
+                  ),
+                },
+              },
+            );
+          }
           return NextResponse.json(
             { error: "invalid_current_password" },
             { status: 400 },
           );
         }
+
+        await clearPasswordAttempts(conn, dbUser.id);
       }
       passwordHash = await bcrypt.hash(data.newPassword!, 12);
     }
@@ -216,12 +269,18 @@ export async function POST(req: NextRequest) {
     );
 
     if (wantsPasswordChange) {
-      /* Rotate the account's session slot: every device holding the previous
-         id is signed out on its next protected request. */
-      await conn.query(`UPDATE users SET session_id = ? WHERE id = ?`, [
-        generateULID({ prefix: "sess", maxLength: 40 }),
-        dbUser.id,
-      ]);
+      const currentSessionId = guard.session.user.session_id;
+      if (currentSessionId) {
+        await conn.query(
+          `DELETE FROM user_sessions
+            WHERE user_id = ? AND session_id <> ?`,
+          [dbUser.id, currentSessionId],
+        );
+      } else {
+        await conn.query(`DELETE FROM user_sessions WHERE user_id = ?`, [
+          dbUser.id,
+        ]);
+      }
     }
 
     /* ---- audit ---- */

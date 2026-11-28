@@ -37,6 +37,7 @@ export interface RateLimitConfig {
   trustProxy: boolean;
   prefix: string;
   enabled: boolean;
+  failOpen: boolean;
 }
 
 /**
@@ -76,6 +77,7 @@ export class RateLimiter {
     trustProxy: true,
     prefix: `${getDBName()}:ratelimit`,
     enabled: true,
+    failOpen: true,
   };
 
   private static getValidIp(ip: string): string | null {
@@ -258,7 +260,7 @@ export class RateLimiter {
       // Fallback if Redis is unavailable
       if (!redis) {
         console.warn(
-          "[RATELIMIT - FALLBACK] ➤ Redis unavailable, using in-memory fallback",
+          "[RATELIMIT - FALLBACK] ➤ Redis unavailable, applying fallback policy",
         );
         return this.fallbackResponse(ip, config);
       }
@@ -319,10 +321,11 @@ export class RateLimiter {
     config: RateLimitConfig,
   ): RateLimitResponse {
     return {
-      blocked: false,
+      blocked: !config.failOpen,
+      retryAfter: config.failOpen ? undefined : 60,
       ip,
       limit: config.maxRequests,
-      remaining: config.maxRequests,
+      remaining: config.failOpen ? config.maxRequests : 0,
     };
   }
 }

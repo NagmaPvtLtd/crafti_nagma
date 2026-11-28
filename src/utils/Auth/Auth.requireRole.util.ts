@@ -36,7 +36,8 @@
  *   4. session.user.status !== "active"            → 403
  *   5. session.user.role is missing                → 403
  *   6. Role rank < min required rank               → 403
- *   7. Success                                     → { ok: true, session }
+ *   7. Token's user_sessions row is missing         → 401
+ *   8. Success                                     → { ok: true, session }
  *
  * LOGS
  * ────
@@ -51,15 +52,11 @@
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
-import type { RowDataPacket } from "mysql2/promise";
 
 import type { UserRole } from "../../types/User/UserRow.types";
+import type { UserSession } from "../../types/User/UserSession.types";
 import { authOptions } from "../../app/api/auth/[...nextauth]/route";
 import { getPool } from "../../lib/Database/main.db";
-
-interface SessionRow extends RowDataPacket {
-  session_id: string | null;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Role hierarchy                                                     */
@@ -213,8 +210,8 @@ export async function requireRole(
   }
 
   /* ---- 6. session revocation check ------------------------------ */
-  /* A password change or a newer sign-in rotates `users.session_id`, so a
-     token that no longer matches is treated as signed out. */
+  /* Each device has its own user_sessions row. Signing out or a password
+     change on another device can delete this row without affecting the rest. */
   const sessionId = session.user.session_id ?? null;
   if (!sessionId) {
     console.warn(`[AUTH - DENY] ✕ ${label} — token has no session id | ${who}`);
@@ -229,12 +226,14 @@ export async function requireRole(
 
   try {
     const p = await getPool();
-    const [rows] = await p.query<SessionRow[]>(
-      `SELECT session_id FROM users WHERE id = ? LIMIT 1`,
-      [id],
+    const [rows] = await p.query<UserSession[]>(
+      `SELECT session_id FROM user_sessions
+        WHERE session_id = ? AND user_id = ?
+        LIMIT 1`,
+      [sessionId, id],
     );
 
-    if (!rows[0] || rows[0].session_id !== sessionId) {
+    if (!rows[0]) {
       console.warn(
         `[AUTH - DENY] ✕ ${label} — session revoked | ${who}`,
       );
