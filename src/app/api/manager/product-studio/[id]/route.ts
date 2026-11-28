@@ -20,6 +20,7 @@ import {
   loadProductTags,
   loadTagsByIds,
   pruneUnusedTags,
+  removeDuplicateVariantTagMappings,
   replaceTagMappings,
   uniqueTagIds,
 } from "../../../../../utils/Tags/tag.util";
@@ -1218,6 +1219,7 @@ export async function PUT(
         tagIds,
         now,
       );
+      await removeDuplicateVariantTagMappings(conn, id);
     }
 
     /* ---- apply the option replacement plan ---- */

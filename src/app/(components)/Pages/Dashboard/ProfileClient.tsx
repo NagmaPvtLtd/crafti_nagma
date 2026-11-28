@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -17,6 +16,7 @@ import { ProfileResponse } from "../../../../types/User/ProfileClient.types";
 import { profileUpdateSchema } from "../../../../utils/zod/auth.profile.zod";
 import CustomLoader from "../../CustomLoader";
 import PageWrapper from "../../utils/PageWrapper";
+import UserAvatar from "../../utils/UserAvatar";
 
 type EditFormState = {
   first_name: string;
@@ -201,20 +201,7 @@ function ViewMode({ profile }: { profile: ProfileResponse }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        {profile.image ? (
-          <Image
-            src={profile.image}
-            alt={displayName}
-            width={56}
-            height={56}
-            loading={"eager"}
-            className="h-14 w-14 rounded-full border border-rose-200 object-cover"
-          />
-        ) : (
-          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-lg font-medium text-rose-500">
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        )}
+        <UserAvatar name={displayName} image={profile.image} size={56} />
         <div className="min-w-0">
           <p className="truncate text-base font-medium text-stone-900">
             {displayName}

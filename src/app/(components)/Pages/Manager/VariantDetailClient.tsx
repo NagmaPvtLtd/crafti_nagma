@@ -146,7 +146,14 @@ export default function VariantDetailClient({
       });
       setFeatures(res.data.features.map((item) => item.value));
       setCareInstructions(res.data.careInstructions.map((item) => item.value));
-      setAdditionalTags(res.data.tags?.additional ?? []);
+      const inheritedTagIds = new Set(
+        res.data.tags.inherited.map((tag) => tag.id),
+      );
+      setAdditionalTags(
+        (res.data.tags.additional ?? []).filter(
+          (tag) => !inheritedTagIds.has(tag.id),
+        ),
+      );
     } catch (err) {
       /* A failed refresh must never blank a variant that is already on screen —
          the photos and edits stay visible while the banner explains the miss. */
@@ -755,6 +762,9 @@ export default function VariantDetailClient({
                           <TagInput
                             value={additionalTags}
                             onChange={setAdditionalTags}
+                            excludedTagIds={data.tags.inherited.map(
+                              (tag) => tag.id,
+                            )}
                             placeholder="Type a tag and press Enter…"
                           />
                         </div>

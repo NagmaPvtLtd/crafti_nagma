@@ -110,7 +110,11 @@ Three of those fields are set on the variant page (`/manager/product-studio/prod
   delete of the owner; the tag itself cascades out of the mappings.
 - **Effective variant tags = base product tags + variant-specific tags.**
   Inherited tags are never inserted into the variant table and never
-  synchronised. A variant editor shows the inherited chips read-only.
+  synchronised. A variant editor shows the inherited chips read-only and excludes
+  those ids from additional-tag suggestions.
+- Saving a variant drops any submitted tag id already inherited from its base
+  product. Updating base-product tags removes matching variant-only mappings, and
+  `20261128120000000_remove_duplicate_variant_tags.sql` cleans existing duplicates.
 - Limits: 15 tags per base product, 15 additional tags per variant, 100
   characters per tag. Enforced in zod (`tagIds` on the base-product create /
   update schemas and on the variant update schema) and again by the routes.
