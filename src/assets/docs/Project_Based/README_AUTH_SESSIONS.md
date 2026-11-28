@@ -1,59 +1,104 @@
 # Sessions and password cooldown
 
-Two additions to the password login path and the shared auth guard.
+Authentication uses one `user_sessions` row per signed-in device. Password login
+cooldown remains part of the same auth flow.
 
 ## Schema
 
-Migration: `src/lib/Database/Migrations/20261124120000000_user_session_and_cooldown.sql`
+Migration: `src/lib/Database/Migrations/20261127200835897_user_sessions.sql`
 
 | Column | Type | Meaning |
 | --- | --- | --- |
-| `users.session_id` | `CHAR(40) NULL` | Shared session generation for the account; rotated only by a password change |
+| `user_sessions.session_id` | `CHAR(40) PRIMARY KEY` | Unique `sess_<ulid>` carried by one device's JWT |
+| `user_sessions.user_id` | `CHAR(40) NOT NULL` | Account that owns the device session |
+| `user_sessions.created_at` | `DATETIME NOT NULL` | Sign-in time used for stale-session pruning |
 | `users.cooldown_till` | `DATETIME NULL` | UTC moment password sign-in is allowed again |
 
-`LATEST_SCHEMA.sql` and `UserRow.types.ts` carry the same fields.
+The migration creates `user_sessions`, then drops the old shared
+`users.session_id` column. `LATEST_SCHEMA.sql`, `UserRow.types.ts` and
+`UserSession.types.ts` reflect the new shape.
 
-## Many devices, one session generation
+## Per-device sessions
 
-1. `users.session_id` is the account's shared session generation. `sess_<ulid>` is
-   created on the first sign-in that finds the column empty; every later sign-in
-   (Google or password) adopts the existing value, so all devices hold the same
-   `session_id` claim (also copied to `session.user.session_id`).
-2. `requireRole` / `requireAuth` / `requireAdmin` / `requireManager` compare the
-   token claim with the database value on every guarded call. A mismatch returns
+1. On every Google or credentials sign-in, the NextAuth `jwt` callback creates a
+   fresh `sess_<ulid>`, prunes this user's rows older than the JWT max age, inserts
+   the new `user_sessions` row, and stores the id in the token's `session_id`
+   claim. The `session` callback also exposes it as `session.user.session_id`.
+2. `requireRole` and its wrappers validate the token against the database with:
+
+   ```sql
+   SELECT session_id FROM user_sessions
+   WHERE session_id = ? AND user_id = ?
+   LIMIT 1;
+   ```
+
+   A missing token claim or row returns
    `401 { "error": "Your session is no longer active. Please sign in again." }`.
-3. Signing in on another device does **not** affect sessions already open — the
-   same account may be used from anywhere at the same time.
-4. Changing the password in `/dashboard/profile` rotates `session_id`. That is the
-   only action that revokes sessions: every device, including the one that made the
-   change, is signed out on its next protected request, so the changer must sign in
-   again.
+3. Normal sign-out runs `authOptions.events.signOut` and deletes only the row
+   identified by the token:
+
+   ```sql
+   DELETE FROM user_sessions
+   WHERE user_id = ? AND session_id = ?;
+   ```
+
+   Other devices remain signed in.
+4. Changing a password in `/dashboard/profile` deletes every other device's row
+   and keeps the current device's row:
+
+   ```sql
+   DELETE FROM user_sessions
+   WHERE user_id = ? AND session_id <> ?;
+   ```
+
+   If a legacy token has no `session_id`, the fallback deletes all rows for that
+   user. A future "sign out everywhere" action can use that same fallback
+   explicitly.
+5. Other profile edits do not touch `user_sessions`, so they do not sign out the
+   device making the change.
+6. `GET /api/auth/profile` already reads the live `users` row. Other devices see
+   profile changes when they refresh that API; no profile-to-JWT synchronization
+   or extra per-request profile query is added.
 
 Files: `src/app/api/auth/[...nextauth]/route.ts`,
 `src/utils/Auth/Auth.requireRole.util.ts`,
-`src/app/api/auth/profile/update/route.ts`, `src/types/User/JWT.types.ts`.
+`src/app/api/auth/profile/update/route.ts`, `src/types/User/JWT.types.ts`,
+`src/types/User/UserSession.types.ts`.
 
 ## Password cooldown
 
-- 7 consecutive wrong passwords trigger a 24-hour cooldown
+- 5 consecutive wrong password verifications trigger a 24-hour cooldown
   (`MAX_FAILED_PASSWORD_ATTEMPTS`, `LOGIN_COOLDOWN_MS`).
-- Wrong attempts are counted in Redis (`auth:password-fail:<userId>`, 24h TTL), so an
-  abandoned streak expires by itself. Redis failure is logged and the attempt is not
-  counted rather than blocking sign-in.
-- When the threshold trips, `cooldown_till` is written and the counter cleared. The
-  attempt that trips it already sees the wait message.
-- A correct password clears the Redis counter and any stale `cooldown_till`.
+- Login attempts 3 and 4 show an amber warning with the attempts used and remaining.
+  Attempt 5 starts the cooldown.
+- Attempts are stored in MySQL (`failed_password_attempts` and
+  `last_failed_password_at`) in a sliding 24-hour window. Redis restarts, eviction,
+  flushes, and outages do not reset account lockout state.
+- When the threshold trips, `cooldown_till` is written. The attempt that trips it
+  already sees the wait message.
+- An active cooldown blocks password and Google sign-in for that account.
+- Current-password verification during a profile password change uses the same
+  attempt state and cooldown, returning `429` with `Retry-After` while locked.
+- A correct password clears the attempt state and any stale `cooldown_till`.
+- All `/api/auth/*` routes are rate-limited except the exact paths listed in
+  `RATE_LIMIT_EXCLUDED_PATHS` (`/api/auth/session` and `/api/auth/csrf`). The auth
+  rules keep `maxRequests` at 250; credentials and profile-update rules fail closed
+  when Redis is unavailable.
 - The message uses the largest remaining unit, rounded up:
   `Please try to login again after 3 hours.` → minutes → seconds.
-- The message travels from `authorize` as `login_cooldown|<sentence>`; `LoginClient`
-  reads it with `parseCooldownError` and shows the sentence instead of the generic
-  sign-in error.
+- Cooldown errors travel as `login_cooldown|<sentence>`; attempt warnings travel as
+  `login_wrong_password|<sentence>`. `LoginClient` parses both, including errors
+  returned to the login page after a blocked Google redirect.
 
 Files: `src/utils/Auth/Auth.loginCooldown.util.ts` (pure, browser-safe),
-`src/utils/Auth/Auth.loginGuard.util.ts` (Redis + `users` write),
-`src/app/(components)/Pages/LoginClient.tsx`.
+`src/utils/Auth/Auth.loginGuard.util.ts` (MySQL attempt state),
+`src/app/api/auth/profile/update/route.ts`, `src/proxy.ts`,
+`src/app/(components)/Pages/LoginClient.tsx`,
+`src/lib/Database/Migrations/20261128101121314_password_attempt_state.sql`.
 
 ## Runtime checks
 
-Sign-in, cooldown timing and the 401 revocation path are manually tested by the
-owner. Static checks only: `tsc`, `eslint`, `next typegen`.
+Sign-in, the 3/5 warning, fifth-attempt lockout, Google cooldown blocking,
+cooldown timing, two-device sign-out, password-change revocation and the 401
+revocation path are manually tested against a database. Static checks: `tsc`,
+`eslint`, `next typegen`.

@@ -32,7 +32,8 @@ import { UserRole } from "./types/User/UserRow.types";
  *   Banned / inactive users are treated as logged out on every request.
  *
  * RATE LIMITING:
- *   Applied to every /api/* route except /api/auth.
+ *   Applied to every /api/* route except exact paths listed in
+ *   RATE_LIMIT_EXCLUDED_PATHS.
  * ========================================================================== */
 
 const ROLE_WEIGHT: Record<UserRole, number> = {
@@ -60,16 +61,42 @@ const PAGES_DASHBOARD = "/dashboard";
 const PAGES_CART = "/cart";
 const PAGES_MANAGER = "/manager";
 
-const RATE_LIMIT_EXCLUDED_PREFIXES = [API_AUTH] as const;
+// Add exact API paths here to opt them out of rate limiting.
+const RATE_LIMIT_EXCLUDED_PATHS: ReadonlySet<string> = new Set([
+  `${API_AUTH}/session`,
+  `${API_AUTH}/csrf`,
+]);
 
 interface RateLimitRule {
   prefix: string;
   maxRequests: number;
   windowMs: number;
   blockTimeMs: number;
+  failOpen?: boolean;
 }
 
 const RATE_LIMIT_RULES: readonly RateLimitRule[] = [
+  {
+    prefix: `${API_AUTH}/callback/credentials`,
+    maxRequests: 250,
+    windowMs: 60_000,
+    blockTimeMs: 5 * 60_000,
+    failOpen: false,
+  },
+  {
+    prefix: `${API_AUTH}/profile/update`,
+    maxRequests: 250,
+    windowMs: 60_000,
+    blockTimeMs: 5 * 60_000,
+    failOpen: false,
+  },
+  {
+    prefix: API_AUTH,
+    maxRequests: 250,
+    windowMs: 60_000,
+    blockTimeMs: 5 * 60_000,
+    failOpen: true,
+  },
   {
     prefix: API_PUBLIC,
     maxRequests: 60,
@@ -131,7 +158,7 @@ function apiGroup(path: string): ApiGroup {
 
 function shouldRateLimit(path: string): boolean {
   if (!isApi(path)) return false;
-  return !matchesPrefix(path, RATE_LIMIT_EXCLUDED_PREFIXES);
+  return !RATE_LIMIT_EXCLUDED_PATHS.has(path);
 }
 
 function rateLimitOverrideFor(path: string): RateLimitRule | undefined {
@@ -254,7 +281,7 @@ function homePageFor(user: MyJWT): string {
 }
 
 export async function proxy(req: NextRequest): Promise<NextResponse> {
-  const path = req.nextUrl.pathname;
+  const path = req.nextUrl.pathname.replace(/\/+$/, "") || "/";
 
   if (shouldRateLimit(path)) {
     const rl = await rateLimitMiddleware(req, rateLimitOverrideFor(path));
