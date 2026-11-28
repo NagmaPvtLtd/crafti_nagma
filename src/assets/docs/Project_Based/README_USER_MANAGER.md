@@ -9,7 +9,8 @@ changing `users.role`. Reached from the navbar's Admin section (`User Manager`, 
 | File | Purpose |
 | --- | --- |
 | `src/app/admin/user-manager/page.tsx` | Route shell and page metadata |
-| `src/app/(components)/Pages/Admin/UserManagerClient.tsx` | List UI, filters, pagination, role select |
+| `src/app/(components)/Pages/Admin/UserManagerClient.tsx` | List UI, filters, pagination, role select, contact modal |
+| `src/app/(components)/utils/ContactModal.tsx` | Reusable Call / WhatsApp popup for a selected phone number |
 | `src/app/api/admin/users/route.ts` | `GET` — searchable, filterable, paginated user list |
 | `src/app/api/admin/users/[userId]/route.ts` | `PATCH` — role change / access removal |
 | `src/utils/zod/admin/userManager.zod.ts` | `USER_ROLES`, `USER_STATUSES`, `userRoleUpdateSchema` |
@@ -33,8 +34,10 @@ directly.
 
 ## What the screen shows
 
-- Stored profile photo with initials fallback, display name, email, phone, role,
-  status, profile-completion badge, password badge, verified mark and join date.
+- Stored profile photo with initials fallback, display name, email, clickable phone,
+  role, status, profile-completion badge, password badge, verified mark and join date.
+- Clicking a phone number opens the shared contact modal with Call and WhatsApp
+  actions for that number.
 - Accounts are sorted A-Z by display name.
 - Facet counts for roles and statuses, total account count.
 - Filters: free-text search (name, email, phone), role, status; 25 per page.
