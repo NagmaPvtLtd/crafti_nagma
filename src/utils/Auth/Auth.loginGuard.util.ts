@@ -1,93 +1,97 @@
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 
-import { getRedis } from "../../lib/Redis/redis.config";
 import { formatSqlDateTime } from "../ValueFetcher/getDateTime.util";
 import {
   LOGIN_COOLDOWN_MS,
   MAX_FAILED_PASSWORD_ATTEMPTS,
+  nextPasswordAttemptCount,
 } from "./Auth.loginCooldown.util";
 
-const failureKey = (userId: string) => `auth:password-fail:${userId}`;
+interface PasswordAttemptRow extends RowDataPacket {
+  failed_password_attempts: number;
+  seconds_since_last_failure: number | null;
+}
 
-/**
- * Increments the consecutive wrong-password counter for a user.
- *
- * @function countFailedPassword
- * @description Uses a Redis key with a 24-hour TTL, so an abandoned streak expires
- *              on its own. Redis failures are logged and treated as "not counted"
- *              rather than blocking sign-in.
- *
- * @param {string} userId - `users.id`
- *
- * @returns {Promise<number | null>} New attempt count, or null when Redis failed
- */
-export async function countFailedPassword(
-  userId: string,
-): Promise<number | null> {
-  try {
-    const redis = getRedis();
-    const key = failureKey(userId);
-    const attempts = await redis.incr(key);
-    if (attempts === 1) {
-      await redis.expire(key, Math.ceil(LOGIN_COOLDOWN_MS / 1000));
-    }
-    return Number(attempts);
-  } catch (err) {
-    console.error(
-      "[AUTH - COOLDOWN] Redis unavailable, failed attempt not counted:",
-      err,
-    );
-    return null;
-  }
+export interface FailedPasswordAttemptResult {
+  attempts: number;
+  cooldownTill: Date | null;
 }
 
 /**
- * Clears the consecutive wrong-password counter.
- *
- * @function clearFailedPassword
- * @description Called after a successful password sign-in and when a cooldown
- *              starts, so the next streak begins from zero.
- *
- * @param {string} userId - `users.id`
- *
- * @returns {Promise<void>} Resolves even when Redis is unavailable
+ * Records one failed password verification in a sliding 24-hour window.
+ * The row lock keeps concurrent failures from losing increments.
  */
-export async function clearFailedPassword(userId: string): Promise<void> {
-  try {
-    await getRedis().del(failureKey(userId));
-  } catch (err) {
-    console.error("[AUTH - COOLDOWN] Could not clear the counter:", err);
-  }
-}
-
-/**
- * Starts a 24-hour cooldown once the attempt threshold is reached.
- *
- * @function applyCooldownIfNeeded
- * @description Writes `users.cooldown_till` and clears the Redis counter. Returns
- *              null when the attempt count is below the threshold.
- *
- * @param {PoolConnection} conn - Connection used for the `users` update
- * @param {string} userId - `users.id`
- * @param {number | null} attempts - Result of `countFailedPassword`
- *
- * @returns {Promise<Date | null>} Cooldown end when one just started
- */
-export async function applyCooldownIfNeeded(
+export async function recordFailedPasswordAttempt(
   conn: PoolConnection,
   userId: string,
-  attempts: number | null,
-): Promise<Date | null> {
-  if (attempts === null || attempts < MAX_FAILED_PASSWORD_ATTEMPTS) {
-    return null;
+): Promise<FailedPasswordAttemptResult | null> {
+  await conn.beginTransaction();
+
+  try {
+    const [rows] = await conn.query<PasswordAttemptRow[]>(
+      `SELECT failed_password_attempts,
+              TIMESTAMPDIFF(SECOND, last_failed_password_at, UTC_TIMESTAMP())
+                AS seconds_since_last_failure
+         FROM users
+        WHERE id = ?
+        FOR UPDATE`,
+      [userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      await conn.rollback();
+      return null;
+    }
+
+    const secondsSinceLastFailure =
+      row.seconds_since_last_failure === null
+        ? null
+        : Number(row.seconds_since_last_failure);
+    const attempts = nextPasswordAttemptCount(
+      Number(row.failed_password_attempts),
+      secondsSinceLastFailure,
+    );
+    const now = new Date();
+    const cooldownTill =
+      attempts >= MAX_FAILED_PASSWORD_ATTEMPTS
+        ? new Date(now.getTime() + LOGIN_COOLDOWN_MS)
+        : null;
+
+    await conn.execute(
+      `UPDATE users
+          SET failed_password_attempts = ?,
+              last_failed_password_at = ?,
+              cooldown_till = CASE WHEN ? THEN ? ELSE cooldown_till END
+        WHERE id = ?`,
+      [
+        attempts,
+        formatSqlDateTime(now),
+        cooldownTill !== null,
+        cooldownTill ? formatSqlDateTime(cooldownTill) : null,
+        userId,
+      ],
+    );
+    await conn.commit();
+
+    return { attempts, cooldownTill };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
   }
+}
 
-  const till = new Date(Date.now() + LOGIN_COOLDOWN_MS);
-  await conn.execute(`UPDATE users SET cooldown_till = ? WHERE id = ?`, [
-    formatSqlDateTime(till),
-    userId,
-  ]);
-  await clearFailedPassword(userId);
-
-  return till;
+/** Clears failed-attempt state after a successful password verification. */
+export async function clearPasswordAttempts(
+  conn: PoolConnection,
+  userId: string,
+): Promise<void> {
+  await conn.execute(
+    `UPDATE users
+        SET failed_password_attempts = 0,
+            last_failed_password_at = NULL,
+            cooldown_till = NULL
+      WHERE id = ?`,
+    [userId],
+  );
 }

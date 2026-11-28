@@ -26,6 +26,8 @@ CREATE TABLE users (
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     profile_completed BOOLEAN DEFAULT FALSE,
     cooldown_till DATETIME DEFAULT NULL,
+    failed_password_attempts INT NOT NULL DEFAULT 0,
+    last_failed_password_at DATETIME DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id),

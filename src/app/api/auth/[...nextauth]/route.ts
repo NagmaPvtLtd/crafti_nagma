@@ -26,9 +26,8 @@ import { googleProfileSchema } from "../../../../utils/zod/auth.valildator.zod";
 import { getPool } from "../../../../lib/Database/main.db";
 import { credentialsSchema } from "../../../../utils/zod/auth.credentialsLogin.schemas.zod";
 import {
-  applyCooldownIfNeeded,
-  clearFailedPassword,
-  countFailedPassword,
+  clearPasswordAttempts,
+  recordFailedPasswordAttempt,
 } from "../../../../utils/Auth/Auth.loginGuard.util";
 import {
   cooldownError,
@@ -222,35 +221,22 @@ const authOptions: NextAuthOptions = {
             const valid = await bcrypt.compare(password, dbUser.password_hash);
 
             if (!valid) {
-              const attempts = await countFailedPassword(dbUser.id);
-              const till = await applyCooldownIfNeeded(
-                conn,
-                dbUser.id,
-                attempts,
-              );
+              const result = await recordFailedPasswordAttempt(conn, dbUser.id);
+              if (!result) return null;
 
-              /* The attempt that trips the threshold already reports the wait. */
-              if (till) {
+              if (result.cooldownTill) {
                 throw new Error(
-                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}`,
+                  `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(result.cooldownTill)}`,
                 );
               }
-              if (
-                attempts !== null &&
-                attempts >= WRONG_PASSWORD_WARNING_AFTER
-              ) {
-                throw new Error(wrongPasswordError(attempts));
+              if (result.attempts >= WRONG_PASSWORD_WARNING_AFTER) {
+                throw new Error(wrongPasswordError(result.attempts));
               }
               return null;
             }
 
             /* A good password ends the streak and clears a stale cooldown. */
-            await conn.execute(
-              `UPDATE users SET cooldown_till = NULL
-                WHERE id = ? AND cooldown_till IS NOT NULL`,
-              [dbUser.id],
-            );
-            await clearFailedPassword(dbUser.id);
+            await clearPasswordAttempts(conn, dbUser.id);
 
             return {
               id: dbUser.id,

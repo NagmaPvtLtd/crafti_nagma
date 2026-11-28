@@ -67,19 +67,23 @@ Files: `src/app/api/auth/[...nextauth]/route.ts`,
 
 ## Password cooldown
 
-- 5 consecutive wrong passwords trigger a 24-hour cooldown
+- 5 consecutive wrong password verifications trigger a 24-hour cooldown
   (`MAX_FAILED_PASSWORD_ATTEMPTS`, `LOGIN_COOLDOWN_MS`).
-- Wrong attempts 3 and 4 show an amber `3/5` or `4/5` warning instead of the
-  generic invalid-email-or-password message. Attempt 5 starts the cooldown.
-- Wrong attempts are counted in Redis (`auth:password-fail:<userId>`, 24h TTL), so an
-  abandoned streak expires by itself. Redis failure is logged and the attempt is not
-  counted rather than blocking sign-in.
-- When the threshold trips, `cooldown_till` is written and the counter cleared. The
-  attempt that trips it already sees the wait message.
-- An active cooldown blocks both password and Google sign-in for that account.
-- A correct password clears the Redis counter and any stale `cooldown_till`.
-- MySQL DATETIME values are written and read as UTC (`timezone: "Z"`), so a new
-  cooldown reports the full 24 hours instead of losing the server's local offset.
+- Login attempts 3 and 4 show an amber warning with the attempts used and remaining.
+  Attempt 5 starts the cooldown.
+- Attempts are stored in MySQL (`failed_password_attempts` and
+  `last_failed_password_at`) in a sliding 24-hour window. Redis restarts, eviction,
+  flushes, and outages do not reset account lockout state.
+- When the threshold trips, `cooldown_till` is written. The attempt that trips it
+  already sees the wait message.
+- An active cooldown blocks password and Google sign-in for that account.
+- Current-password verification during a profile password change uses the same
+  attempt state and cooldown, returning `429` with `Retry-After` while locked.
+- A correct password clears the attempt state and any stale `cooldown_till`.
+- All `/api/auth/*` routes are rate-limited except the exact paths listed in
+  `RATE_LIMIT_EXCLUDED_PATHS` (`/api/auth/session` and `/api/auth/csrf`). The auth
+  rules keep `maxRequests` at 250; credentials and profile-update rules fail closed
+  when Redis is unavailable.
 - The message uses the largest remaining unit, rounded up:
   `Please try to login again after 3 hours.` → minutes → seconds.
 - Cooldown errors travel as `login_cooldown|<sentence>`; attempt warnings travel as
@@ -87,8 +91,10 @@ Files: `src/app/api/auth/[...nextauth]/route.ts`,
   returned to the login page after a blocked Google redirect.
 
 Files: `src/utils/Auth/Auth.loginCooldown.util.ts` (pure, browser-safe),
-`src/utils/Auth/Auth.loginGuard.util.ts` (Redis + `users` write),
-`src/lib/Database/connection.db.ts`, `src/app/(components)/Pages/LoginClient.tsx`.
+`src/utils/Auth/Auth.loginGuard.util.ts` (MySQL attempt state),
+`src/app/api/auth/profile/update/route.ts`, `src/proxy.ts`,
+`src/app/(components)/Pages/LoginClient.tsx`,
+`src/lib/Database/Migrations/20261128101121314_password_attempt_state.sql`.
 
 ## Runtime checks
 

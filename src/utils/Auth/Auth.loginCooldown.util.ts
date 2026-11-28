@@ -12,6 +12,25 @@ export const WRONG_PASSWORD_WARNING_AFTER = 3;
 /** Cooldown length after too many wrong passwords. */
 export const LOGIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Returns the next failure count for a sliding 24-hour window.
+ *
+ * @function nextPasswordAttemptCount
+ * @param {number} previousAttempts - Failures already recorded
+ * @param {number | null} secondsSinceLastFailure - Age of the latest failure
+ *
+ * @returns {number} Incremented count, or 1 when the window expired
+ */
+export function nextPasswordAttemptCount(
+  previousAttempts: number,
+  secondsSinceLastFailure: number | null,
+): number {
+  const withinWindow =
+    secondsSinceLastFailure !== null &&
+    secondsSinceLastFailure < LOGIN_COOLDOWN_MS / 1000;
+  return withinWindow ? previousAttempts + 1 : 1;
+}
+
 /** Marks a thrown credentials error whose suffix is already user-facing text. */
 export const LOGIN_COOLDOWN_PREFIX = "login_cooldown|";
 
