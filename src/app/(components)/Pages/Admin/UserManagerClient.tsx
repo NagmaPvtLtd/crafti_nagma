@@ -18,6 +18,7 @@ import getApiErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.uti
 import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import ErrorState from "../../utils/ErrorState";
 import PageWrapper from "../../utils/PageWrapper";
+import ContactModal from "../../utils/ContactModal";
 import UserAvatar from "../../utils/UserAvatar";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import { formatDateTime } from "../../../../utils/Formator/formatDateTime.util";
@@ -116,6 +117,10 @@ export default function UserManagerClient() {
   const [status, setStatus] = useState<UserStatus | "">("");
   const [page, setPage] = useState(1);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [contact, setContact] = useState<{
+    phone: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +211,7 @@ export default function UserManagerClient() {
         </div>
 
         {/* Summary + filters */}
-        <div className="mt-5 rounded-2xl border border-white/60 bg-white/85 py-4 backdrop-blur-sm sm:rounded-3xl sm:py-5">
+        <div className="mt-5 rounded-2xl  py-4  sm:rounded-3xl sm:py-5">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-rose-200/70 bg-rose-50/60 px-3 py-1 text-xs font-semibold text-rose-600">
               <UserCog className="h-3.5 w-3.5" />
@@ -324,7 +329,11 @@ export default function UserManagerClient() {
                       className="grid gap-3 px-4 py-4 sm:grid-cols-[1.5fr_1fr_auto] sm:items-center sm:gap-4 sm:px-5"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <UserAvatar name={user.name} image={user.image} size={36} />
+                        <UserAvatar
+                          name={user.name}
+                          image={user.image}
+                          size={36}
+                        />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-stone-900">
                             {user.name}
@@ -338,61 +347,75 @@ export default function UserManagerClient() {
                             {user.email}
                           </p>
                           {user.phone && (
-                            <p className="text-[11px] text-stone-400">
-                              {user.phone}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setContact({
+                                  phone: user.phone!,
+                                  name: user.name,
+                                })
+                              }
+                              aria-label={`Contact ${user.name}`}
+                              className="cursor-pointer text-left text-[11px] text-stone-400 underline-offset-2 transition-colors hover:text-rose-600 hover:underline"
+                            >
+                              +91 {user.phone}
+                            </button>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                        <span
-                          className={`rounded-full border px-2 py-0.5 font-semibold ${ROLE_STYLES[user.role]}`}
-                        >
-                          {ROLE_LABELS[user.role]}
-                        </span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 font-semibold capitalize ${STATUS_STYLES[user.status]}`}
-                        >
-                          {user.status}
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-semibold ${
-                            user.profileCompleted
-                              ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200/70 bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {user.profileCompleted ? (
-                            <CheckCircle2 className="h-2.5 w-2.5" />
-                          ) : (
-                            <AlertCircle className="h-2.5 w-2.5" />
-                          )}
-                          {user.profileCompleted
-                            ? "Profile completed"
-                            : "Profile incomplete"}
-                        </span>
-                        {user.hasPassword && (
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                           <span
-                            title="Password sign-in enabled"
-                            className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-stone-500"
+                            className={`rounded-full border px-2 py-0.5 font-semibold ${ROLE_STYLES[user.role]}`}
                           >
-                            <KeyRound className="h-2.5 w-2.5" />
-                            Password
+                            {ROLE_LABELS[user.role]}
                           </span>
-                        )}
-                        {user.emailVerified && (
-                          <span className="inline-flex items-center gap-1 text-emerald-600">
-                            <CheckCircle2 className="h-2.5 w-2.5" />
-                            Verified
+                          <span
+                            className={`rounded-full border px-2 py-0.5 font-semibold capitalize ${STATUS_STYLES[user.status]}`}
+                          >
+                            {user.status}
                           </span>
-                        )}
-                        <span className="text-stone-400">
-                          Joined{" "}
-                          {formatDateTime(user.createdAt, {
-                            format: "date-long",
-                          })}
-                        </span>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-semibold ${
+                              user.profileCompleted
+                                ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200/70 bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {user.profileCompleted ? (
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                            ) : (
+                              <AlertCircle className="h-2.5 w-2.5" />
+                            )}
+                            {user.profileCompleted
+                              ? "Profile completed"
+                              : "Profile incomplete"}
+                          </span>
+                          {user.hasPassword && (
+                            <span
+                              title="Password sign-in enabled"
+                              className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-stone-500"
+                            >
+                              <KeyRound className="h-2.5 w-2.5" />
+                              Password
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px]">
+                          {user.emailVerified && (
+                            <span className="inline-flex items-center gap-1 text-emerald-600">
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              Verified
+                            </span>
+                          )}
+                          <span className="text-stone-400">
+                            Joined{" "}
+                            {formatDateTime(user.createdAt, {
+                              format: "date-long",
+                            })}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 sm:justify-self-end">
@@ -463,6 +486,12 @@ export default function UserManagerClient() {
           </div>
         )}
       </div>
+
+      <ContactModal
+        phone={contact?.phone ?? null}
+        contactName={contact?.name}
+        onClose={() => setContact(null)}
+      />
     </PageWrapper>
   );
 }

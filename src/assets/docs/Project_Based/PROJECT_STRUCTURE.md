@@ -399,7 +399,7 @@ Generated from the working tree (directories first, then files, both alphabetica
 | Admin clients | `src/app/(components)/Pages/Admin/` |
 | Customer dashboard clients | `src/app/(components)/Pages/Dashboard/` |
 | Shared shells / chrome | `src/app/(components)/` — `Footer`, `GoBack`, `CustomLoader`, `MetricChartCard`, `Navbar/`, `About/AboutLayout`, `Policy/PolicyLayout` |
-| Reusable UI + hooks | `src/app/(components)/utils/` — `PageWrapper`, `SectionDiv`, `ErrorState`, `ConfirmDialog`, `PhotoViewer`, `Form/`, `Hooks/useDebouncedValue`, `SocialIcons`, `WhatsappFloating` |
+| Reusable UI + hooks | `src/app/(components)/utils/` — `PageWrapper`, `SectionDiv`, `ErrorState`, `ConfirmDialog`, `ContactModal`, `UserAvatar`, `PhotoViewer`, `Form/`, `Hooks/useDebouncedValue`, `SocialIcons`, `WhatsappFloating` |
 | APIs | `src/app/api/{public,user,auth,manager,admin}/…/route.ts` |
 | Database | `src/lib/Database/` — `main.db.ts` (`getPool`), `connection.db.ts`, `index.db.ts`, `Migrations/*.sql`, `Dump/LATEST_SCHEMA.sql` |
 | Server utilities | `src/utils/` — `Auth`, `Api`, `Formator`, `Cart`, `Pricing`, `Slug`, `Tags`, `Imagekit`, `ValueFetcher`, `zod/` |
