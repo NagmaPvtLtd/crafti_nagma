@@ -41,12 +41,14 @@ export default function TagInput({
   max = MAX_TAGS,
   placeholder = "Type a tag and press Enter…",
   disabled = false,
+  excludedTagIds = [],
 }: {
   value: TagRef[];
   onChange: (tags: TagRef[]) => void;
   max?: number;
   placeholder?: string;
   disabled?: boolean;
+  excludedTagIds?: string[];
 }) {
   const [input, setInput] = useState("");
   const [pool, setPool] = useState<TagListItem[]>([]);
@@ -62,6 +64,10 @@ export default function TagInput({
   const selectedIds = useMemo(
     () => new Set(value.map((tag) => tag.id)),
     [value],
+  );
+  const excludedIds = useMemo(
+    () => new Set(excludedTagIds),
+    [excludedTagIds],
   );
   const atLimit = value.length >= max;
   const busy = creating || pasting;
@@ -109,7 +115,9 @@ export default function TagInput({
   const term = input.trim().toLowerCase();
 
   const suggestions = useMemo(() => {
-    const list = pool.filter((tag) => !selectedIds.has(tag.id));
+    const list = pool.filter(
+      (tag) => !selectedIds.has(tag.id) && !excludedIds.has(tag.id),
+    );
     if (!term) return list.slice(0, 8);
     return list
       .filter((tag) => tag.name.toLowerCase().includes(term))
@@ -119,7 +127,7 @@ export default function TagInput({
         return aStarts - bStarts || a.name.localeCompare(b.name);
       })
       .slice(0, 8);
-  }, [pool, selectedIds, term]);
+  }, [pool, selectedIds, excludedIds, term]);
 
   const exactMatch = useMemo(
     () => pool.find((tag) => tag.name.toLowerCase() === term) ?? null,
@@ -127,6 +135,11 @@ export default function TagInput({
   );
 
   function addTag(tag: TagRef) {
+    if (excludedIds.has(tag.id)) {
+      setInput("");
+      toast(`"${tag.name}" is already in the parent product's tags.`);
+      return;
+    }
     if (selectedIds.has(tag.id)) return;
     if (atLimit) {
       toast.error(`A product can carry at most ${max} tags`);
@@ -212,28 +225,53 @@ export default function TagInput({
     }
     if (wanted.length === 0) return;
 
+    const poolByName = new Map(
+      pool.map((tag) => [tag.name.toLowerCase(), tag] as const),
+    );
+    const chosenIds = new Set([
+      ...value.map((tag) => tag.id),
+      ...excludedIds,
+    ]);
+    const inheritedNames = new Set<string>();
+    const eligible = wanted.filter((name) => {
+      const known = poolByName.get(name.toLowerCase());
+      if (known && excludedIds.has(known.id)) {
+        inheritedNames.add(known.name);
+        return false;
+      }
+      return !known || !chosenIds.has(known.id);
+    });
+    if (eligible.length === 0) {
+      if (inheritedNames.size === 1) {
+        const [name] = inheritedNames;
+        toast(`"${name}" is already in the parent product's tags.`);
+      } else if (inheritedNames.size > 1) {
+        toast(
+          `${inheritedNames.size} tags are already in the parent product's tags.`,
+        );
+      }
+      return;
+    }
+
     const room = max - value.length;
     if (room <= 0) {
       toast.error(`A product can carry at most ${max} tags`);
       return;
     }
-    if (wanted.length > room) {
+    if (eligible.length > room) {
       toast.error(`A product can carry at most ${max} tags`);
     }
 
     shouldRefocusRef.current = inputRef.current === document.activeElement;
     setPasting(true);
 
-    const poolByName = new Map(
-      pool.map((tag) => [tag.name.toLowerCase(), tag] as const),
-    );
-    const chosenIds = new Set(value.map((tag) => tag.id));
     const added: TagRef[] = [];
     const poolAdditions: TagListItem[] = [];
     let failures = 0;
 
     try {
-      for (const name of wanted.slice(0, room)) {
+      for (const name of eligible) {
+        if (added.length >= room) break;
         const known = poolByName.get(name.toLowerCase());
         if (known) {
           if (!chosenIds.has(known.id)) {
@@ -250,7 +288,9 @@ export default function TagInput({
             tag: TagRef;
           }>(TAGS_URL, { name }, { withCredentials: true });
           const created = res.data.tag;
-          if (!chosenIds.has(created.id)) {
+          if (excludedIds.has(created.id)) {
+            inheritedNames.add(created.name);
+          } else if (!chosenIds.has(created.id)) {
             chosenIds.add(created.id);
             added.push(created);
           }
@@ -275,6 +315,14 @@ export default function TagInput({
         ]);
       }
       if (added.length > 0) onChange([...value, ...added]);
+      if (inheritedNames.size === 1) {
+        const [name] = inheritedNames;
+        toast(`"${name}" is already in the parent product's tags.`);
+      } else if (inheritedNames.size > 1) {
+        toast(
+          `${inheritedNames.size} tags are already in the parent product's tags.`,
+        );
+      }
       if (failures > 0) {
         toast.error(
           failures === 1
@@ -445,8 +493,10 @@ export default function TagInput({
 
           {exactMatch && (
             <div className="flex items-center gap-1.5 border-t border-stone-100 px-3 py-1.5 text-[10px] text-emerald-600">
-              <Check className="h-3 w-3" />“{exactMatch.name}” already exists —
-              Enter selects it
+              <Check className="h-3 w-3" />“{exactMatch.name}”{" "}
+              {excludedIds.has(exactMatch.id)
+                ? "is already in the parent product's tags"
+                : "already exists — Enter selects it"}
             </div>
           )}
         </div>

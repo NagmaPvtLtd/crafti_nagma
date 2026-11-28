@@ -23,10 +23,12 @@ import { auditLog } from "../../../../../../../services/AuditLog.service";
 import { ImageKitService } from "../../../../../../../services/Imagekit.service";
 import { capitalizeFirst } from "../../../../../../../utils/Formator/capitalize.util";
 import {
+  excludeInheritedTagIds,
   loadProductTags,
   loadTagsByIds,
   loadVariantTags,
   pruneUnusedTags,
+  removeDuplicateVariantTagMappings,
   replaceTagMappings,
   uniqueTagIds,
 } from "../../../../../../../utils/Tags/tag.util";
@@ -434,7 +436,10 @@ export async function GET(
     /* Inherited tags come from the base product; additional tags are this
        variant's own mappings. They are never merged in the database. */
     const inheritedTags = await loadProductTags(conn, productId);
-    const additionalTags = await loadVariantTags(conn, variantId);
+    const inheritedTagIds = new Set(inheritedTags.map((tag) => tag.id));
+    const additionalTags = (await loadVariantTags(conn, variantId)).filter(
+      (tag) => !inheritedTagIds.has(tag.id),
+    );
 
     const payload: VariantDetailResponse = {
       ok: true,
@@ -585,7 +590,7 @@ export async function GET(
  *                                the flag on its siblings, so a product has at most one
  * @body {boolean} [mainShowcase] - Main showcase flag (default: false)
  * @body {string[]} [tagIds] - Full replacement of the variant's own additional tags (max 15,
- *                            10-40 chars each; inherited base tags are never written here)
+ *                            10-40 chars each; inherited base tags are dropped before writing)
  *
  * @returns {Promise<NextResponse>} JSON response with:
  *   - ok: `true`
@@ -687,7 +692,12 @@ export async function PUT(
        mappings; inherited base tags are never written here. */
     let tagIds: string[] | null = null;
     if (data.tagIds) {
-      tagIds = uniqueTagIds(data.tagIds);
+      const inheritedTags = await loadProductTags(conn, productId);
+      const inheritedTagIds = new Set(inheritedTags.map((tag) => tag.id));
+      tagIds = excludeInheritedTagIds(
+        uniqueTagIds(data.tagIds),
+        inheritedTagIds,
+      );
       if (tagIds.length > 0) {
         const tags = await loadTagsByIds(conn, tagIds);
         if (tags.size !== tagIds.length) {
@@ -949,6 +959,8 @@ export async function PUT(
           now,
         );
       }
+
+      await removeDuplicateVariantTagMappings(conn, productId);
 
       await conn.query(
         `UPDATE products SET updated_by = ?, updated_at = ? WHERE id = ?`,

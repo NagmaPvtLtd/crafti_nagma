@@ -22,6 +22,7 @@ import CartBadge from "./CartBadge";
 import { getSectionsForRole, type NavLink } from "./navLinks";
 import CraftiNagmaPNG from "../../../assets/images/logo_png_v1.png";
 import { SectionDivider } from "../utils/SectionDiv";
+import UserAvatar from "../utils/UserAvatar";
 import { useDebouncedValue } from "../utils/Hooks/useDebouncedValue";
 
 type Props = { user: SessionUserClient | null };
@@ -205,7 +206,7 @@ export default function NavbarClient({ user }: Props) {
                   aria-expanded={isMobile ? mobileOpen : userMenuOpen}
                   className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 pr-2 transition hover:bg-rose-50/60"
                 >
-                  <Avatar name={user.name} image={user.image} size={30} />
+                  <UserAvatar name={user.name} image={user.image} size={30} />
                   <ChevronDown
                     size={13}
                     className={`hidden text-stone-400 transition-transform sm:block ${
@@ -351,7 +352,7 @@ export default function NavbarClient({ user }: Props) {
                 aria-hidden
                 className="pointer-events-none absolute -top-8 -right-8 h-20 w-20 rounded-full bg-rose-200/50 blur-2xl"
               />
-              <Avatar name={user.name} image={user.image} size={40} />
+              <UserAvatar name={user.name} image={user.image} size={40} />
               <div className="relative min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-stone-900">
                   {user.name}
@@ -429,43 +430,6 @@ export default function NavbarClient({ user }: Props) {
         </nav>
       </div>
     </>
-  );
-}
-
-function Avatar({
-  name,
-  image,
-  size,
-}: {
-  name: string;
-  image: string | null;
-  size: number;
-}) {
-  const [failed, setFailed] = useState(false);
-  const initials = (name || "?").charAt(0).toUpperCase();
-
-  if (!image || failed) {
-    return (
-      <span
-        style={{ width: size, height: size }}
-        className="flex shrink-0 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-xs font-medium text-rose-500"
-      >
-        {initials}
-      </span>
-    );
-  }
-
-  return (
-    <Image
-      src={image}
-      alt={name}
-      width={size}
-      height={size}
-      loading={"eager"}
-      onError={() => setFailed(true)}
-      className="shrink-0 rounded-full border border-rose-200 object-cover"
-      style={{ width: size, height: size }}
-    />
   );
 }
 

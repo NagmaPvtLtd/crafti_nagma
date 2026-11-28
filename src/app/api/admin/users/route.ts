@@ -33,7 +33,8 @@ interface UserListRow extends RowDataPacket {
   role: UserRole;
   status: UserStatus;
   email_verified: 0 | 1;
-  google_id: string | null;
+  profile_completed: 0 | 1;
+  image: string | null;
   password_hash: string | null;
   created_at: string;
 }
@@ -104,7 +105,7 @@ function isMember(allowed: readonly string[], value: string): boolean {
  *   - query: the effective `search`, `role`, `status`, `page` and `limit`
  *   - pagination: `page`, `limit`, `total` and `totalPages`
  *   - users: rows with `id`, `name`, `email`, `phone`, `role`, `status`, `emailVerified`,
- *            `hasGoogle`, `hasPassword` and `createdAt`
+ *            `profileCompleted`, `image`, `hasPassword` and `createdAt`, sorted A-Z by name
  *   - facets: `roles` and `statuses`, each with a `value` and `count`
  *
  * @throws {401} Unauthorized - No session
@@ -119,7 +120,7 @@ function isMember(allowed: readonly string[], value: string): boolean {
  *   5. Initialize the database pool
  *   6. Build the `WHERE` list from the trimmed search and the exact filters
  *   7. Count matching rows with the same conditions
- *   8. Select the page slice newest first, mapping `hasGoogle` and `hasPassword`
+ *   8. Select the page slice A-Z by display name, mapping auth and profile fields
  *   9. Load role and status facet counts over the whole table
  *   10. Return 200 response with scope, query, pagination, users and facets
  */
@@ -185,12 +186,13 @@ export async function GET(req: NextRequest) {
          u.role,
          u.status,
          u.email_verified,
-         u.google_id,
+         u.profile_completed,
+         u.google_profile_picture AS image,
          u.password_hash,
          u.created_at
        FROM users u
        ${whereSql}
-       ORDER BY u.created_at DESC, u.id DESC
+       ORDER BY ${USER_NAME_EXPR} ASC, u.id ASC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
@@ -223,7 +225,8 @@ export async function GET(req: NextRequest) {
           role: row.role,
           status: row.status,
           emailVerified: Boolean(row.email_verified),
-          hasGoogle: row.google_id !== null,
+          profileCompleted: Boolean(row.profile_completed),
+          image: row.image,
           hasPassword: row.password_hash !== null,
           createdAt: row.created_at,
         })),

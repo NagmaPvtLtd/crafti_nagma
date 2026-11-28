@@ -42,8 +42,9 @@ function isValidIndianMobile(phone: string): boolean {
  * @async
  * @function POST
  * @description Validates the body with `profileUpdateSchema` (required name, phone, address,
- *              city, state and 6-digit pincode; optional GSTIN; password rules only apply
- *              while any password field is filled) and writes the caller's own `users` row.
+ *              city, state and 6-digit pincode; company, GSTIN and password are optional) and
+ *              writes the caller's own `users` row. `profile_completed` is computed from
+ *              every mandatory profile field and is only true when all are filled.
  *              A password change requires the current password when one already exists, is
  *              compared with bcrypt, and is stored as a bcrypt hash with cost 12.
  *              A password change revokes the account's other device sessions and keeps
@@ -227,6 +228,18 @@ export async function POST(req: NextRequest) {
         ? false
         : Boolean(dbUser.phone_verified);
 
+    const profileCompleted = [
+      data.first_name,
+      data.last_name,
+      data.phone,
+      data.address_line_1,
+      data.address_line_2,
+      data.landmark,
+      data.city,
+      data.state,
+      data.postal_code,
+    ].every((value) => value.trim().length > 0);
+
     const now = getCurrentDateTime();
 
     /* ---- update ---- */
@@ -246,6 +259,7 @@ export async function POST(req: NextRequest) {
               company_name      = ?,
               gstin             = ?,
               password_hash     = ?,
+              profile_completed = ?,
               updated_at        = ?
         WHERE id = ?`,
       [
@@ -263,6 +277,7 @@ export async function POST(req: NextRequest) {
         data.company_name || null,
         data.gstin || null,
         passwordHash,
+        profileCompleted,
         now,
         dbUser.id,
       ],

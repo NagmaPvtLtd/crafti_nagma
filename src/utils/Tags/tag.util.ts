@@ -60,6 +60,14 @@ export function uniqueTagIds(tagIds: string[]): string[] {
   return [...new Set(tagIds.map((id) => id.trim()).filter(Boolean))];
 }
 
+/** Removes tags already inherited from the variant's base product. */
+export function excludeInheritedTagIds(
+  tagIds: string[],
+  inheritedTagIds: ReadonlySet<string>,
+): string[] {
+  return tagIds.filter((tagId) => !inheritedTagIds.has(tagId));
+}
+
 /**
  * Loads every tag referenced by the given ids.
  * Returns a map keyed by id — a missing id simply never appears in it, so
@@ -157,4 +165,25 @@ export async function loadVariantTags(
     [variantId],
   );
   return rows.map((row) => ({ id: row.id, name: row.name, slug: row.slug }));
+}
+
+/** Removes variant mappings that duplicate a tag inherited from their product. */
+export async function removeDuplicateVariantTagMappings(
+  db: TagDb,
+  productId: string,
+): Promise<number> {
+  const [result] = await db.query<ResultSetHeader>(
+    `DELETE FROM product_variant_tag_mappings
+      WHERE EXISTS (
+              SELECT 1
+                FROM product_variants v
+                JOIN product_tag_mappings ptm
+                  ON ptm.product_id = v.product_id
+               WHERE v.id = product_variant_tag_mappings.variant_id
+                 AND v.product_id = ?
+                 AND ptm.tag_id = product_variant_tag_mappings.tag_id
+            )`,
+    [productId],
+  );
+  return result.affectedRows ?? 0;
 }
