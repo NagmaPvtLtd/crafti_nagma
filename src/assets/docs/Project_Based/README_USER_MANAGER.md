@@ -33,8 +33,9 @@ directly.
 
 ## What the screen shows
 
-- Display name, email, phone, role badge, status badge, Google/password sign-in
-  badges, verified mark and join date.
+- Stored profile photo with initials fallback, display name, email, phone, role,
+  status, profile-completion badge, password badge, verified mark and join date.
+- Accounts are sorted A-Z by display name.
 - Facet counts for roles and statuses, total account count.
 - Filters: free-text search (name, email, phone), role, status; 25 per page.
 - The caller's own row is marked "(you)" and its controls are disabled.

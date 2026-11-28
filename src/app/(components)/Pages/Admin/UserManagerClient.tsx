@@ -3,8 +3,8 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   CheckCircle2,
-  Globe,
   KeyRound,
   RefreshCw,
   Search,
@@ -18,6 +18,7 @@ import getApiErrorMessage from "../../../../utils/Auth/Auth.axiosErrorHelper.uti
 import { useDebouncedValue } from "../../utils/Hooks/useDebouncedValue";
 import ErrorState from "../../utils/ErrorState";
 import PageWrapper from "../../utils/PageWrapper";
+import UserAvatar from "../../utils/UserAvatar";
 import { SectionDivider, SectionEyebrow } from "../../utils/SectionDiv";
 import { formatDateTime } from "../../../../utils/Formator/formatDateTime.util";
 import { USER_ROLES } from "../../../../utils/zod/admin/userManager.zod";
@@ -61,7 +62,8 @@ type AdminUser = {
   role: UserRole;
   status: UserStatus;
   emailVerified: boolean;
-  hasGoogle: boolean;
+  profileCompleted: boolean;
+  image: string | null;
   hasPassword: boolean;
   createdAt: string;
 };
@@ -204,7 +206,7 @@ export default function UserManagerClient() {
         </div>
 
         {/* Summary + filters */}
-        <div className="mt-5 rounded-2xl border border-white/60 bg-white/85 p-4 backdrop-blur-sm sm:rounded-3xl sm:p-5">
+        <div className="mt-5 rounded-2xl border border-white/60 bg-white/85 py-4 backdrop-blur-sm sm:rounded-3xl sm:py-5">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-rose-200/70 bg-rose-50/60 px-3 py-1 text-xs font-semibold text-rose-600">
               <UserCog className="h-3.5 w-3.5" />
@@ -322,9 +324,7 @@ export default function UserManagerClient() {
                       className="grid gap-3 px-4 py-4 sm:grid-cols-[1.5fr_1fr_auto] sm:items-center sm:gap-4 sm:px-5"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-rose-200/70 bg-rose-50 text-xs font-semibold text-rose-600 uppercase">
-                          {user.name.slice(0, 1)}
-                        </span>
+                        <UserAvatar name={user.name} image={user.image} size={36} />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-stone-900">
                             {user.name}
@@ -356,15 +356,22 @@ export default function UserManagerClient() {
                         >
                           {user.status}
                         </span>
-                        {user.hasGoogle && (
-                          <span
-                            title="Signed up with Google"
-                            className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-stone-500"
-                          >
-                            <Globe className="h-2.5 w-2.5" />
-                            Google
-                          </span>
-                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-semibold ${
+                            user.profileCompleted
+                              ? "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+                              : "border-amber-200/70 bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {user.profileCompleted ? (
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                          ) : (
+                            <AlertCircle className="h-2.5 w-2.5" />
+                          )}
+                          {user.profileCompleted
+                            ? "Profile completed"
+                            : "Profile incomplete"}
+                        </span>
                         {user.hasPassword && (
                           <span
                             title="Password sign-in enabled"
@@ -382,7 +389,9 @@ export default function UserManagerClient() {
                         )}
                         <span className="text-stone-400">
                           Joined{" "}
-                          {formatDateTime(user.createdAt, { format: "date-long" })}
+                          {formatDateTime(user.createdAt, {
+                            format: "date-long",
+                          })}
                         </span>
                       </div>
 
