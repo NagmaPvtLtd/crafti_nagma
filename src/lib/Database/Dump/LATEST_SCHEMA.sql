@@ -25,12 +25,21 @@ CREATE TABLE users (
     role ENUM('super_admin', 'admin', 'manager', 'customer') DEFAULT 'customer',
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     profile_completed BOOLEAN DEFAULT FALSE,
-    session_id CHAR(40) DEFAULT NULL,
     cooldown_till DATETIME DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+-- ===========================================================
+-- User Sessions (one active row per signed-in device)
+-- ===========================================================
+CREATE TABLE user_sessions (
+    session_id CHAR(40) NOT NULL PRIMARY KEY,
+    user_id CHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_user_sessions_user_created (user_id, created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 -- ===========================================================
 -- Categories

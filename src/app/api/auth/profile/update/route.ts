@@ -5,7 +5,6 @@ import { profileUpdateSchema } from "../../../../../utils/zod/auth.profile.zod";
 import { getPool } from "../../../../../lib/Database/main.db";
 import { UserRow } from "../../../../../types/User/UserRow.types";
 import { getCurrentDateTime } from "../../../../../utils/ValueFetcher/getDateTime.util";
-import { generateULID } from "../../../../../utils/generateULID.util";
 import { auditLog } from "../../../../../services/AuditLog.service";
 
 /* Indian mobile — same shape as the zod preprocess step, kept local so the
@@ -39,6 +38,8 @@ function isValidIndianMobile(phone: string): boolean {
  *              while any password field is filled) and writes the caller's own `users` row.
  *              A password change requires the current password when one already exists, is
  *              compared with bcrypt, and is stored as a bcrypt hash with cost 12.
+ *              A password change revokes the account's other device sessions and keeps
+ *              the current device signed in.
  *              `phone_verified` becomes true only for a valid new Indian mobile, false when the
  *              phone is cleared, and otherwise keeps its stored value.
  *
@@ -80,10 +81,12 @@ function isValidIndianMobile(phone: string): boolean {
  *   8. Derive `phone_verified`: true for a valid Indian mobile, false when cleared, else keep
  *   9. Timestamp the update with `getCurrentDateTime`
  *   10. Update the profile columns on `users` (empty values stored as `NULL`)
- *   11. Write an UPDATE / USER audit entry listing the changed `phone` / `password` fields,
+ *   11. On a password change, delete every other row from `user_sessions` while keeping
+ *       the current device's row; a legacy token without a session id clears them all
+ *   12. Write an UPDATE / USER audit entry listing the changed `phone` / `password` fields,
  *       swallowing any audit error
- *   12. Return 200 response with `{ ok: true }`
- *   13. Release the connection in `finally`
+ *   13. Return 200 response with `{ ok: true }`
+ *   14. Release the connection in `finally`
  */
 export async function POST(req: NextRequest) {
   /* ---- auth ---- */
@@ -216,13 +219,18 @@ export async function POST(req: NextRequest) {
     );
 
     if (wantsPasswordChange) {
-      /* A password change is the only thing that rotates the shared session
-         generation: every device signed into the account (including this
-         one) is signed out on its next protected request. */
-      await conn.query(`UPDATE users SET session_id = ? WHERE id = ?`, [
-        generateULID({ prefix: "sess", maxLength: 40 }),
-        dbUser.id,
-      ]);
+      const currentSessionId = guard.session.user.session_id;
+      if (currentSessionId) {
+        await conn.query(
+          `DELETE FROM user_sessions
+            WHERE user_id = ? AND session_id <> ?`,
+          [dbUser.id, currentSessionId],
+        );
+      } else {
+        await conn.query(`DELETE FROM user_sessions WHERE user_id = ?`, [
+          dbUser.id,
+        ]);
+      }
     }
 
     /* ---- audit ---- */

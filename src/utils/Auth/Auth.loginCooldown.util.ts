@@ -4,7 +4,10 @@
  */
 
 /** Consecutive wrong passwords before a cooldown starts. */
-export const MAX_FAILED_PASSWORD_ATTEMPTS = 7;
+export const MAX_FAILED_PASSWORD_ATTEMPTS = 5;
+
+/** Wrong-password attempt where the frontend warning starts. */
+export const WRONG_PASSWORD_WARNING_AFTER = 3;
 
 /** Cooldown length after too many wrong passwords. */
 export const LOGIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -12,13 +15,43 @@ export const LOGIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 /** Marks a thrown credentials error whose suffix is already user-facing text. */
 export const LOGIN_COOLDOWN_PREFIX = "login_cooldown|";
 
+/** Marks a thrown credentials error for a wrong-password attempt warning. */
+export const LOGIN_WRONG_PASSWORD_PREFIX = "login_wrong_password|";
+
+/**
+ * Builds the wrong-password warning shown before the cooldown threshold.
+ *
+ * @function wrongPasswordWarning
+ * @param {number} attempts - Consecutive wrong-password count
+ *
+ * @returns {string} User-facing attempt warning
+ */
+export function wrongPasswordWarning(attempts: number): string {
+  const remaining = MAX_FAILED_PASSWORD_ATTEMPTS - attempts;
+  const attemptLabel = remaining === 1 ? "attempt" : "attempts";
+  return `Incorrect password — ${attempts} of ${MAX_FAILED_PASSWORD_ATTEMPTS} attempts used. ${remaining} ${attemptLabel} left.`;
+}
+
+/**
+ * Builds the prefixed credentials error for a wrong-password warning.
+ *
+ * @function wrongPasswordError
+ * @param {number} attempts - Consecutive wrong-password count
+ *
+ * @returns {string} Prefixed error message
+ */
+export function wrongPasswordError(attempts: number): string {
+  return `${LOGIN_WRONG_PASSWORD_PREFIX}${wrongPasswordWarning(attempts)}`;
+}
+
 /**
  * Reads a MySQL DATETIME value into a Date.
  *
  * @function toDate
  * @description `mysql2` returns DATETIME as a Date by default, but a string comes
- *              back when `dateStrings` is on. Both forms are accepted; anything
- *              unparseable becomes `null`.
+ *              back when `dateStrings` is on. Raw MySQL strings are interpreted as
+ *              UTC, matching the app's DATETIME writes; anything unparseable becomes
+ *              `null`.
  *
  * @param {string | Date | null | undefined} value - Raw column value
  *
@@ -26,7 +59,13 @@ export const LOGIN_COOLDOWN_PREFIX = "login_cooldown|";
  */
 function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const trimmed = value.trim();
+  const mysqlLike = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/.test(trimmed);
+  const date = new Date(mysqlLike ? `${trimmed.replace(" ", "T")}Z` : trimmed);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -92,9 +131,7 @@ export function cooldownError(
   value: string | Date | null | undefined,
 ): string | null {
   const till = activeCooldown(value);
-  return till
-    ? `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}`
-    : null;
+  return till ? `${LOGIN_COOLDOWN_PREFIX}${loginCooldownMessage(till)}` : null;
 }
 
 /**
@@ -112,4 +149,21 @@ export function parseCooldownError(
 ): string | null {
   if (!error?.startsWith(LOGIN_COOLDOWN_PREFIX)) return null;
   return error.slice(LOGIN_COOLDOWN_PREFIX.length);
+}
+
+/**
+ * Extracts the user-facing sentence from a wrong-password warning error.
+ *
+ * @function parseWrongPasswordError
+ * @description Used by the login page on the error returned by `signIn`.
+ *
+ * @param {string | null | undefined} error - Error string from NextAuth
+ *
+ * @returns {string | null} Sentence to show, or null for other errors
+ */
+export function parseWrongPasswordError(
+  error: string | null | undefined,
+): string | null {
+  if (!error?.startsWith(LOGIN_WRONG_PASSWORD_PREFIX)) return null;
+  return error.slice(LOGIN_WRONG_PASSWORD_PREFIX.length);
 }

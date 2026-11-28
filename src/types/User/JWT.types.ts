@@ -8,7 +8,7 @@ export interface MyJWT {
   role?: UserRole;
   status?: UserStatus;
   profile_completed?: boolean;
-  /** Session currently allowed for this account; rotated on sign-in. */
+  /** This device's session row in user_sessions. */
   session_id?: string | null;
   [key: string]: unknown;
 }

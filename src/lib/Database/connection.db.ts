@@ -1,4 +1,3 @@
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import mysql from "mysql2/promise";
 import { getProduction } from "../../utils/ValueFetcher/getProduction.util";
@@ -62,10 +61,7 @@ export async function ensureDatabaseExists() {
       ssl: dbSsl,
     });
 
-    const [rows] = await connection.query(
-      "SHOW DATABASES LIKE ?",
-      [dbName],
-    );
+    const [rows] = await connection.query("SHOW DATABASES LIKE ?", [dbName]);
 
     if ((rows as any[]).length === 0) {
       await connection.query(`CREATE DATABASE \`${dbName}\``);
